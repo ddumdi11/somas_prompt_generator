@@ -1,0 +1,27 @@
+# CodeRabbit Configuration
+# https://docs.coderabbit.ai/guides/configure-coderabbit
+
+language: "de"
+
+reviews:
+  # Review-Einstellungen
+  request_changes_workflow: true
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+
+  # Auto-Review bei PRs
+  auto_review:
+    enabled: true
+    drafts: false
+
+  # Pfade die ignoriert werden sollen
+  path_filters:
+    - "!**/*.md"
+    - "!**/*.txt"
+    - "!.gitignore"
+    - "!LICENSE"
+
+chat:
+  auto_reply: true
