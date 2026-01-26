@@ -1,0 +1,41 @@
+Analysiere das folgende YouTube-Video nach dem SOMAS-Schema (Source Overview Mapping And extraction Schema).
+
+KONFIGURATION:
+- Tiefe: {{ depth }} ({{ depth_description }})
+- Abschnitte: FRAMING, KERNTHESE, ELABORATION, IMPLIKATION + 1 passendes Erweiterungsmodul
+- Sprache: {{ language }}
+{% if time_range %}- Zeitbereich: Analysiere AUSSCHLIESSLICH {{ time_range.start }} bis {{ time_range.end }}
+{% endif %}
+MODUL-AUSWAHL:
+Wähle das Erweiterungsmodul basierend auf dem Inhalt:
+- KRITIK (bei werblichen/einseitigen Inhalten)
+- OFFENE_FRAGEN (bei komplexen/unvollständigen Themen)
+- ZITATE (bei Interviews mit starken O-Tönen)
+- VERBINDUNGEN (bei Themen mit historischen Bezügen)
+
+OUTPUT-FORMAT:
+Erstelle genau 5 Absätze mit jeweils {{ sentences_per_section }} Sätzen. Verwende folgende Struktur:
+
+### FRAMING
+[Wer spricht, welches Format, welcher Kontext – {{ sentences_per_section }} Sätze]
+
+### KERNTHESE
+[Zentrale Aussage oder Position des Inhalts – {{ sentences_per_section }} Sätze]
+
+### ELABORATION
+[Vertiefung, Mechanismen, Belege oder Wendepunkte – {{ sentences_per_section }} Sätze]
+
+### IMPLIKATION
+[Fazit, Empfehlung, Zielgruppe, Bedeutung – {{ sentences_per_section }} Sätze]
+
+### [GEWÄHLTES MODUL]
+[Inhalt des gewählten Erweiterungsmoduls – {{ sentences_per_section }} Sätze]
+
+QUELLE:
+YouTube-Video: "{{ video_title }}" von {{ channel_name }}
+URL: {{ video_url }}
+{% if questions %}
+---
+WICHTIG: Analysiere ZUERST das Video vollständig. Anschlussfragen werden NACH der Analyse bearbeitet:
+{{ questions }}
+{% endif %}

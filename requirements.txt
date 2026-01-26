@@ -1,0 +1,18 @@
+# SOMAS Prompt Generator - Dependencies
+# Python 3.11+
+
+# GUI Framework
+PyQt6>=6.4.0
+
+# YouTube Integration
+youtube-transcript-api>=0.6.0    # Transkript-Zugriff (wie NotebookLM)
+yt-dlp>=2024.1.0                 # Metadaten-Extraktion (Titel, Kanal, Dauer)
+
+# Template Engine (für Prompt-Generierung)
+Jinja2>=3.1.0
+
+# PDF Export (später)
+# reportlab>=4.0.0
+
+# Testing
+pytest>=7.0.0
