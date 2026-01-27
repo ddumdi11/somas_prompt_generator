@@ -4,14 +4,16 @@ import logging
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QTextEdit, QMessageBox,
-    QFrame, QApplication
+    QFrame, QApplication, QComboBox
 )
 from PyQt6.QtCore import Qt, pyqtSlot
 from PyQt6.QtGui import QFont
 
 from src.config.defaults import VideoInfo, SomasConfig
 from src.core.youtube_client import get_video_info
-from src.core.prompt_builder import build_prompt
+from src.core.prompt_builder import (
+    build_prompt, load_presets, get_preset_by_name, PromptPreset
+)
 from src.core.linkedin_formatter import format_for_linkedin
 from src.core.export import export_to_markdown
 
@@ -26,9 +28,12 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.video_info: VideoInfo | None = None
         self.config = SomasConfig()
+        self.presets = load_presets()
+        self.current_preset: PromptPreset | None = None
 
         self._setup_ui()
         self._connect_signals()
+        self._on_preset_changed()  # Initialisiere mit erstem Preset
 
     def _setup_ui(self):
         """Initialisiert das UI-Layout."""
@@ -50,6 +55,9 @@ class MainWindow(QMainWindow):
 
         # Fragen-Sektion
         main_layout.addWidget(self._create_questions_section())
+
+        # Preset-Auswahl
+        main_layout.addLayout(self._create_preset_section())
 
         # Generate Button
         self.btn_generate = QPushButton("Generate Prompt")
@@ -122,6 +130,45 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.questions_text)
 
         return frame
+
+    def _create_preset_section(self) -> QHBoxLayout:
+        """Erstellt die Preset-Auswahl mit Lesezeit-Anzeige."""
+        layout = QHBoxLayout()
+
+        # Preset-Label
+        label = QLabel("Variante:")
+        label.setMinimumWidth(60)
+        layout.addWidget(label)
+
+        # Preset-Dropdown
+        self.preset_combo = QComboBox()
+        self.preset_combo.setMinimumWidth(150)
+        for preset in self.presets.values():
+            self.preset_combo.addItem(preset.name)
+        layout.addWidget(self.preset_combo)
+
+        # Preset-Beschreibung
+        self.preset_description = QLabel("")
+        self.preset_description.setStyleSheet("color: gray; font-style: italic;")
+        layout.addWidget(self.preset_description)
+
+        layout.addStretch()
+
+        # Lesezeit-Anzeige
+        self.reading_time_label = QLabel("")
+        self.reading_time_label.setStyleSheet(
+            "background-color: #e8f4e8; padding: 4px 8px; border-radius: 4px;"
+        )
+        layout.addWidget(self.reading_time_label)
+
+        # Max-Zeichen-Anzeige
+        self.max_chars_label = QLabel("")
+        self.max_chars_label.setStyleSheet(
+            "background-color: #e8e8f4; padding: 4px 8px; border-radius: 4px;"
+        )
+        layout.addWidget(self.max_chars_label)
+
+        return layout
 
     def _create_prompt_section(self) -> QFrame:
         """Erstellt den Prompt-Ausgabebereich."""
@@ -201,9 +248,29 @@ class MainWindow(QMainWindow):
         self.btn_copy_prompt.clicked.connect(self._on_copy_prompt)
         self.btn_paste_result.clicked.connect(self._on_paste_result)
         self.url_input.returnPressed.connect(self._on_get_meta)
+        # Preset-Dropdown
+        self.preset_combo.currentTextChanged.connect(self._on_preset_changed)
         # Export-Buttons
         self.btn_export_linkedin.clicked.connect(self._on_export_linkedin)
         self.btn_export_markdown.clicked.connect(self._on_export_markdown)
+
+    @pyqtSlot()
+    def _on_preset_changed(self):
+        """Handler für Preset-Auswahl."""
+        preset_name = self.preset_combo.currentText()
+        self.current_preset = get_preset_by_name(preset_name)
+
+        if self.current_preset:
+            # Beschreibung aktualisieren
+            self.preset_description.setText(self.current_preset.description)
+            # Lesezeit aktualisieren
+            self.reading_time_label.setText(
+                f"Lesezeit: {self.current_preset.reading_time_display}"
+            )
+            # Max-Zeichen aktualisieren
+            self.max_chars_label.setText(
+                f"Max: {self.current_preset.max_chars:,} Zeichen".replace(",", ".")
+            )
 
     @pyqtSlot()
     def _on_get_meta(self):
@@ -242,8 +309,16 @@ class MainWindow(QMainWindow):
             return
 
         questions = self.questions_text.toPlainText()
-        prompt = build_prompt(self.video_info, self.config, questions)
+
+        # Verwende das ausgewählte Preset
+        preset_name = self.current_preset.name if self.current_preset else None
+        prompt = build_prompt(self.video_info, self.config, questions, preset_name)
         self.prompt_text.setText(prompt)
+
+        # Zeige Zeichenzahl im Prompt-Header
+        char_count = len(prompt)
+        max_chars = self.current_preset.max_chars if self.current_preset else 2800
+        logger.info(f"Prompt generiert: {char_count} Zeichen (Max: {max_chars})")
 
     @pyqtSlot()
     def _on_copy_prompt(self):

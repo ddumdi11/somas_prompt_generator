@@ -1,0 +1,51 @@
+{
+  "version": "1.0",
+  "author": "SOMAS Team (Claude.ai + Gemini + Thorsten)",
+  "module_logic": "Select one module based on content: KRITIK (bias/ads), OFFENE_FRAGEN (complexity), ZITATE (interviews), or VERBINDUNGEN (history/context).",
+  "api_settings": {
+    "temperature": 0.4,
+    "stop_sequences": ["###"]
+  },
+  "presets": {
+    "standard": {
+      "id": "std_01",
+      "name": "Standard",
+      "description": "Detaillierte Analyse für Wissensmanagement und Recherche.",
+      "max_chars": 2800,
+      "sentences_per_section": 3,
+      "reading_time_seconds": 90,
+      "system_prompt": "Role: Expert Video Analyst. Output: SOMAS-Schema in German. Sections: FRAMING, KERNTHESE, ELABORATION, IMPLIKATION, [MODULE]. Constraints: Exactly 3 short sentences per section. No intro/outro. Direct start with '### FRAMING'. Follow-up question: Max 4 sentences.",
+      "template_file": "somas_standard.txt"
+    },
+    "linkedin": {
+      "id": "li_02",
+      "name": "LinkedIn",
+      "description": "Optimiert für Social Media mit Fokus auf Storytelling und Hook.",
+      "max_chars": 2200,
+      "sentences_per_section": 3,
+      "reading_time_seconds": 60,
+      "system_prompt": "Role: Social Media Content Strategist. Output: SOMAS-Schema in German. Sections: FRAMING, KERNTHESE (written as a catchy 'Hook'), ELABORATION, IMPLIKATION, [MODULE]. Constraints: Exactly 3 punchy sentences per section. Use active voice. No intro/outro. Follow-up question: Max 3 sentences.",
+      "template_file": "somas_linkedin.txt"
+    },
+    "minimal": {
+      "id": "min_03",
+      "name": "Minimal",
+      "description": "Quick Scan Modus für mobile Ansichten und schnellen Überblick.",
+      "max_chars": 800,
+      "sentences_per_section": 1,
+      "reading_time_seconds": 20,
+      "system_prompt": "Role: Ultra-Concise Summarizer. Output: SOMAS-Schema in German. Sections: FRAMING, KERNTHESE, ELABORATION, IMPLIKATION, [MODULE]. Constraints: Exactly ONE precise sentence per section. Absolute focus on core facts. No intro/outro. Follow-up question: Max 2 sentences.",
+      "template_file": "somas_minimal.txt"
+    },
+    "academia": {
+      "id": "acad_04",
+      "name": "Academia",
+      "description": "Wissenschaftliche Analyse mit Fokus auf Methodik und Evidenz.",
+      "max_chars": 3000,
+      "sentences_per_section": 4,
+      "reading_time_seconds": 120,
+      "system_prompt": "Role: Academic Researcher & Peer-Reviewer. Output: SOMAS-Schema in German. Sections: FRAMING (Source/Context), KERNTHESE (Primary Hypothesis), ELABORATION (Evidence/Data/Mechanisms), IMPLIKATION (Scientific Impact/Future Research), [MODULE]. Constraints: Formal, objective tone. Exactly 4 precise sentences per section for higher depth. Focus on reproducibility and logical consistency. No intro/outro. Follow-up question: Technical/Academic focus, max 5 sentences.",
+      "template_file": "somas_academia.txt"
+    }
+  }
+}
