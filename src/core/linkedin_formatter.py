@@ -152,6 +152,10 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
                 result_lines.append('')
             continue
 
+        # SOMAS-Header am Zeilenanfang entfernen (auch mit nachfolgendem Text)
+        for header in somas_headers:
+            line = re.sub(rf'^{header}\s*:\s*', '', line, flags=re.IGNORECASE)
+
         # Markdown Links: [text](url) → text (url)
         line = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1 (\2)', line)
 
