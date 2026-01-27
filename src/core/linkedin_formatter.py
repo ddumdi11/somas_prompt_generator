@@ -58,10 +58,55 @@ def to_italic(text: str) -> str:
     return ''.join(UNICODE_ITALIC.get(c, c) for c in text)
 
 
-def format_for_linkedin(text: str) -> str:
+def create_post_header(title: str, channel: str) -> str:
+    """Erstellt den LinkedIn-Post-Header aus Video-Metadaten.
+
+    Format:
+        Video-Titel
+        Kanal, YT
+
+        SOMAS-Analyse
+
+    Args:
+        title: Video-Titel
+        channel: Kanal-Name
+
+    Returns:
+        Formatierter Header für LinkedIn-Post
+    """
+    return f"{title}\n{channel}, YT\n\nSOMAS-Analyse\n\n"
+
+
+def extract_analysis_body(text: str) -> str:
+    """Extrahiert den Analyse-Text ab FRAMING (ohne Einleitung).
+
+    Args:
+        text: Vollständiger Analyse-Text
+
+    Returns:
+        Text ab FRAMING (ohne Einleitungssätze)
+    """
+    # Suche nach FRAMING (mit oder ohne ### Markdown-Header)
+    framing_patterns = [
+        r'(?m)^###?\s*FRAMING',  # ### FRAMING oder # FRAMING
+        r'(?m)^FRAMING',          # FRAMING ohne Markdown
+        r'(?m)^𝗙𝗥𝗔𝗠𝗜𝗡𝗚',        # Bereits konvertiertes Unicode-Bold
+    ]
+
+    for pattern in framing_patterns:
+        match = re.search(pattern, text)
+        if match:
+            return text[match.start():]
+
+    # Falls kein FRAMING gefunden, gib den ganzen Text zurück
+    return text
+
+
+def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "") -> str:
     """Konvertiert Markdown-formatierten Text zu LinkedIn-kompatiblem Format.
 
     Transformationen:
+    - Extrahiert nur den Analyse-Teil (ab FRAMING)
     - ### HEADING → 𝗛𝗘𝗔𝗗𝗜𝗡𝗚
     - **bold** → 𝗯𝗼𝗹𝗱
     - *italic* oder _italic_ → 𝘪𝘵𝘢𝘭𝘪𝘤
@@ -70,11 +115,16 @@ def format_for_linkedin(text: str) -> str:
 
     Args:
         text: Markdown-formatierter Text
+        video_title: Optional - Video-Titel für Post-Header
+        video_channel: Optional - Kanal-Name für Post-Header
 
     Returns:
         LinkedIn-kompatibler Text mit Unicode-Formatierung
     """
-    lines = text.split('\n')
+    # Nur den Analyse-Teil ab FRAMING extrahieren (ohne Einleitung)
+    analysis_text = extract_analysis_body(text)
+
+    lines = analysis_text.split('\n')
     result_lines = []
 
     for line in lines:
@@ -107,4 +157,11 @@ def format_for_linkedin(text: str) -> str:
 
         result_lines.append(line)
 
-    return '\n'.join(result_lines)
+    formatted_text = '\n'.join(result_lines)
+
+    # Post-Header hinzufügen, wenn Video-Infos vorhanden
+    if video_title and video_channel:
+        header = create_post_header(video_title, video_channel)
+        return header + formatted_text
+
+    return formatted_text

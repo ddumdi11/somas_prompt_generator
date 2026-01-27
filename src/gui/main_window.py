@@ -281,13 +281,26 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Fehler", "Kein Analyse-Ergebnis vorhanden.")
             return
 
-        # Konvertiere zu LinkedIn-Format und kopiere in Zwischenablage
-        linkedin_text = format_for_linkedin(result)
-        clipboard = QApplication.clipboard()
-        clipboard.setText(linkedin_text)
+        try:
+            # Konvertiere zu LinkedIn-Format (mit Post-Header aus Video-Metadaten)
+            video_title = self.video_info.title if self.video_info else ""
+            video_channel = self.video_info.channel if self.video_info else ""
 
-        # Visuelles Feedback
-        self._show_button_feedback(self.btn_export_linkedin, "Copied!")
+            logger.info(f"LinkedIn-Export: {len(result)} Zeichen Eingabe")
+            linkedin_text = format_for_linkedin(result, video_title, video_channel)
+            logger.info(f"LinkedIn-Export: {len(linkedin_text)} Zeichen Ausgabe")
+
+            # In Zwischenablage kopieren
+            clipboard = QApplication.clipboard()
+            clipboard.setText(linkedin_text)
+            logger.info("LinkedIn-Export: In Zwischenablage kopiert")
+
+            # Visuelles Feedback
+            self._show_button_feedback(self.btn_export_linkedin, "Copied!")
+
+        except Exception as e:
+            logger.error(f"LinkedIn-Export fehlgeschlagen: {e}")
+            QMessageBox.critical(self, "Fehler", f"LinkedIn-Export fehlgeschlagen:\n{e}")
 
     @pyqtSlot()
     def _on_export_markdown(self):
