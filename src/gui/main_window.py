@@ -28,8 +28,20 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.video_info: VideoInfo | None = None
         self.config = SomasConfig()
-        self.presets = load_presets()
         self.current_preset: PromptPreset | None = None
+
+        # Lade Presets mit Fehlerbehandlung
+        try:
+            self.presets = load_presets()
+        except Exception as e:
+            logger.error(f"Fehler beim Laden der Presets: {e}")
+            self.presets = {}
+            QMessageBox.critical(
+                None,
+                "Preset-Fehler",
+                f"Presets konnten nicht geladen werden:\n{e}\n\n"
+                "Die App startet mit deaktivierten Presets."
+            )
 
         self._setup_ui()
         self._connect_signals()
@@ -271,6 +283,11 @@ class MainWindow(QMainWindow):
             self.max_chars_label.setText(
                 f"Max: {self.current_preset.max_chars:,} Zeichen".replace(",", ".")
             )
+        else:
+            # Keine Presets verfügbar
+            self.preset_description.setText("Keine Presets verfügbar")
+            self.reading_time_label.setText("")
+            self.max_chars_label.setText("")
 
     @pyqtSlot()
     def _on_get_meta(self):
