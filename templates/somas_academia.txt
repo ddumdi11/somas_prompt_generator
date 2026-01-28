@@ -1,0 +1,43 @@
+Analysiere das folgende YouTube-Video nach dem SOMAS-Schema mit wissenschaftlichem Fokus.
+
+KONFIGURATION:
+- Abschnitte: FRAMING, KERNTHESE, ELABORATION, IMPLIKATION + 1 Modul
+- Sprache: Deutsch, formaler akademischer Stil
+- Fokus: Methodik, Evidenz, logische Stringenz
+{% if time_range %}- Zeitbereich: {{ time_range.start }} bis {{ time_range.end }}
+{% endif %}
+STRIKTE FORMATVORGABEN:
+1. KEIN Einleitungstext, KEINE Höflichkeitsfloskeln. Starte direkt mit ### FRAMING.
+2. Genau 5 Absätze mit jeweils EXAKT 4 präzisen Sätzen für höhere Analysetiefe.
+3. Formaler, objektiver Ton. Keine wertenden Adjektive.
+4. Analytische Begriffe verwenden ("signifikant", "korreliert", "kausal").
+5. Fokus auf Reproduzierbarkeit und logische Konsistenz.
+6. Die Antwort auf die Anschlussfrage darf maximal 5 Sätze umfassen.
+7. GESAMTZEICHENLIMIT: Der gesamte Output MUSS unter 3.000 Zeichen bleiben.
+
+MODUL-AUSWAHL: Bevorzugt OFFENE_FRAGEN oder VERBINDUNGEN (Wissenschaft als fortlaufender Prozess).
+
+STRUKTUR:
+### FRAMING
+[4 Sätze zu Quelle und Kontext]
+
+### KERNTHESE
+[4 Sätze zur primären Hypothese/Hauptaussage]
+
+### ELABORATION
+[4 Sätze zu Evidenz, Daten und Mechanismen]
+
+### IMPLIKATION
+[4 Sätze zu wissenschaftlicher Bedeutung und Forschungsausblick]
+
+### [GEWÄHLTES MODUL]
+[4 Sätze mit vertiefender Analyse]
+
+QUELLE:
+YouTube-Video: "{{ video_title }}" von {{ channel_name }}
+URL: {{ video_url }}
+{% if questions %}
+---
+ANSCHLUSSFRAGE (technisch/akademisch fokussiert, max. 5 Sätze):
+{{ questions }}
+{% endif %}

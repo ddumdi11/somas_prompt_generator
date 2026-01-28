@@ -62,10 +62,10 @@ def create_post_header(title: str, channel: str) -> str:
     """Erstellt den LinkedIn-Post-Header aus Video-Metadaten.
 
     Format:
-        Video-Titel
+        𝗩𝗶𝗱𝗲𝗼-𝗧𝗶𝘁𝗲𝗹 (fett)
         Kanal, YT
 
-        SOMAS-Analyse
+        𝗦𝗢𝗠𝗔𝗦-𝗔𝗻𝗮𝗹𝘆𝘀𝗲 (fett)
 
     Args:
         title: Video-Titel
@@ -74,7 +74,9 @@ def create_post_header(title: str, channel: str) -> str:
     Returns:
         Formatierter Header für LinkedIn-Post
     """
-    return f"{title}\n{channel}, YT\n\nSOMAS-Analyse\n\n"
+    bold_title = to_bold(title)
+    bold_somas = to_bold("SOMAS-Analyse")
+    return f"{bold_title}\n{channel}, YT\n\n{bold_somas}\n\n"
 
 
 def extract_analysis_body(text: str) -> str:
@@ -107,7 +109,7 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
 
     Transformationen:
     - Extrahiert nur den Analyse-Teil (ab FRAMING)
-    - ### HEADING → 𝗛𝗘𝗔𝗗𝗜𝗡𝗚
+    - ### HEADING → entfernt (Zwischenüberschriften werden zu Leerzeilen)
     - **bold** → 𝗯𝗼𝗹𝗱
     - *italic* oder _italic_ → 𝘪𝘵𝘢𝘭𝘪𝘤
     - - item → • item
@@ -127,13 +129,32 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
     lines = analysis_text.split('\n')
     result_lines = []
 
+    # SOMAS-Abschnittsüberschriften (mit und ohne Markdown-Hashes)
+    somas_headers = [
+        'FRAMING', 'KERNTHESE', 'ELABORATION', 'IMPLIKATION',
+        'KRITIK', 'OFFENE_FRAGEN', 'ZITATE', 'VERBINDUNGEN',
+        'ANSCHLUSSFRAGE', 'QUICK INFO'
+    ]
+    somas_pattern = r'^(?:#{1,6}\s+)?(' + '|'.join(somas_headers) + r')(?:\s*:?)?\s*$'
+
     for line in lines:
-        # Headers: ### HEADING → 𝗛𝗘𝗔𝗗𝗜𝗡𝗚
+        # SOMAS-Überschriften → Leerzeile (Abschnitt visuell trennen)
+        if re.match(somas_pattern, line.strip(), re.IGNORECASE):
+            # Füge Leerzeile als Trenner hinzu (falls nicht am Anfang)
+            if result_lines and result_lines[-1].strip():
+                result_lines.append('')
+            continue
+
+        # Andere Markdown-Headers: ### HEADING → auch entfernen
         header_match = re.match(r'^(#{1,6})\s+(.+)$', line)
         if header_match:
-            header_text = header_match.group(2)
-            result_lines.append(to_bold(header_text))
+            if result_lines and result_lines[-1].strip():
+                result_lines.append('')
             continue
+
+        # SOMAS-Header am Zeilenanfang entfernen (auch mit nachfolgendem Text)
+        for header in somas_headers:
+            line = re.sub(rf'^{header}\s*:\s*', '', line, flags=re.IGNORECASE)
 
         # Markdown Links: [text](url) → text (url)
         line = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1 (\2)', line)
@@ -158,6 +179,12 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
         result_lines.append(line)
 
     formatted_text = '\n'.join(result_lines)
+
+    # Mehrfache Leerzeilen auf eine reduzieren
+    formatted_text = re.sub(r'\n{3,}', '\n\n', formatted_text)
+
+    # Führende/trailing Leerzeilen entfernen
+    formatted_text = formatted_text.strip()
 
     # Post-Header hinzufügen, wenn Video-Infos vorhanden
     if video_title and video_channel:

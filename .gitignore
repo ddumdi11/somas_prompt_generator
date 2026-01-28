@@ -50,3 +50,5 @@ Thumbs.db
 # Project specific
 *.md.bak
 exports/
+examples/          # Local examples, images, test outputs (not for GitHub)
+Archiv/            # Local archive for old/unused files

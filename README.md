@@ -14,24 +14,28 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### MVP (v0.1)
+### Aktuell implementiert (v0.2)
 
 - **YouTube-URL-Eingabe** – URL einfügen, Metadaten abrufen
-- **Meta-Information-Anzeige** – Titel, Kanal, Dauer, Thumbnail (editierbares Textfeld)
+- **Meta-Information-Anzeige** – Titel, Kanal, Dauer (editierbares Textfeld)
 - **Fragen-Eingabe** – Optionale Anschlussfragen für die Analyse
 - **Prompt-Generierung** – Fertiger SOMAS-Prompt zum Kopieren
-- **Analyse-Ausgabe** – Großes Textfeld für das LLM-Ergebnis (mit Lock/Unlock)
+- **4 Prompt-Presets:**
+  - **Standard** – Ausgewogene Analyse (2.800 Zeichen, ~2 Min Lesezeit)
+  - **LinkedIn** – Social-Media-optimiert (2.200 Zeichen, ~90 Sek)
+  - **Minimal** – Blitz-Überblick (800 Zeichen, ~30 Sek)
+  - **Academia** – Wissenschaftlich (3.000 Zeichen, ~2,5 Min)
+- **Analyse-Ausgabe** – Großes Textfeld für das LLM-Ergebnis
 - **Export-Formate:**
-  - LinkedIn-optimiert (Unicode-Formatierung: **fett**, •Aufzählungen)
+  - LinkedIn-optimiert (Unicode-Bold, Post-Header, •Aufzählungen)
   - Markdown (.md)
-  - PDF (.pdf) – später
 
-### Geplant (v0.2+)
+### Geplant (v0.3+)
 
-- API-Integration (Gemini/Claude via Kilo-Code)
-- Konfigurierbare SOMAS-Parameter (depth, modules, time_range)
+- API-Integration (Gemini/Claude)
+- PDF-Export
+- Konfigurationsdialog
 - Batch-Verarbeitung mehrerer URLs
-- Englisch-Support
 
 ---
 
@@ -45,31 +49,27 @@ somas_prompt_generator/
 ├── CLAUDE.md              # Instruktionen für Claude Code
 │
 ├── src/
-│   ├── __init__.py
 │   ├── gui/
-│   │   ├── __init__.py
-│   │   ├── main_window.py      # Hauptfenster (PyQt6)
-│   │   ├── meta_panel.py       # Metadaten-Anzeige
-│   │   ├── prompt_panel.py     # Prompt-Generierung
-│   │   └── result_panel.py     # Analyse-Ergebnis
+│   │   └── main_window.py      # Hauptfenster mit Preset-Dropdown
 │   │
 │   ├── core/
-│   │   ├── __init__.py
-│   │   ├── youtube_client.py   # YouTube-Metadaten & Transkript
-│   │   ├── prompt_builder.py   # SOMAS-Prompt-Konstruktion
-│   │   ├── linkedin_formatter.py # LinkedIn-Formatierung
-│   │   └── export.py           # MD/PDF-Export
+│   │   ├── youtube_client.py   # YouTube-Metadaten via yt-dlp
+│   │   ├── prompt_builder.py   # SOMAS-Prompt + Preset-Handling
+│   │   ├── linkedin_formatter.py # Unicode-Bold, Post-Formatierung
+│   │   └── export.py           # Markdown-Export
 │   │
 │   └── config/
-│       ├── __init__.py
-│       ├── defaults.py         # Default-Konfiguration
-│       └── somas_schema.py     # SOMAS v0.5 Schema-Definition
+│       ├── defaults.py         # VideoInfo, SomasConfig
+│       └── prompt_presets.json # 4 Preset-Konfigurationen
 │
 ├── templates/
-│   └── somas_prompt.txt        # Basis-Prompt-Template
+│   ├── somas_prompt.txt        # Basis-Prompt-Template
+│   ├── somas_standard.txt      # Standard-Preset
+│   ├── somas_linkedin.txt      # LinkedIn-Preset
+│   ├── somas_minimal.txt       # Minimal-Preset
+│   └── somas_academia.txt      # Academia-Preset
 │
-└── tests/
-    └── test_youtube_client.py
+└── tests/                  # Test-Analyse-Beispiele (lokal)
 ```
 
 ---
@@ -191,7 +191,8 @@ python -m pytest tests/ -v
 
 | Version | Datum | Änderungen |
 |---------|-------|------------|
-| 0.1.0 | TBD | Initial MVP – URL-Eingabe, Metadaten, Prompt-Generierung |
+| 0.2.0 | 2025-01-28 | Prompt-Presets (4 Varianten), LinkedIn-Export mit Post-Header |
+| 0.1.0 | 2025-01-26 | Initial MVP – URL-Eingabe, Metadaten, Prompt-Generierung |
 
 ---
 

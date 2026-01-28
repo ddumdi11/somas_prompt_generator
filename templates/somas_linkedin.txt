@@ -1,0 +1,42 @@
+Analysiere das folgende YouTube-Video nach dem SOMAS-Schema.
+
+KONFIGURATION:
+- Abschnitte: FRAMING, KERNTHESE, ELABORATION, IMPLIKATION + 1 Modul
+- Sprache: Deutsch
+- Stil: Social Media optimiert, aktive Sprache, eingängige Formulierungen
+{% if time_range %}- Zeitbereich: {{ time_range.start }} bis {{ time_range.end }}
+{% endif %}
+STRIKTE FORMATVORGABEN:
+1. KEIN Einleitungstext, KEINE Höflichkeitsfloskeln. Starte direkt mit ### FRAMING.
+2. Genau 5 Absätze mit jeweils maximal 3 KURZEN, KNACKIGEN Sätzen.
+3. KERNTHESE als starker "Hook" formulieren - eingängig und teilbar.
+4. Aktive Sprache verwenden, keine Passivkonstruktionen.
+5. Die Antwort auf die Anschlussfrage darf maximal 3 Sätze umfassen.
+6. GESAMTZEICHENLIMIT: Der gesamte Output MUSS unter 2.200 Zeichen bleiben.
+
+MODUL-AUSWAHL: KRITIK, OFFENE_FRAGEN, ZITATE oder VERBINDUNGEN (Inhaltsbasiert).
+
+STRUKTUR:
+### FRAMING
+[3 kurze Sätze]
+
+### KERNTHESE
+[3 kurze Sätze - formuliert als eingängiger Hook]
+
+### ELABORATION
+[3 kurze Sätze]
+
+### IMPLIKATION
+[3 kurze Sätze]
+
+### [GEWÄHLTES MODUL]
+[3 kurze Sätze]
+
+QUELLE:
+YouTube-Video: "{{ video_title }}" von {{ channel_name }}
+URL: {{ video_url }}
+{% if questions %}
+---
+ANSCHLUSSFRAGE (max. 3 Sätze):
+{{ questions }}
+{% endif %}

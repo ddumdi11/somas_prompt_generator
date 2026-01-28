@@ -1,0 +1,33 @@
+Analysiere das folgende YouTube-Video nach dem SOMAS-Schema im Quick-Scan-Modus.
+
+STRIKTE FORMATVORGABEN:
+1. KEIN Einleitungstext. Starte direkt mit ### FRAMING.
+2. Genau 5 Absätze mit jeweils EXAKT EINEM präzisen Satz.
+3. Absoluter Fokus auf Kernfakten.
+4. GESAMTZEICHENLIMIT: Der gesamte Output MUSS unter 800 Zeichen bleiben.
+{% if time_range %}
+Zeitbereich: {{ time_range.start }} bis {{ time_range.end }}
+{% endif %}
+STRUKTUR:
+### FRAMING
+[1 präziser Satz zu Sprecher & Kontext]
+
+### KERNTHESE
+[1 Satz zur Hauptbotschaft]
+
+### ELABORATION
+[1 Satz zum wichtigsten Beweis/Argument]
+
+### IMPLIKATION
+[1 Satz zu Fazit oder Bedeutung]
+
+### [MODUL]
+[1 Satz Zusatzinfo]
+
+QUELLE:
+"{{ video_title }}" von {{ channel_name }}
+URL: {{ video_url }}
+{% if questions %}
+---
+QUICK INFO (max. 2 Sätze): {{ questions }}
+{% endif %}
