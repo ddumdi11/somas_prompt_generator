@@ -25,26 +25,27 @@ somas_prompt_generator/
 │
 ├── src/
 │   ├── gui/                # PyQt6-Komponenten
-│   │   ├── main_window.py      # QMainWindow mit allen Panels
-│   │   ├── meta_panel.py       # Metadaten-Anzeige (QTextEdit, editierbar)
-│   │   ├── prompt_panel.py     # Prompt-Ausgabe (QTextEdit, read-only)
-│   │   └── result_panel.py     # Analyse-Ergebnis (QTextEdit mit Lock-Toggle)
+│   │   └── main_window.py      # QMainWindow mit Preset-Dropdown, Export-Buttons
 │   │
 │   ├── core/               # Business-Logik
-│   │   ├── youtube_client.py   # Metadaten + Transkript via yt-dlp & youtube-transcript-api
-│   │   ├── prompt_builder.py   # SOMAS-Prompt aus Template + Config
+│   │   ├── youtube_client.py   # Metadaten via yt-dlp
+│   │   ├── prompt_builder.py   # SOMAS-Prompt + Preset-Handling
 │   │   ├── linkedin_formatter.py # Unicode-Formatierung für LinkedIn
-│   │   └── export.py           # Markdown & PDF Export
+│   │   └── export.py           # Markdown-Export
 │   │
 │   └── config/             # Konfiguration
-│       ├── defaults.py         # SOMAS-Defaults (depth, modules, language)
-│       └── somas_schema.py     # Schema-Definition als Python-Objekt
+│       ├── defaults.py         # SOMAS-Defaults (VideoInfo, SomasConfig)
+│       └── prompt_presets.json # 4 Preset-Varianten (Standard, LinkedIn, Minimal, Academia)
 │
 ├── templates/
-│   └── somas_prompt.txt        # Basis-Prompt-Template (Jinja2-Style)
+│   ├── somas_prompt.txt        # Basis-Prompt-Template (Jinja2)
+│   ├── somas_standard.txt      # Standard-Preset (2.800 Zeichen)
+│   ├── somas_linkedin.txt      # LinkedIn-Preset (2.200 Zeichen)
+│   ├── somas_minimal.txt       # Minimal-Preset (800 Zeichen)
+│   └── somas_academia.txt      # Academia-Preset (3.000 Zeichen)
 │
-└── tests/
-    └── test_youtube_client.py
+└── tests/                  # Test-Dateien (lokal)
+    └── *.md                    # SOMAS-Analyse-Beispiele
 ```
 
 ---
@@ -278,25 +279,31 @@ TEST_URLS = [
 
 ## 🚀 Entwicklungsschritte
 
-### Phase 1: Grundgerüst (MVP)
-- [ ] `main.py` – App-Start
-- [ ] `main_window.py` – Basis-Layout
-- [ ] `youtube_client.py` – Metadaten-Abruf
-- [ ] `prompt_builder.py` – Einfache Prompt-Generierung
-- [ ] Templates-Ordner mit `somas_prompt.txt`
+### Phase 1: Grundgerüst (MVP) ✅
 
-### Phase 2: Vollständige GUI
-- [ ] `meta_panel.py` – Editierbares Metadaten-Feld
-- [ ] `prompt_panel.py` – Prompt-Anzeige mit Copy-Button
-- [ ] `result_panel.py` – Ergebnis-Feld mit Lock-Toggle
+- [x] `main.py` – App-Start
+- [x] `main_window.py` – Basis-Layout mit Preset-Dropdown
+- [x] `youtube_client.py` – Metadaten-Abruf
+- [x] `prompt_builder.py` – Prompt-Generierung mit Preset-Unterstützung
+- [x] Templates-Ordner mit 5 Templates (Basis + 4 Presets)
 
-### Phase 3: Export
-- [ ] `linkedin_formatter.py` – Unicode-Konvertierung
-- [ ] `export.py` – Markdown-Export
-- [ ] PDF-Export (später)
+### Phase 2: Vollständige GUI (teilweise erledigt)
+
+- [x] Meta-Eingabe – Editierbares Metadaten-Feld in main_window.py
+- [x] Prompt-Anzeige – Mit Copy-Button
+- [x] Ergebnis-Feld – Mit Paste-Button
+- [x] Preset-Auswahl – Dropdown mit Beschreibung, Lesezeit, Zeichenlimit
+- [ ] Lock-Toggle für Ergebnis-Feld (optional)
+
+### Phase 3: Export ✅
+
+- [x] `linkedin_formatter.py` – Unicode-Bold, Header-Entfernung, Post-Formatierung
+- [x] `export.py` – Markdown-Export
+- [ ] PDF-Export (später/optional)
 
 ### Phase 4: Erweiterungen
-- [ ] API-Integration via Kilo-Code (Gemini/Claude – Modell wählbar)
+
+- [ ] API-Integration (Gemini/Claude – Modell wählbar)
 - [ ] Konfigurationsdialog
 - [ ] Batch-Modus
 
@@ -320,4 +327,4 @@ Bei Unklarheiten: Frag nach! Lieber einmal zu viel als eine falsche Annahme tref
 
 ---
 
-*Letzte Aktualisierung: 2025-01-26*
+*Letzte Aktualisierung: 2025-01-28*
