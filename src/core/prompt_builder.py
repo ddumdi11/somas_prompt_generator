@@ -122,6 +122,7 @@ def build_prompt(
     )
 
     # Wähle Template basierend auf Preset
+    preset = None
     if preset_name:
         preset = get_preset_by_name(preset_name)
         if preset:
@@ -131,6 +132,11 @@ def build_prompt(
     else:
         template_file = "somas_prompt.txt"
 
+    # Verwende sentences_per_section vom Preset wenn vorhanden
+    sentences_per_section = (
+        preset.sentences_per_section if preset else config.sentences_per_section
+    )
+
     template = env.get_template(template_file)
 
     return template.render(
@@ -139,7 +145,7 @@ def build_prompt(
         video_url=video_info.url,
         depth=config.depth,
         depth_description=config.depth_description,
-        sentences_per_section=config.sentences_per_section,
+        sentences_per_section=sentences_per_section,
         language=config.language,
         time_range=config.time_range,
         questions=questions.strip() if questions else "",

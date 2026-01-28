@@ -255,7 +255,7 @@ class MainWindow(QMainWindow):
         self.btn_export_markdown.clicked.connect(self._on_export_markdown)
 
     @pyqtSlot()
-    def _on_preset_changed(self):
+    def _on_preset_changed(self) -> None:
         """Handler für Preset-Auswahl."""
         preset_name = self.preset_combo.currentText()
         self.current_preset = get_preset_by_name(preset_name)
