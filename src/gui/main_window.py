@@ -440,7 +440,7 @@ class MainWindow(QMainWindow):
                 logger.error(f"Markdown-Export fehlgeschlagen: {e}")
 
     @pyqtSlot()
-    def _on_copy_sources_detail(self):
+    def _on_copy_sources_detail(self) -> None:
         """Kopiert die Detail-Quellen (mit vollen URLs) in die Zwischenablage."""
         if not self._detailed_sources:
             return

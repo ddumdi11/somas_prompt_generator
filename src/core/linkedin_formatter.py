@@ -128,29 +128,16 @@ def extract_domain_name(url: str) -> str:
         Reiner Domain-Name (z.B. 'timesofisrael', 'cnn')
     """
     domain = strip_url_protocol(url).split('/')[0]
-    # TLD entfernen (.com, .org, .net, .de, etc.)
-    domain = re.sub(r'\.[a-z]{2,}$', '', domain)
+    # Compound-TLDs entfernen (.co.uk, .com.au, .org.uk, etc.)
+    stripped = re.sub(
+        r'\.(co|com|org|net|gov)\.[a-z]{2}$', '', domain, flags=re.IGNORECASE
+    )
+    if stripped != domain:
+        domain = stripped
+    else:
+        # Einfache TLD entfernen (.com, .org, .net, .de, etc.)
+        domain = re.sub(r'\.[a-z]{2,}$', '', domain, flags=re.IGNORECASE)
     return domain
-
-
-# Unicode Superscript-Ziffern für Fußnoten
-SUPERSCRIPT_DIGITS = {
-    '0': '\u2070', '1': '\u00b9', '2': '\u00b2', '3': '\u00b3',
-    '4': '\u2074', '5': '\u2075', '6': '\u2076', '7': '\u2077',
-    '8': '\u2078', '9': '\u2079',
-}
-
-
-def to_superscript(number: int) -> str:
-    """Konvertiert eine Zahl zu Unicode-Superscript.
-
-    Args:
-        number: Fußnoten-Nummer
-
-    Returns:
-        Unicode-Superscript-Darstellung (z.B. 1 → ¹, 12 → ¹²)
-    """
-    return ''.join(SUPERSCRIPT_DIGITS[d] for d in str(number))
 
 
 def format_for_linkedin(
@@ -212,7 +199,7 @@ def format_for_linkedin(
             line = re.sub(rf'^{header}\s*:\s*', '', line, flags=re.IGNORECASE)
 
         # Markdown Links: [text](url) → Text [N]
-        def collect_markdown_link(match):
+        def collect_markdown_link(match: re.Match[str]) -> str:
             nonlocal footnote_counter
             name = match.group(1)
             url = match.group(2)
@@ -223,9 +210,9 @@ def format_for_linkedin(
         line = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', collect_markdown_link, line)
 
         # Bare URLs im Text: durch [N] ersetzen
-        def collect_bare_url(match):
+        def collect_bare_url(match: re.Match[str]) -> str:
             nonlocal footnote_counter
-            url = match.group(0)
+            url = match.group(0).rstrip('.,!?;:')
             domain = extract_domain_name(url)
             footnote_counter += 1
             collected_sources.append((footnote_counter, domain, url, domain))
@@ -295,9 +282,9 @@ def format_for_linkedin(
     # Detail-Quellen: nummerierte Liste mit vollen URLs
     detailed_sources = ""
     if collected_sources:
-        detail_lines: list[str] = []
+        detail_lines: list[str] = ["Quellenangaben im Detail:"]
         for number, name, url, _domain in collected_sources:
-            detail_lines.append(f"[{number}] {name} – {url}")
+            detail_lines.append(f"[{number}] {name} - {url}")
         detailed_sources = "\n".join(detail_lines)
 
     return formatted_text, detailed_sources
