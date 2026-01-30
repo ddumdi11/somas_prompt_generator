@@ -104,6 +104,20 @@ def extract_analysis_body(text: str) -> str:
     return text
 
 
+def strip_url_protocol(url: str) -> str:
+    """Entfernt Protokoll und www. von einer URL.
+
+    Args:
+        url: Vollständige URL
+
+    Returns:
+        URL ohne https://, http:// und www.
+    """
+    url = re.sub(r'^https?://', '', url)
+    url = re.sub(r'^www\.', '', url)
+    return url
+
+
 def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "") -> str:
     """Konvertiert Markdown-formatierten Text zu LinkedIn-kompatiblem Format.
 
@@ -113,7 +127,7 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
     - **bold** → 𝗯𝗼𝗹𝗱
     - *italic* oder _italic_ → 𝘪𝘵𝘢𝘭𝘪𝘤
     - - item → • item
-    - [text](url) → text (url)
+    - URLs aus Fließtext entfernen, am Ende als Quellenblock sammeln
 
     Args:
         text: Markdown-formatierter Text
@@ -127,7 +141,8 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
     analysis_text = extract_analysis_body(text)
 
     lines = analysis_text.split('\n')
-    result_lines = []
+    result_lines: list[str] = []
+    collected_sources: list[tuple[str, str]] = []  # (name, url)
 
     # SOMAS-Abschnittsüberschriften (mit und ohne Markdown-Hashes)
     somas_headers = [
@@ -156,8 +171,22 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
         for header in somas_headers:
             line = re.sub(rf'^{header}\s*:\s*', '', line, flags=re.IGNORECASE)
 
-        # Markdown Links: [text](url) → text (url)
-        line = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1 (\2)', line)
+        # Markdown Links: [text](url) → Quellen sammeln, nur Text behalten
+        def collect_markdown_link(match):
+            name = match.group(1)
+            url = match.group(2)
+            collected_sources.append((name, url))
+            return name
+        line = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', collect_markdown_link, line)
+
+        # Bare URLs im Text: sammeln und entfernen
+        def collect_bare_url(match):
+            url = match.group(0)
+            # Domain als Name extrahieren
+            domain = strip_url_protocol(url).split('/')[0]
+            collected_sources.append((domain, url))
+            return domain
+        line = re.sub(r'https?://[^\s,)]+', collect_bare_url, line)
 
         # Code blocks: `code` → code (einfach Backticks entfernen)
         line = re.sub(r'`([^`]+)`', r'\1', line)
@@ -189,6 +218,22 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
     # Post-Header hinzufügen, wenn Video-Infos vorhanden
     if video_title and video_channel:
         header = create_post_header(video_title, video_channel)
-        return header + formatted_text
+        formatted_text = header + formatted_text
+
+    # Quellenblock am Ende anhängen (URLs ohne Protokoll)
+    if collected_sources:
+        # Duplikate entfernen (basierend auf URL)
+        seen_urls: set[str] = set()
+        unique_sources: list[tuple[str, str]] = []
+        for name, url in collected_sources:
+            if url not in seen_urls:
+                seen_urls.add(url)
+                unique_sources.append((name, url))
+
+        sources_block = "\n\nQuellen:\n"
+        for name, url in unique_sources:
+            clean_url = strip_url_protocol(url)
+            sources_block += f"  {name}: {clean_url}\n"
+        formatted_text += sources_block.rstrip()
 
     return formatted_text
