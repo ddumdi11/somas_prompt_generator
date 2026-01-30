@@ -254,9 +254,10 @@ def format_for_linkedin(
     # Domain-Namen vor [N]-Markern entfernen (AI gibt oft "domainname URL" aus)
     if collected_sources:
         for _, _, _url, domain in collected_sources:
-            # "domainname [N]" → "[N]" und "domainname. [N]" → "[N]"
+            # "domainname [N]", "domainname. [N]", "domainname.net [N]",
+            # "domainname.co.uk [N]" → "[N]"
             formatted_text = re.sub(
-                rf'\b{re.escape(domain)}\.?\s*(\[\d+\])',
+                rf'\b{re.escape(domain)}(?:\.[a-z]{{2,}}){{0,2}}\.?\s*(\[\d+\])',
                 r'\1',
                 formatted_text,
                 flags=re.IGNORECASE
