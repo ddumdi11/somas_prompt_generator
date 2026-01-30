@@ -119,7 +119,7 @@ def strip_url_protocol(url: str) -> str:
 
 
 def extract_domain_name(url: str) -> str:
-    """Extrahiert den Domain-Namen ohne Protokoll, www und TLD.
+    """Extrahiert den registrierbaren Domain-Namen ohne Protokoll, www, Port, Subdomains und TLD.
 
     Args:
         url: Vollständige URL oder Domain
@@ -128,6 +128,8 @@ def extract_domain_name(url: str) -> str:
         Reiner Domain-Name (z.B. 'timesofisrael', 'cnn')
     """
     domain = strip_url_protocol(url).split('/')[0]
+    # Port entfernen (z.B. localhost:8080 → localhost)
+    domain = domain.split(':')[0].strip()
     # Compound-TLDs entfernen (.co.uk, .com.au, .org.uk, etc.)
     stripped = re.sub(
         r'\.(co|com|org|net|gov)\.[a-z]{2}$', '', domain, flags=re.IGNORECASE
@@ -137,6 +139,8 @@ def extract_domain_name(url: str) -> str:
     else:
         # Einfache TLD entfernen (.com, .org, .net, .de, etc.)
         domain = re.sub(r'\.[a-z]{2,}$', '', domain, flags=re.IGNORECASE)
+    # Subdomains entfernen: nur den letzten Label behalten (edition.cnn → cnn)
+    domain = domain.rsplit('.', 1)[-1]
     return domain
 
 
