@@ -260,6 +260,17 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
         header = create_post_header(video_title, video_channel)
         formatted_text = header + formatted_text
 
+    # Domain-Namen vor [N]-Markern entfernen (AI gibt oft "domainname URL" aus)
+    if collected_sources:
+        for _, _, domain in collected_sources:
+            # "domainname [N]" → "[N]" und "domainname. [N]" → "[N]"
+            formatted_text = re.sub(
+                rf'\b{re.escape(domain)}\.?\s*(\[\d+\])',
+                r'\1',
+                formatted_text,
+                flags=re.IGNORECASE
+            )
+
     # Quellenblock am Ende: gleiche Domains zusammenfassen
     if collected_sources:
         # Gruppiere Fußnoten-Nummern nach Domain
