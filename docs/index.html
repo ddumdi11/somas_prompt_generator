@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SOMAS Prompt Generator - Strukturierte YouTube-Analysen für LinkedIn, Recherche und Wissenschaft.">
+    <title>SOMAS Prompt Generator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Hero Section -->
+    <header class="hero">
+        <div class="container">
+            <h1>SOMAS Prompt Generator</h1>
+            <p class="tagline">Strukturierte YouTube-Analysen in Sekunden.<br>Vier Presets. Ein Klick. LinkedIn-ready.</p>
+            <div class="cta-buttons">
+                <a href="https://github.com/ddumdi11/somas_prompt_generator" class="btn btn-primary">GitHub Repo</a>
+                <a href="https://github.com/ddumdi11/somas_prompt_generator/releases" class="btn btn-secondary">Download</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Screenshot Section -->
+    <section class="screenshot-section">
+        <div class="container">
+            <img src="assets/screenshot.png" alt="SOMAS Prompt Generator App Screenshot" class="app-screenshot">
+            <p class="screenshot-caption">Von YouTube-URL zu LinkedIn-Post in unter 2 Minuten</p>
+        </div>
+    </section>
+
+    <!-- Features: Die 4 Presets -->
+    <section class="features">
+        <div class="container">
+            <h2>Vier Analyse-Presets</h2>
+            <div class="preset-grid">
+                <div class="preset-card">
+                    <span class="preset-icon">&#x1F4CA;</span>
+                    <h3>Standard</h3>
+                    <p>Allrounder für Recherche und Archivierung</p>
+                    <span class="preset-meta">3 Sätze &middot; max. 2.800 Zeichen</span>
+                </div>
+                <div class="preset-card">
+                    <span class="preset-icon">&#x1F4BC;</span>
+                    <h3>LinkedIn</h3>
+                    <p>Social-Media-optimiert mit Hook</p>
+                    <span class="preset-meta">3 Sätze &middot; max. 2.200 Zeichen</span>
+                </div>
+                <div class="preset-card">
+                    <span class="preset-icon">&#x26A1;</span>
+                    <h3>Minimal</h3>
+                    <p>Quick Scan - lohnt sich das Video?</p>
+                    <span class="preset-meta">1 Satz &middot; max. 800 Zeichen</span>
+                </div>
+                <div class="preset-card">
+                    <span class="preset-icon">&#x1F393;</span>
+                    <h3>Academia</h3>
+                    <p>Wissenschaftlich, formal, zitierfähig</p>
+                    <span class="preset-meta">4 Sätze &middot; max. 3.000 Zeichen</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="how-it-works">
+        <div class="container">
+            <h2>So funktioniert's</h2>
+            <div class="steps">
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <h3>URL einfügen</h3>
+                    <p>YouTube-Link eingeben und Metadaten abrufen</p>
+                </div>
+                <div class="step-arrow">&rarr;</div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <h3>Preset wählen</h3>
+                    <p>Standard, LinkedIn, Minimal oder Academia</p>
+                </div>
+                <div class="step-arrow">&rarr;</div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <h3>Exportieren</h3>
+                    <p>LinkedIn-ready oder als Markdown</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SOMAS Schema Erklärung -->
+    <section class="schema-section">
+        <div class="container">
+            <h2>Was ist SOMAS?</h2>
+            <p class="schema-intro"><strong>S</strong>ource <strong>O</strong>verview <strong>M</strong>apping <strong>A</strong>nd extraction <strong>S</strong>chema</p>
+            <p>Ein strukturiertes Analyse-Framework für Video-Inhalte, basierend auf reverse-engineerten NotebookLM-Patterns.</p>
+            <div class="schema-blocks">
+                <div class="schema-block">
+                    <strong>FRAMING</strong>
+                    <span>Wer spricht? Welcher Kontext?</span>
+                </div>
+                <div class="schema-block">
+                    <strong>KERNTHESE</strong>
+                    <span>Was ist die Hauptaussage?</span>
+                </div>
+                <div class="schema-block">
+                    <strong>ELABORATION</strong>
+                    <span>Welche Belege und Details?</span>
+                </div>
+                <div class="schema-block">
+                    <strong>IMPLIKATION</strong>
+                    <span>Was bedeutet das? Fazit?</span>
+                </div>
+                <div class="schema-block schema-block-module">
+                    <strong>[MODUL]</strong>
+                    <span>Kritik &middot; Zitate &middot; Offene Fragen &middot; Verbindungen</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Installation -->
+    <section class="installation">
+        <div class="container">
+            <h2>Installation</h2>
+            <div class="code-block">
+                <code>
+git clone https://github.com/ddumdi11/somas_prompt_generator.git
+cd somas_prompt_generator
+pip install -r requirements.txt
+python main.py
+                </code>
+            </div>
+            <p class="tech-stack">
+                <strong>Tech Stack:</strong> Python 3.11+ &middot; PyQt6 &middot; yt-dlp &middot; youtube-transcript-api &middot; Jinja2
+            </p>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>
+                MIT License &middot; Made with
+                <a href="https://github.com/ddumdi11">Thorsten Diederichs</a>
+                + Claude + Gemini
+            </p>
+            <p class="footer-links">
+                <a href="https://github.com/ddumdi11/somas_prompt_generator">GitHub</a> &middot;
+                <a href="https://github.com/ddumdi11/somas_prompt_generator/issues">Issues</a> &middot;
+                <a href="https://github.com/ddumdi11/somas_prompt_generator/releases">Releases</a>
+            </p>
+        </div>
+    </footer>
+</body>
+</html>
