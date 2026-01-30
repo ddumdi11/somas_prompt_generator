@@ -118,6 +118,26 @@ def strip_url_protocol(url: str) -> str:
     return url
 
 
+# Unicode Superscript-Ziffern für Fußnoten
+SUPERSCRIPT_DIGITS = {
+    '0': '\u2070', '1': '\u00b9', '2': '\u00b2', '3': '\u00b3',
+    '4': '\u2074', '5': '\u2075', '6': '\u2076', '7': '\u2077',
+    '8': '\u2078', '9': '\u2079',
+}
+
+
+def to_superscript(number: int) -> str:
+    """Konvertiert eine Zahl zu Unicode-Superscript.
+
+    Args:
+        number: Fußnoten-Nummer
+
+    Returns:
+        Unicode-Superscript-Darstellung (z.B. 1 → ¹, 12 → ¹²)
+    """
+    return ''.join(SUPERSCRIPT_DIGITS[d] for d in str(number))
+
+
 def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "") -> str:
     """Konvertiert Markdown-formatierten Text zu LinkedIn-kompatiblem Format.
 
@@ -142,7 +162,8 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
 
     lines = analysis_text.split('\n')
     result_lines: list[str] = []
-    collected_sources: list[tuple[str, str]] = []  # (name, url)
+    collected_sources: list[str] = []  # Quellennamen für Fußnoten
+    footnote_counter = 0
 
     # SOMAS-Abschnittsüberschriften (mit und ohne Markdown-Hashes)
     somas_headers = [
@@ -171,21 +192,23 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
         for header in somas_headers:
             line = re.sub(rf'^{header}\s*:\s*', '', line, flags=re.IGNORECASE)
 
-        # Markdown Links: [text](url) → Quellen sammeln, nur Text behalten
+        # Markdown Links: [text](url) → Text + Fußnote
         def collect_markdown_link(match):
+            nonlocal footnote_counter
             name = match.group(1)
-            url = match.group(2)
-            collected_sources.append((name, url))
-            return name
+            footnote_counter += 1
+            collected_sources.append(name)
+            return f"{name}{to_superscript(footnote_counter)}"
         line = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', collect_markdown_link, line)
 
-        # Bare URLs im Text: sammeln und entfernen
+        # Bare URLs im Text: durch Domain + Fußnote ersetzen
         def collect_bare_url(match):
+            nonlocal footnote_counter
             url = match.group(0)
-            # Domain als Name extrahieren
             domain = strip_url_protocol(url).split('/')[0]
-            collected_sources.append((domain, url))
-            return domain
+            footnote_counter += 1
+            collected_sources.append(domain)
+            return f"{domain}{to_superscript(footnote_counter)}"
         line = re.sub(r'https?://[^\s,)]+', collect_bare_url, line)
 
         # Code blocks: `code` → code (einfach Backticks entfernen)
@@ -220,20 +243,12 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
         header = create_post_header(video_title, video_channel)
         formatted_text = header + formatted_text
 
-    # Quellenblock am Ende anhängen (URLs ohne Protokoll)
+    # Fußnoten-Block am Ende anhängen (nur Quellennamen, keine URLs)
     if collected_sources:
-        # Duplikate entfernen (basierend auf URL)
-        seen_urls: set[str] = set()
-        unique_sources: list[tuple[str, str]] = []
-        for name, url in collected_sources:
-            if url not in seen_urls:
-                seen_urls.add(url)
-                unique_sources.append((name, url))
-
-        sources_block = "\n\nQuellen:\n"
-        for name, url in unique_sources:
-            clean_url = strip_url_protocol(url)
-            sources_block += f"  {name}: {clean_url}\n"
-        formatted_text += sources_block.rstrip()
+        footnotes = " ".join(
+            f"{to_superscript(i + 1)}{name}"
+            for i, name in enumerate(collected_sources)
+        )
+        formatted_text += f"\n\nQuellen: {footnotes}"
 
     return formatted_text
