@@ -104,7 +104,45 @@ def extract_analysis_body(text: str) -> str:
     return text
 
 
-def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "") -> str:
+def strip_url_protocol(url: str) -> str:
+    """Entfernt Protokoll und www. von einer URL.
+
+    Args:
+        url: Vollständige URL
+
+    Returns:
+        URL ohne https://, http:// und www.
+    """
+    url = re.sub(r'^https?://', '', url)
+    url = re.sub(r'^www\.', '', url)
+    return url
+
+
+def extract_domain_name(url: str) -> str:
+    """Extrahiert den Domain-Namen ohne Protokoll, www und TLD.
+
+    Args:
+        url: Vollständige URL oder Domain
+
+    Returns:
+        Reiner Domain-Name (z.B. 'timesofisrael', 'cnn')
+    """
+    domain = strip_url_protocol(url).split('/')[0]
+    # Compound-TLDs entfernen (.co.uk, .com.au, .org.uk, etc.)
+    stripped = re.sub(
+        r'\.(co|com|org|net|gov)\.[a-z]{2}$', '', domain, flags=re.IGNORECASE
+    )
+    if stripped != domain:
+        domain = stripped
+    else:
+        # Einfache TLD entfernen (.com, .org, .net, .de, etc.)
+        domain = re.sub(r'\.[a-z]{2,}$', '', domain, flags=re.IGNORECASE)
+    return domain
+
+
+def format_for_linkedin(
+    text: str, video_title: str = "", video_channel: str = ""
+) -> tuple[str, str]:
     """Konvertiert Markdown-formatierten Text zu LinkedIn-kompatiblem Format.
 
     Transformationen:
@@ -113,7 +151,7 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
     - **bold** → 𝗯𝗼𝗹𝗱
     - *italic* oder _italic_ → 𝘪𝘵𝘢𝘭𝘪𝘤
     - - item → • item
-    - [text](url) → text (url)
+    - URLs aus Fließtext entfernen, am Ende als Quellenblock sammeln
 
     Args:
         text: Markdown-formatierter Text
@@ -121,13 +159,17 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
         video_channel: Optional - Kanal-Name für Post-Header
 
     Returns:
-        LinkedIn-kompatibler Text mit Unicode-Formatierung
+        Tuple aus (LinkedIn-Text, Detail-Quellen).
+        LinkedIn-Text: Formatierter Text mit Unicode und Kurzquellen.
+        Detail-Quellen: Nummerierte Quellenliste mit vollen URLs.
     """
     # Nur den Analyse-Teil ab FRAMING extrahieren (ohne Einleitung)
     analysis_text = extract_analysis_body(text)
 
     lines = analysis_text.split('\n')
-    result_lines = []
+    result_lines: list[str] = []
+    collected_sources: list[tuple[int, str, str, str]] = []  # (nr, name, url, domain)
+    footnote_counter = 0
 
     # SOMAS-Abschnittsüberschriften (mit und ohne Markdown-Hashes)
     somas_headers = [
@@ -156,8 +198,26 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
         for header in somas_headers:
             line = re.sub(rf'^{header}\s*:\s*', '', line, flags=re.IGNORECASE)
 
-        # Markdown Links: [text](url) → text (url)
-        line = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1 (\2)', line)
+        # Markdown Links: [text](url) → Text [N]
+        def collect_markdown_link(match: re.Match[str]) -> str:
+            nonlocal footnote_counter
+            name = match.group(1)
+            url = match.group(2)
+            footnote_counter += 1
+            domain = extract_domain_name(url)
+            collected_sources.append((footnote_counter, name, url, domain))
+            return f"{name} [{footnote_counter}]"
+        line = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', collect_markdown_link, line)
+
+        # Bare URLs im Text: durch [N] ersetzen
+        def collect_bare_url(match: re.Match[str]) -> str:
+            nonlocal footnote_counter
+            url = match.group(0).rstrip('.,!?;:')
+            domain = extract_domain_name(url)
+            footnote_counter += 1
+            collected_sources.append((footnote_counter, domain, url, domain))
+            return f"[{footnote_counter}]"
+        line = re.sub(r'https?://[^\s,)]+', collect_bare_url, line)
 
         # Code blocks: `code` → code (einfach Backticks entfernen)
         line = re.sub(r'`([^`]+)`', r'\1', line)
@@ -189,6 +249,42 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
     # Post-Header hinzufügen, wenn Video-Infos vorhanden
     if video_title and video_channel:
         header = create_post_header(video_title, video_channel)
-        return header + formatted_text
+        formatted_text = header + formatted_text
 
-    return formatted_text
+    # Domain-Namen vor [N]-Markern entfernen (AI gibt oft "domainname URL" aus)
+    if collected_sources:
+        for _, _, _url, domain in collected_sources:
+            # "domainname [N]" → "[N]" und "domainname. [N]" → "[N]"
+            formatted_text = re.sub(
+                rf'\b{re.escape(domain)}\.?\s*(\[\d+\])',
+                r'\1',
+                formatted_text,
+                flags=re.IGNORECASE
+            )
+
+    # Quellenblock am Ende: gleiche Domains zusammenfassen
+    if collected_sources:
+        # Gruppiere Fußnoten-Nummern nach Domain
+        domain_numbers: dict[str, list[int]] = {}
+        for number, _name, _url, domain in collected_sources:
+            if domain not in domain_numbers:
+                domain_numbers[domain] = []
+            domain_numbers[domain].append(number)
+
+        # Formatiere: "1,6: timesofisrael" oder "2: cnn"
+        source_parts: list[str] = []
+        for domain, numbers in domain_numbers.items():
+            nums = ",".join(str(n) for n in numbers)
+            source_parts.append(f"{nums}: {domain}")
+
+        formatted_text += "\n\nQuellen: " + " | ".join(source_parts)
+
+    # Detail-Quellen: nummerierte Liste mit vollen URLs
+    detailed_sources = ""
+    if collected_sources:
+        detail_lines: list[str] = ["Quellenangaben im Detail:"]
+        for number, name, url, _domain in collected_sources:
+            detail_lines.append(f"[{number}] {name} - {url}")
+        detailed_sources = "\n".join(detail_lines)
+
+    return formatted_text, detailed_sources

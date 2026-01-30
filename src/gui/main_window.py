@@ -243,12 +243,18 @@ class MainWindow(QMainWindow):
         self.btn_export_markdown = QPushButton("Export: Markdown")
         self.btn_export_pdf = QPushButton("Export: PDF")
 
+        # Quellen-Detail-Button (erscheint nach LinkedIn-Export)
+        self.btn_sources_detail = QPushButton("Quellen (Details)")
+        self.btn_sources_detail.setVisible(False)
+        self._detailed_sources: str = ""
+
         # PDF vorerst deaktiviert (Phase 3)
         self.btn_export_pdf.setEnabled(False)
 
         layout.addWidget(self.btn_export_linkedin)
         layout.addWidget(self.btn_export_markdown)
         layout.addWidget(self.btn_export_pdf)
+        layout.addWidget(self.btn_sources_detail)
         layout.addStretch()
 
         return layout
@@ -265,6 +271,7 @@ class MainWindow(QMainWindow):
         # Export-Buttons
         self.btn_export_linkedin.clicked.connect(self._on_export_linkedin)
         self.btn_export_markdown.clicked.connect(self._on_export_markdown)
+        self.btn_sources_detail.clicked.connect(self._on_copy_sources_detail)
 
     @pyqtSlot()
     def _on_preset_changed(self) -> None:
@@ -373,19 +380,29 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Fehler", "Kein Analyse-Ergebnis vorhanden.")
             return
 
+        # Stale-Daten zurücksetzen vor neuem Export-Versuch
+        self._detailed_sources = ""
+        self.btn_sources_detail.setVisible(False)
+
         try:
             # Konvertiere zu LinkedIn-Format (mit Post-Header aus Video-Metadaten)
             video_title = self.video_info.title if self.video_info else ""
             video_channel = self.video_info.channel if self.video_info else ""
 
             logger.info(f"LinkedIn-Export: {len(result)} Zeichen Eingabe")
-            linkedin_text = format_for_linkedin(result, video_title, video_channel)
+            linkedin_text, detailed_sources = format_for_linkedin(
+                result, video_title, video_channel
+            )
             logger.info(f"LinkedIn-Export: {len(linkedin_text)} Zeichen Ausgabe")
 
             # In Zwischenablage kopieren
             clipboard = QApplication.clipboard()
             clipboard.setText(linkedin_text)
             logger.info("LinkedIn-Export: In Zwischenablage kopiert")
+
+            # Detail-Quellen speichern und Button anzeigen
+            self._detailed_sources = detailed_sources
+            self.btn_sources_detail.setVisible(bool(detailed_sources))
 
             # Visuelles Feedback
             self._show_button_feedback(self.btn_export_linkedin, "Copied!")
@@ -425,6 +442,19 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "Fehler", f"Export fehlgeschlagen: {e}")
                 logger.error(f"Markdown-Export fehlgeschlagen: {e}")
+
+    @pyqtSlot()
+    def _on_copy_sources_detail(self) -> None:
+        """Kopiert die Detail-Quellen (mit vollen URLs) in die Zwischenablage."""
+        if not self._detailed_sources:
+            return
+
+        clipboard = QApplication.clipboard()
+        clipboard.setText(self._detailed_sources)
+        logger.info("Detail-Quellen in Zwischenablage kopiert")
+
+        # Visuelles Feedback
+        self._show_button_feedback(self.btn_sources_detail, "Copied!")
 
     def _show_button_feedback(self, button: QPushButton, message: str):
         """Zeigt kurzes Feedback auf einem Button."""
