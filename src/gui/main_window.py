@@ -380,6 +380,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Fehler", "Kein Analyse-Ergebnis vorhanden.")
             return
 
+        # Stale-Daten zurücksetzen vor neuem Export-Versuch
+        self._detailed_sources = ""
+        self.btn_sources_detail.setVisible(False)
+
         try:
             # Konvertiere zu LinkedIn-Format (mit Post-Header aus Video-Metadaten)
             video_title = self.video_info.title if self.video_info else ""
