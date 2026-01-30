@@ -153,7 +153,9 @@ def to_superscript(number: int) -> str:
     return ''.join(SUPERSCRIPT_DIGITS[d] for d in str(number))
 
 
-def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "") -> str:
+def format_for_linkedin(
+    text: str, video_title: str = "", video_channel: str = ""
+) -> tuple[str, str]:
     """Konvertiert Markdown-formatierten Text zu LinkedIn-kompatiblem Format.
 
     Transformationen:
@@ -170,14 +172,16 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
         video_channel: Optional - Kanal-Name für Post-Header
 
     Returns:
-        LinkedIn-kompatibler Text mit Unicode-Formatierung
+        Tuple aus (LinkedIn-Text, Detail-Quellen).
+        LinkedIn-Text: Formatierter Text mit Unicode und Kurzquellen.
+        Detail-Quellen: Nummerierte Quellenliste mit vollen URLs.
     """
     # Nur den Analyse-Teil ab FRAMING extrahieren (ohne Einleitung)
     analysis_text = extract_analysis_body(text)
 
     lines = analysis_text.split('\n')
     result_lines: list[str] = []
-    collected_sources: list[tuple[int, str, str]] = []  # (nummer, name, domain)
+    collected_sources: list[tuple[int, str, str, str]] = []  # (nr, name, url, domain)
     footnote_counter = 0
 
     # SOMAS-Abschnittsüberschriften (mit und ohne Markdown-Hashes)
@@ -214,7 +218,7 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
             url = match.group(2)
             footnote_counter += 1
             domain = extract_domain_name(url)
-            collected_sources.append((footnote_counter, name, domain))
+            collected_sources.append((footnote_counter, name, url, domain))
             return f"{name} [{footnote_counter}]"
         line = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', collect_markdown_link, line)
 
@@ -224,7 +228,7 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
             url = match.group(0)
             domain = extract_domain_name(url)
             footnote_counter += 1
-            collected_sources.append((footnote_counter, domain, domain))
+            collected_sources.append((footnote_counter, domain, url, domain))
             return f"[{footnote_counter}]"
         line = re.sub(r'https?://[^\s,)]+', collect_bare_url, line)
 
@@ -262,7 +266,7 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
 
     # Domain-Namen vor [N]-Markern entfernen (AI gibt oft "domainname URL" aus)
     if collected_sources:
-        for _, _, domain in collected_sources:
+        for _, _, _url, domain in collected_sources:
             # "domainname [N]" → "[N]" und "domainname. [N]" → "[N]"
             formatted_text = re.sub(
                 rf'\b{re.escape(domain)}\.?\s*(\[\d+\])',
@@ -275,7 +279,7 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
     if collected_sources:
         # Gruppiere Fußnoten-Nummern nach Domain
         domain_numbers: dict[str, list[int]] = {}
-        for number, name, domain in collected_sources:
+        for number, _name, _url, domain in collected_sources:
             if domain not in domain_numbers:
                 domain_numbers[domain] = []
             domain_numbers[domain].append(number)
@@ -288,4 +292,12 @@ def format_for_linkedin(text: str, video_title: str = "", video_channel: str = "
 
         formatted_text += "\n\nQuellen: " + " | ".join(source_parts)
 
-    return formatted_text
+    # Detail-Quellen: nummerierte Liste mit vollen URLs
+    detailed_sources = ""
+    if collected_sources:
+        detail_lines: list[str] = []
+        for number, name, url, _domain in collected_sources:
+            detail_lines.append(f"[{number}] {name} – {url}")
+        detailed_sources = "\n".join(detail_lines)
+
+    return formatted_text, detailed_sources
