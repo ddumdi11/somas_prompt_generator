@@ -1,0 +1,71 @@
+{
+  "providers": [
+    {
+      "id": "perplexity",
+      "name": "Perplexity AI",
+      "base_url": "https://api.perplexity.ai",
+      "chat_endpoint": "/chat/completions",
+      "models_endpoint": null,
+      "supports_dynamic_models": false,
+      "default_model": "sonar-pro",
+      "pro_plan_credit": "$5/Monat (verfällt am Monatsende)",
+      "models": [
+        {
+          "id": "sonar",
+          "name": "Sonar",
+          "description": "Balanced - Geschwindigkeit & Kosten"
+        },
+        {
+          "id": "sonar-pro",
+          "name": "Sonar Pro",
+          "description": "Best für komplexe Queries (empfohlen für SOMAS)"
+        },
+        {
+          "id": "sonar-reasoning",
+          "name": "Sonar Reasoning",
+          "description": "Spezialisiert für Reasoning-Tasks"
+        }
+      ]
+    },
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "base_url": "https://openrouter.ai/api/v1",
+      "chat_endpoint": "/chat/completions",
+      "models_endpoint": "/models",
+      "supports_dynamic_models": true,
+      "default_model": "anthropic/claude-3-haiku",
+      "models": [
+        {
+          "id": "anthropic/claude-3-opus",
+          "name": "Claude 3 Opus",
+          "description": "Stärkstes Claude-Modell"
+        },
+        {
+          "id": "anthropic/claude-3-sonnet",
+          "name": "Claude 3 Sonnet",
+          "description": "Ausgewogen"
+        },
+        {
+          "id": "anthropic/claude-3-haiku",
+          "name": "Claude 3 Haiku",
+          "description": "Schnell und günstig"
+        },
+        {
+          "id": "google/gemini-pro",
+          "name": "Gemini Pro",
+          "description": "Google's Gemini"
+        },
+        {
+          "id": "meta-llama/llama-3.1-405b-instruct",
+          "name": "Llama 3.1 405B",
+          "description": "Größtes Open-Source-Modell"
+        }
+      ],
+      "note": "Modell-Liste kann dynamisch von /models abgerufen werden"
+    }
+  ],
+  "default_provider": "perplexity",
+  "version": "1.1",
+  "last_updated": "2025-01-31"
+}
