@@ -19,6 +19,7 @@ from src.core.export import export_to_markdown
 from src.core.api_client import APIResponse, APIStatus
 from src.core.api_worker import APIWorker
 from src.core.perplexity_client import PerplexityClient
+from src.core.openrouter_client import OpenRouterClient
 from src.config.api_config import (
     load_providers, get_api_key, has_api_key,
     get_last_provider, get_last_model, save_last_selection,
@@ -706,9 +707,11 @@ class MainWindow(QMainWindow):
             self._api_worker.cancel()
             self._api_worker.wait(2000)
 
-        # Client erstellen (vorerst nur Perplexity)
+        # Client erstellen
         if provider_id == "perplexity":
             client = PerplexityClient(api_key)
+        elif provider_id == "openrouter":
+            client = OpenRouterClient(api_key)
         else:
             self._update_api_status("error")
             self.api_status_label.setText("Provider nicht unterstützt")

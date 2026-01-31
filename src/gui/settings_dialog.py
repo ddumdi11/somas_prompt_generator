@@ -15,6 +15,7 @@ from src.config.api_config import (
     save_last_selection, save_preferences, load_preferences,
 )
 from src.core.perplexity_client import PerplexityClient
+from src.core.openrouter_client import OpenRouterClient
 
 logger = logging.getLogger(__name__)
 
@@ -176,8 +177,10 @@ class SettingsDialog(QDialog):
         if provider_id == "perplexity":
             client = PerplexityClient(api_key=key)
             success = client.validate_key()
+        elif provider_id == "openrouter":
+            client = OpenRouterClient(api_key=key)
+            success = client.validate_key()
         else:
-            # Andere Provider: Einfacher HTTP-Test
             status_label.setText("Test nicht verfügbar für diesen Provider")
             status_label.setStyleSheet("color: #FFC107; font-style: italic;")
             return
