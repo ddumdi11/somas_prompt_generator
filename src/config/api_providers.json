@@ -34,32 +34,32 @@
       "chat_endpoint": "/chat/completions",
       "models_endpoint": "/models",
       "supports_dynamic_models": true,
-      "default_model": "anthropic/claude-3-haiku",
+      "default_model": "anthropic/claude-sonnet-4.5",
       "models": [
         {
-          "id": "anthropic/claude-3-opus",
-          "name": "Claude 3 Opus",
-          "description": "Stärkstes Claude-Modell"
+          "id": "anthropic/claude-sonnet-4.5",
+          "name": "Claude Sonnet 4.5",
+          "description": "Anthropic's beliebtestes Modell"
         },
         {
-          "id": "anthropic/claude-3-sonnet",
-          "name": "Claude 3 Sonnet",
-          "description": "Ausgewogen"
+          "id": "anthropic/claude-opus-4.5",
+          "name": "Claude Opus 4.5",
+          "description": "Frontier Reasoning & Coding"
         },
         {
-          "id": "anthropic/claude-3-haiku",
-          "name": "Claude 3 Haiku",
+          "id": "anthropic/claude-3.5-haiku",
+          "name": "Claude 3.5 Haiku",
           "description": "Schnell und günstig"
         },
         {
-          "id": "google/gemini-pro",
-          "name": "Gemini Pro",
-          "description": "Google's Gemini"
+          "id": "google/gemini-2.5-flash-preview",
+          "name": "Gemini 2.5 Flash",
+          "description": "Google's schnellstes Modell"
         },
         {
-          "id": "meta-llama/llama-3.1-405b-instruct",
-          "name": "Llama 3.1 405B",
-          "description": "Größtes Open-Source-Modell"
+          "id": "google/gemini-2.0-flash",
+          "name": "Gemini 2.0 Flash",
+          "description": "Google Budget-Option"
         }
       ],
       "note": "Modell-Liste kann dynamisch von /models abgerufen werden"

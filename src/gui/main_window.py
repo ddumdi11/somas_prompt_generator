@@ -571,6 +571,44 @@ class MainWindow(QMainWindow):
                     return model.name
         return model_id
 
+    def _load_dynamic_models(self, provider_id: str) -> None:
+        """Lädt Modell-Liste dynamisch von der API (z.B. OpenRouter /models).
+
+        Aktualisiert die models-Liste im Provider, sodass das Dropdown
+        immer die aktuelle Modell-Liste anzeigt.
+        """
+        from src.config.api_config import ProviderModel
+
+        api_key = get_api_key(provider_id)
+        if not api_key:
+            return
+
+        if provider_id == "openrouter":
+            client = OpenRouterClient(api_key)
+        else:
+            return
+
+        try:
+            models_data = client.get_available_models()
+            if models_data:
+                provider = self._api_providers[provider_id]
+                provider.models = [
+                    ProviderModel(
+                        id=m["id"],
+                        name=m["name"],
+                        description=m.get("description", ""),
+                    )
+                    for m in models_data
+                ]
+                logger.info(
+                    f"Dynamische Modell-Liste für {provider_id}: "
+                    f"{len(provider.models)} Modelle"
+                )
+        except Exception as e:
+            logger.warning(
+                f"Dynamische Modelle für {provider_id} nicht geladen: {e}"
+            )
+
     def _set_api_controls_enabled(self, enabled: bool) -> None:
         """Aktiviert/deaktiviert die API-Controls (Provider, Modell, Settings)."""
         self.provider_combo.setEnabled(enabled)
@@ -607,6 +645,11 @@ class MainWindow(QMainWindow):
             return
 
         provider = self._api_providers[provider_id]
+
+        # Dynamische Modell-Liste laden (z.B. OpenRouter /models)
+        if provider.supports_dynamic_models and has_api_key(provider_id):
+            self._load_dynamic_models(provider_id)
+            provider = self._api_providers[provider_id]
 
         # Modell-Dropdown aktualisieren
         self.model_combo.blockSignals(True)
