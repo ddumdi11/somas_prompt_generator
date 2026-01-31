@@ -206,4 +206,4 @@ python -m pytest tests/ -v
 
 ## 📄 Lizenz
 
-Privates Projekt – Thorsten Diederichs
+MIT - Open Source – Thorsten Diederichs
