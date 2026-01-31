@@ -40,7 +40,10 @@ def sanitize_filename(title: str, max_length: int = 50) -> str:
 def export_to_markdown(
     analysis_result: str,
     video_info: Optional[VideoInfo] = None,
-    output_path: Optional[str] = None
+    output_path: Optional[str] = None,
+    model_name: str = "",
+    provider_name: str = "",
+    sources: Optional[list[str]] = None,
 ) -> str:
     """Exportiert die Analyse als Markdown-Datei.
 
@@ -48,11 +51,16 @@ def export_to_markdown(
         analysis_result: Der Analyse-Text
         video_info: Optional - Video-Metadaten für Header
         output_path: Optional - Zielpfad
+        model_name: Optional - Name des verwendeten Modells
+        provider_name: Optional - Name des API-Providers
+        sources: Optional - Liste von Quellen-URLs (z.B. von Perplexity)
 
     Returns:
         Pfad zur erstellten Datei
     """
-    content = get_markdown_content(analysis_result, video_info)
+    content = get_markdown_content(
+        analysis_result, video_info, model_name, provider_name, sources
+    )
 
     if not output_path:
         if video_info:
@@ -70,13 +78,19 @@ def export_to_markdown(
 
 def get_markdown_content(
     analysis_result: str,
-    video_info: Optional[VideoInfo] = None
+    video_info: Optional[VideoInfo] = None,
+    model_name: str = "",
+    provider_name: str = "",
+    sources: Optional[list[str]] = None,
 ) -> str:
     """Gibt den Markdown-Inhalt als String zurück.
 
     Args:
         analysis_result: Der Analyse-Text
         video_info: Optional - Video-Metadaten für Header
+        model_name: Optional - Name des verwendeten Modells
+        provider_name: Optional - Name des API-Providers
+        sources: Optional - Liste von Quellen-URLs (z.B. von Perplexity)
 
     Returns:
         Formatierter Markdown-String
@@ -87,9 +101,18 @@ def get_markdown_content(
         parts.append(f"# SOMAS-Analyse: {video_info.title}\n")
         parts.append(f"**Kanal:** {video_info.channel}  ")
         parts.append(f"**Dauer:** {video_info.duration_formatted}  ")
-        parts.append(f"**URL:** {video_info.url}\n")
+        parts.append(f"**URL:** {video_info.url}  ")
+        if model_name and provider_name:
+            parts.append(f"**Modell:** {model_name} ({provider_name})")
+        parts.append("")
         parts.append("---\n")
 
     parts.append(analysis_result)
+
+    if sources:
+        parts.append("\n\n---\n")
+        parts.append("## Quellen\n")
+        for i, url in enumerate(sources, 1):
+            parts.append(f"[{i}] {url}  ")
 
     return '\n'.join(parts)

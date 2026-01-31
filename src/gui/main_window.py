@@ -469,9 +469,18 @@ class MainWindow(QMainWindow):
             video_title = self.video_info.title if self.video_info else ""
             video_channel = self.video_info.channel if self.video_info else ""
 
+            # API-Modell/Provider-Info für Header
+            model_name = ""
+            provider_name = ""
+            if self._last_api_response:
+                model_name = self._get_model_display_name(
+                    self._last_api_response.model_used
+                )
+                provider_name = self._last_api_response.provider_used
+
             logger.info(f"LinkedIn-Export: {len(result)} Zeichen Eingabe")
             linkedin_text, detailed_sources = format_for_linkedin(
-                result, video_title, video_channel
+                result, video_title, video_channel, model_name, provider_name
             )
             logger.info(f"LinkedIn-Export: {len(linkedin_text)} Zeichen Ausgabe")
 
@@ -517,7 +526,22 @@ class MainWindow(QMainWindow):
 
         if file_path:
             try:
-                export_to_markdown(result, self.video_info, file_path)
+                # API-Modell/Provider-Info und Quellen
+                model_name = ""
+                provider_name = ""
+                sources = None
+                if self._last_api_response:
+                    model_name = self._get_model_display_name(
+                        self._last_api_response.model_used
+                    )
+                    provider_name = self._last_api_response.provider_used
+                    if self._last_api_response.citations:
+                        sources = self._last_api_response.citations
+
+                export_to_markdown(
+                    result, self.video_info, file_path,
+                    model_name, provider_name, sources,
+                )
                 self._show_button_feedback(self.btn_export_markdown, "Saved!")
             except Exception as e:
                 QMessageBox.critical(self, "Fehler", f"Export fehlgeschlagen: {e}")
@@ -537,6 +561,14 @@ class MainWindow(QMainWindow):
         self._show_button_feedback(self.btn_sources_detail, "Copied!")
 
     # --- API-Methoden ---
+
+    def _get_model_display_name(self, model_id: str) -> str:
+        """Gibt den Anzeigenamen für eine Modell-ID zurück."""
+        for provider in self._api_providers.values():
+            for model in provider.models:
+                if model.id == model_id:
+                    return model.name
+        return model_id
 
     def _set_api_controls_enabled(self, enabled: bool) -> None:
         """Aktiviert/deaktiviert die API-Controls (Provider, Modell, Settings)."""

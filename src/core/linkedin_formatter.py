@@ -58,7 +58,10 @@ def to_italic(text: str) -> str:
     return ''.join(UNICODE_ITALIC.get(c, c) for c in text)
 
 
-def create_post_header(title: str, channel: str) -> str:
+def create_post_header(
+    title: str, channel: str,
+    model_name: str = "", provider_name: str = "",
+) -> str:
     """Erstellt den LinkedIn-Post-Header aus Video-Metadaten.
 
     Format:
@@ -66,17 +69,24 @@ def create_post_header(title: str, channel: str) -> str:
         Kanal, YT
 
         𝗦𝗢𝗠𝗔𝗦-𝗔𝗻𝗮𝗹𝘆𝘀𝗲 (fett)
+        via Modell, Provider (optional)
 
     Args:
         title: Video-Titel
         channel: Kanal-Name
+        model_name: Optional - Name des verwendeten Modells
+        provider_name: Optional - Name des API-Providers
 
     Returns:
         Formatierter Header für LinkedIn-Post
     """
     bold_title = to_bold(title)
     bold_somas = to_bold("SOMAS-Analyse")
-    return f"{bold_title}\n{channel}, YT\n\n{bold_somas}\n\n"
+    header = f"{bold_title}\n{channel}, YT\n\n{bold_somas}\n"
+    if model_name and provider_name:
+        header += f"via {model_name}, {provider_name}\n"
+    header += "\n"
+    return header
 
 
 def extract_analysis_body(text: str) -> str:
@@ -141,7 +151,8 @@ def extract_domain_name(url: str) -> str:
 
 
 def format_for_linkedin(
-    text: str, video_title: str = "", video_channel: str = ""
+    text: str, video_title: str = "", video_channel: str = "",
+    model_name: str = "", provider_name: str = "",
 ) -> tuple[str, str]:
     """Konvertiert Markdown-formatierten Text zu LinkedIn-kompatiblem Format.
 
@@ -248,7 +259,9 @@ def format_for_linkedin(
 
     # Post-Header hinzufügen, wenn Video-Infos vorhanden
     if video_title and video_channel:
-        header = create_post_header(video_title, video_channel)
+        header = create_post_header(
+            video_title, video_channel, model_name, provider_name
+        )
         formatted_text = header + formatted_text
 
     # Domain-Namen vor [N]-Markern entfernen (AI gibt oft "domainname URL" aus)
