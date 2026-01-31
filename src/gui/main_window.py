@@ -4,7 +4,7 @@ import logging
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QTextEdit, QMessageBox,
-    QFrame, QApplication, QComboBox
+    QFrame, QApplication, QComboBox, QCheckBox
 )
 from PyQt6.QtCore import Qt, pyqtSlot
 from PyQt6.QtGui import QFont
@@ -16,9 +16,25 @@ from src.core.prompt_builder import (
 )
 from src.core.linkedin_formatter import format_for_linkedin
 from src.core.export import export_to_markdown
+from src.core.api_client import APIResponse, APIStatus
+from src.core.api_worker import APIWorker
+from src.core.perplexity_client import PerplexityClient
+from src.config.api_config import (
+    load_providers, get_api_key, has_api_key,
+    get_last_provider, get_last_model, save_last_selection,
+)
 
 
 logger = logging.getLogger(__name__)
+
+# Status-Farben und Labels für API-Anzeige
+STATUS_DISPLAY = {
+    "idle": ("", "#808080", "Bereit"),
+    "sending": ("", "#2196F3", "Sende..."),
+    "processing": ("", "#FFC107", "Verarbeite..."),
+    "received": ("", "#4CAF50", "Empfangen"),
+    "error": ("", "#F44336", "Fehler"),
+}
 
 
 class MainWindow(QMainWindow):
@@ -29,6 +45,11 @@ class MainWindow(QMainWindow):
         self.video_info: VideoInfo | None = None
         self.config = SomasConfig()
         self.current_preset: PromptPreset | None = None
+
+        # API-State
+        self._api_worker: APIWorker | None = None
+        self._api_providers = load_providers()
+        self._last_api_response: APIResponse | None = None
 
         # Lade Presets mit Fehlerbehandlung
         try:
@@ -46,6 +67,7 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._connect_signals()
         self._on_preset_changed()  # Initialisiere mit erstem Preset
+        self._restore_api_selection()  # Letzte Provider/Modell-Auswahl wiederherstellen
 
     def _setup_ui(self):
         """Initialisiert das UI-Layout."""
@@ -70,6 +92,9 @@ class MainWindow(QMainWindow):
 
         # Preset-Auswahl
         main_layout.addLayout(self._create_preset_section())
+
+        # API-Modus
+        main_layout.addWidget(self._create_api_section())
 
         # Generate Button
         self.btn_generate = QPushButton("Generate Prompt")
@@ -182,6 +207,52 @@ class MainWindow(QMainWindow):
 
         return layout
 
+    def _create_api_section(self) -> QFrame:
+        """Erstellt den API-Modus-Bereich."""
+        frame = QFrame()
+        frame.setFrameStyle(QFrame.Shape.StyledPanel)
+        layout = QVBoxLayout(frame)
+
+        # Zeile 1: Checkbox
+        self.api_checkbox = QCheckBox("API-Automatik aktivieren")
+        layout.addWidget(self.api_checkbox)
+
+        # Zeile 2: Provider + Modell + Settings
+        controls_layout = QHBoxLayout()
+
+        controls_layout.addWidget(QLabel("Provider:"))
+        self.provider_combo = QComboBox()
+        self.provider_combo.setMinimumWidth(150)
+        for provider in self._api_providers.values():
+            self.provider_combo.addItem(provider.name, provider.id)
+        controls_layout.addWidget(self.provider_combo)
+
+        controls_layout.addWidget(QLabel("Modell:"))
+        self.model_combo = QComboBox()
+        self.model_combo.setMinimumWidth(200)
+        controls_layout.addWidget(self.model_combo)
+
+        self.btn_settings = QPushButton("Settings")
+        self.btn_settings.setMaximumWidth(80)
+        controls_layout.addWidget(self.btn_settings)
+
+        controls_layout.addStretch()
+
+        # Status-Anzeige
+        self.api_status_label = QLabel("Bereit")
+        self.api_status_label.setStyleSheet(
+            "padding: 4px 8px; border-radius: 4px; "
+            "background-color: #f0f0f0; color: #808080;"
+        )
+        controls_layout.addWidget(self.api_status_label)
+
+        layout.addLayout(controls_layout)
+
+        # Initial: Controls deaktiviert bis Checkbox aktiv
+        self._set_api_controls_enabled(False)
+
+        return frame
+
     def _create_prompt_section(self) -> QFrame:
         """Erstellt den Prompt-Ausgabebereich."""
         frame = QFrame()
@@ -272,6 +343,11 @@ class MainWindow(QMainWindow):
         self.btn_export_linkedin.clicked.connect(self._on_export_linkedin)
         self.btn_export_markdown.clicked.connect(self._on_export_markdown)
         self.btn_sources_detail.clicked.connect(self._on_copy_sources_detail)
+        # API-Controls
+        self.api_checkbox.toggled.connect(self._on_api_toggle)
+        self.provider_combo.currentIndexChanged.connect(self._on_provider_changed)
+        self.model_combo.currentIndexChanged.connect(self._on_model_changed)
+        self.btn_settings.clicked.connect(self._on_settings)
 
     @pyqtSlot()
     def _on_preset_changed(self) -> None:
@@ -343,6 +419,10 @@ class MainWindow(QMainWindow):
         char_count = len(prompt)
         max_chars = self.current_preset.max_chars if self.current_preset else 2800
         logger.info(f"Prompt generiert: {char_count} Zeichen (Max: {max_chars})")
+
+        # API-Automatik: Falls aktiv, automatisch API-Call starten
+        if self.api_checkbox.isChecked():
+            self._start_api_call(prompt)
 
     @pyqtSlot()
     def _on_copy_prompt(self):
@@ -455,6 +535,190 @@ class MainWindow(QMainWindow):
 
         # Visuelles Feedback
         self._show_button_feedback(self.btn_sources_detail, "Copied!")
+
+    # --- API-Methoden ---
+
+    def _set_api_controls_enabled(self, enabled: bool) -> None:
+        """Aktiviert/deaktiviert die API-Controls (Provider, Modell, Settings)."""
+        self.provider_combo.setEnabled(enabled)
+        self.model_combo.setEnabled(enabled)
+        self.btn_settings.setEnabled(enabled)
+
+    @pyqtSlot(bool)
+    def _on_api_toggle(self, checked: bool) -> None:
+        """Handler für API-Checkbox."""
+        self._set_api_controls_enabled(checked)
+        if checked:
+            self._check_api_key_configured()
+        else:
+            self._update_api_status("idle")
+
+    def _check_api_key_configured(self) -> None:
+        """Prüft ob ein API-Key für den aktuellen Provider konfiguriert ist."""
+        provider_id = self.provider_combo.currentData()
+        if provider_id and not has_api_key(provider_id):
+            self._update_api_status("error")
+            self.api_status_label.setText("Kein API-Key")
+            QMessageBox.information(
+                self,
+                "API-Key fehlt",
+                f"Kein API-Key für {self.provider_combo.currentText()} konfiguriert.\n\n"
+                "Bitte über 'Settings' einen Key eingeben.",
+            )
+
+    @pyqtSlot(int)
+    def _on_provider_changed(self, index: int) -> None:
+        """Handler für Provider-Dropdown-Änderung."""
+        provider_id = self.provider_combo.currentData()
+        if not provider_id or provider_id not in self._api_providers:
+            return
+
+        provider = self._api_providers[provider_id]
+
+        # Modell-Dropdown aktualisieren
+        self.model_combo.blockSignals(True)
+        self.model_combo.clear()
+        for model in provider.models:
+            self.model_combo.addItem(
+                f"{model.name} - {model.description}", model.id
+            )
+
+        # Letztes Modell wiederherstellen oder Default
+        last_model = get_last_model(provider_id)
+        if last_model:
+            for i in range(self.model_combo.count()):
+                if self.model_combo.itemData(i) == last_model:
+                    self.model_combo.setCurrentIndex(i)
+                    break
+        else:
+            # Default-Modell des Providers setzen
+            for i in range(self.model_combo.count()):
+                if self.model_combo.itemData(i) == provider.default_model:
+                    self.model_combo.setCurrentIndex(i)
+                    break
+
+        self.model_combo.blockSignals(False)
+
+        # Key-Status prüfen wenn API aktiv
+        if self.api_checkbox.isChecked():
+            if has_api_key(provider_id):
+                self._update_api_status("idle")
+            else:
+                self._update_api_status("error")
+                self.api_status_label.setText("Kein API-Key")
+
+    @pyqtSlot(int)
+    def _on_model_changed(self, index: int) -> None:
+        """Handler für Modell-Dropdown-Änderung."""
+        # Auswahl speichern
+        provider_id = self.provider_combo.currentData()
+        model_id = self.model_combo.currentData()
+        if provider_id and model_id:
+            save_last_selection(provider_id, model_id)
+
+    @pyqtSlot()
+    def _on_settings(self) -> None:
+        """Handler für Settings-Button."""
+        QMessageBox.information(
+            self,
+            "API-Einstellungen",
+            "Der Settings-Dialog wird in Schritt 4 implementiert.\n\n"
+            "Bis dahin können API-Keys über die Python-Konsole konfiguriert werden:\n\n"
+            "from src.config.api_config import save_api_key\n"
+            "save_api_key('perplexity', 'pplx-...')",
+        )
+
+    def _restore_api_selection(self) -> None:
+        """Stellt die letzte Provider/Modell-Auswahl wieder her."""
+        last_provider = get_last_provider()
+        for i in range(self.provider_combo.count()):
+            if self.provider_combo.itemData(i) == last_provider:
+                self.provider_combo.setCurrentIndex(i)
+                break
+        # Manuell triggern (falls Index bereits 0 war, feuert kein Signal)
+        self._on_provider_changed(self.provider_combo.currentIndex())
+
+    def _update_api_status(self, status: str) -> None:
+        """Aktualisiert die Status-Anzeige."""
+        _, color, text = STATUS_DISPLAY.get(status, ("", "#808080", status))
+        self.api_status_label.setText(text)
+        self.api_status_label.setStyleSheet(
+            f"padding: 4px 8px; border-radius: 4px; "
+            f"background-color: {color}22; color: {color};"
+        )
+
+    def _start_api_call(self, prompt: str) -> None:
+        """Startet einen API-Call im Worker-Thread."""
+        provider_id = self.provider_combo.currentData()
+        model_id = self.model_combo.currentData()
+
+        if not provider_id or not model_id:
+            return
+
+        api_key = get_api_key(provider_id)
+        if not api_key:
+            self._update_api_status("error")
+            self.api_status_label.setText("Kein API-Key")
+            QMessageBox.warning(
+                self,
+                "API-Key fehlt",
+                f"Kein API-Key für {self.provider_combo.currentText()} konfiguriert.",
+            )
+            return
+
+        # Laufenden Worker abbrechen
+        if self._api_worker and self._api_worker.isRunning():
+            self._api_worker.cancel()
+            self._api_worker.wait(2000)
+
+        # Client erstellen (vorerst nur Perplexity)
+        if provider_id == "perplexity":
+            client = PerplexityClient(api_key)
+        else:
+            self._update_api_status("error")
+            self.api_status_label.setText("Provider nicht unterstützt")
+            return
+
+        # Worker starten
+        self._api_worker = APIWorker(client, prompt, model_id)
+        self._api_worker.status_changed.connect(self._on_api_status_changed)
+        self._api_worker.response_received.connect(self._on_api_response)
+        self._api_worker.error_occurred.connect(self._on_api_error)
+        self._api_worker.start()
+
+        # UI während API-Call sperren
+        self.btn_generate.setEnabled(False)
+        self.btn_generate.setText("API-Aufruf läuft...")
+
+    @pyqtSlot(str)
+    def _on_api_status_changed(self, status: str) -> None:
+        """Handler für API-Statusänderungen."""
+        self._update_api_status(status)
+
+    @pyqtSlot(object)
+    def _on_api_response(self, response: APIResponse) -> None:
+        """Handler für erfolgreiche API-Antwort."""
+        self._last_api_response = response
+        self.result_text.setText(response.content)
+        logger.info(
+            f"API-Antwort: {len(response.content)} Zeichen, "
+            f"{response.tokens_used} Tokens ({response.model_used})"
+        )
+
+        # UI entsperren
+        self.btn_generate.setEnabled(True)
+        self.btn_generate.setText("Generate Prompt")
+
+    @pyqtSlot(str)
+    def _on_api_error(self, error_message: str) -> None:
+        """Handler für API-Fehler."""
+        logger.error(f"API-Fehler: {error_message}")
+        self.api_status_label.setText(f"Fehler: {error_message[:50]}")
+        QMessageBox.warning(self, "API-Fehler", error_message)
+
+        # UI entsperren
+        self.btn_generate.setEnabled(True)
+        self.btn_generate.setText("Generate Prompt")
 
     def _show_button_feedback(self, button: QPushButton, message: str):
         """Zeigt kurzes Feedback auf einem Button."""
