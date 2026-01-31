@@ -39,7 +39,12 @@ class PerplexityClient(LLMClient):
         },
     ]
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str) -> None:
+        """Initialisiert den Perplexity-Client.
+
+        Args:
+            api_key: Perplexity API-Key.
+        """
         self.api_key = api_key
         self.headers = {
             "Authorization": f"Bearer {api_key}",

@@ -51,7 +51,12 @@ class OpenRouterClient(LLMClient):
         },
     ]
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str) -> None:
+        """Initialisiert den OpenRouter-Client.
+
+        Args:
+            api_key: OpenRouter API-Key.
+        """
         self.api_key = api_key
         self.headers = {
             "Authorization": f"Bearer {api_key}",
@@ -124,7 +129,14 @@ class OpenRouterClient(LLMClient):
 
             if response.status_code == 200:
                 data = response.json()
-                content = data["choices"][0]["message"]["content"]
+                try:
+                    content = data["choices"][0]["message"]["content"]
+                except (KeyError, IndexError, TypeError) as e:
+                    logger.error(f"Unerwartete API-Antwort-Struktur: {e}")
+                    return APIResponse(
+                        status=APIStatus.ERROR,
+                        error_message=f"Unerwartete API-Antwort: {e}",
+                    )
                 tokens = data.get("usage", {}).get("total_tokens", 0)
 
                 logger.info(

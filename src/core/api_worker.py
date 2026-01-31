@@ -26,7 +26,14 @@ class APIWorker(QThread):
     response_received = pyqtSignal(object)
     error_occurred = pyqtSignal(str)
 
-    def __init__(self, client: LLMClient, prompt: str, model: str):
+    def __init__(self, client: LLMClient, prompt: str, model: str) -> None:
+        """Initialisiert den API-Worker.
+
+        Args:
+            client: LLM-Client-Instanz für den API-Aufruf.
+            prompt: Der zu sendende Prompt-Text.
+            model: Die Modell-ID (z.B. 'sonar-pro').
+        """
         super().__init__()
         self.client = client
         self.prompt = prompt

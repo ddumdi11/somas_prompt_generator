@@ -2,9 +2,11 @@
 
 import logging
 
+from typing import Optional
+
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QGroupBox, QFormLayout, QMessageBox, QComboBox,
+    QPushButton, QGroupBox, QFormLayout, QMessageBox, QComboBox, QWidget,
 )
 from PyQt6.QtCore import pyqtSlot
 from PyQt6.QtGui import QFont
@@ -23,7 +25,12 @@ logger = logging.getLogger(__name__)
 class SettingsDialog(QDialog):
     """Dialog für API-Einstellungen und Key-Verwaltung."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
+        """Initialisiert den Settings-Dialog.
+
+        Args:
+            parent: Optionales Parent-Widget.
+        """
         super().__init__(parent)
         self.setWindowTitle("API-Einstellungen")
         self.setMinimumWidth(550)
