@@ -6,7 +6,7 @@ Unterstützt dynamisches Laden der Modell-Liste via /models Endpoint.
 """
 
 import logging
-from typing import Optional
+from typing import ClassVar, Optional
 
 import requests
 
@@ -23,7 +23,7 @@ class OpenRouterClient(LLMClient):
     PROVIDER_NAME = "OpenRouter"
 
     # Fallback-Modelle falls /models nicht erreichbar (Stand Januar 2026)
-    FALLBACK_MODELS = [
+    FALLBACK_MODELS: ClassVar[list[dict[str, str]]] = [
         {
             "id": "anthropic/claude-sonnet-4.5",
             "name": "Claude Sonnet 4.5",
@@ -40,13 +40,13 @@ class OpenRouterClient(LLMClient):
             "description": "Schnell und günstig",
         },
         {
-            "id": "google/gemini-2.5-flash-preview",
-            "name": "Gemini 2.5 Flash",
-            "description": "Google's schnellstes Modell",
+            "id": "google/gemini-2.5-pro",
+            "name": "Gemini 2.5 Pro",
+            "description": "Google's stärkstes Modell",
         },
         {
-            "id": "google/gemini-2.0-flash",
-            "name": "Gemini 2.0 Flash",
+            "id": "google/gemini-2.5-flash-lite",
+            "name": "Gemini 2.5 Flash Lite",
             "description": "Google Budget-Option",
         },
     ]

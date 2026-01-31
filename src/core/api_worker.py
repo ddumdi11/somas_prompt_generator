@@ -73,7 +73,7 @@ class APIWorker(QThread):
             if not self._cancelled:
                 self.status_changed.emit(APIStatus.ERROR.value)
                 self.error_occurred.emit(str(e))
-                logger.error(f"API-Worker Exception: {e}")
+                logger.exception("API-Worker Exception")
 
     def cancel(self) -> None:
         """Markiert den Worker als abgebrochen.

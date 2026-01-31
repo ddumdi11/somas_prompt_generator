@@ -5,6 +5,7 @@ Perplexity hat keinen /models Endpoint, daher sind die Modelle hardcoded.
 """
 
 import logging
+from typing import ClassVar
 
 import requests
 
@@ -21,7 +22,7 @@ class PerplexityClient(LLMClient):
     PROVIDER_NAME = "Perplexity AI"
 
     # Aktuelle Modellnamen (Stand Januar 2026)
-    MODELS = [
+    MODELS: ClassVar[list[dict[str, str]]] = [
         {
             "id": "sonar",
             "name": "Sonar",
@@ -83,7 +84,14 @@ class PerplexityClient(LLMClient):
 
             if response.status_code == 200:
                 data = response.json()
-                content = data["choices"][0]["message"]["content"]
+                try:
+                    content = data["choices"][0]["message"]["content"]
+                except (KeyError, IndexError, TypeError) as e:
+                    logger.error(f"Unerwartete API-Antwort-Struktur: {e}")
+                    return APIResponse(
+                        status=APIStatus.ERROR,
+                        error_message=f"Unerwartete API-Antwort: {e}",
+                    )
                 tokens = data.get("usage", {}).get("total_tokens", 0)
                 citations = data.get("citations", [])
 
