@@ -11,6 +11,10 @@ yt-dlp>=2024.1.0                 # Metadaten-Extraktion (Titel, Kanal, Dauer)
 # Template Engine (für Prompt-Generierung)
 Jinja2>=3.1.0
 
+# API Integration
+requests>=2.31.0
+keyring>=24.0.0
+
 # PDF Export (später)
 # reportlab>=4.0.0
 

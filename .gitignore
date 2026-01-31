@@ -52,3 +52,6 @@ Thumbs.db
 exports/
 examples/          # Local examples, images, test outputs (not for GitHub)
 Archiv/            # Local archive for old/unused files
+
+# API Config (user-specific, not for GitHub)
+src/config/user_preferences.json
