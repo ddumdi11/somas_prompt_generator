@@ -618,15 +618,18 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot()
     def _on_settings(self) -> None:
-        """Handler für Settings-Button."""
-        QMessageBox.information(
-            self,
-            "API-Einstellungen",
-            "Der Settings-Dialog wird in Schritt 4 implementiert.\n\n"
-            "Bis dahin können API-Keys über die Python-Konsole konfiguriert werden:\n\n"
-            "from src.config.api_config import save_api_key\n"
-            "save_api_key('perplexity', 'pplx-...')",
-        )
+        """Öffnet den Settings-Dialog für API-Key-Verwaltung."""
+        from src.gui.settings_dialog import SettingsDialog
+        dialog = SettingsDialog(self)
+        if dialog.exec():
+            # Nach Speichern: Key-Status prüfen
+            if self.api_checkbox.isChecked():
+                provider_id = self.provider_combo.currentData()
+                if provider_id and has_api_key(provider_id):
+                    self._update_api_status("idle")
+                else:
+                    self._update_api_status("error")
+                    self.api_status_label.setText("Kein API-Key")
 
     def _restore_api_selection(self) -> None:
         """Stellt die letzte Provider/Modell-Auswahl wieder her."""
