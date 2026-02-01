@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "author": "SOMAS Team (Claude.ai + Gemini + Thorsten)",
   "module_logic": "Select one module based on content: KRITIK (bias/ads), OFFENE_FRAGEN (complexity), ZITATE (interviews), or VERBINDUNGEN (history/context).",
   "api_settings": {
@@ -15,7 +15,9 @@
       "sentences_per_section": 3,
       "reading_time_seconds": 90,
       "system_prompt": "Role: Expert Video Analyst. Output: SOMAS-Schema in German. Sections: FRAMING, KERNTHESE, ELABORATION, IMPLIKATION, [MODULE]. Constraints: Exactly 3 short sentences per section. No intro/outro. Direct start with '### FRAMING'. Follow-up question: Max 4 sentences.",
-      "template_file": "somas_standard.txt"
+      "template_file": "somas_standard.txt",
+      "recommended_models": null,
+      "show_model_hint": false
     },
     "linkedin": {
       "id": "li_02",
@@ -25,7 +27,9 @@
       "sentences_per_section": 3,
       "reading_time_seconds": 60,
       "system_prompt": "Role: Social Media Content Strategist. Output: SOMAS-Schema in German. Sections: FRAMING, KERNTHESE (written as a catchy 'Hook'), ELABORATION, IMPLIKATION, [MODULE]. Constraints: Exactly 3 punchy sentences per section. Use active voice. No intro/outro. Follow-up question: Max 3 sentences.",
-      "template_file": "somas_linkedin.txt"
+      "template_file": "somas_linkedin.txt",
+      "recommended_models": null,
+      "show_model_hint": false
     },
     "minimal": {
       "id": "min_03",
@@ -35,7 +39,9 @@
       "sentences_per_section": 1,
       "reading_time_seconds": 20,
       "system_prompt": "Role: Ultra-Concise Summarizer. Output: SOMAS-Schema in German. Sections: FRAMING, KERNTHESE, ELABORATION, IMPLIKATION, [MODULE]. Constraints: Exactly ONE precise sentence per section. Absolute focus on core facts. No intro/outro. Follow-up question: Max 2 sentences.",
-      "template_file": "somas_minimal.txt"
+      "template_file": "somas_minimal.txt",
+      "recommended_models": null,
+      "show_model_hint": false
     },
     "academia": {
       "id": "acad_04",
@@ -45,7 +51,27 @@
       "sentences_per_section": 4,
       "reading_time_seconds": 120,
       "system_prompt": "Role: Academic Researcher & Peer-Reviewer. Output: SOMAS-Schema in German. Sections: FRAMING (Source/Context), KERNTHESE (Primary Hypothesis), ELABORATION (Evidence/Data/Mechanisms), IMPLIKATION (Scientific Impact/Future Research), [MODULE]. Constraints: Formal, objective tone. Exactly 4 precise sentences per section for higher depth. Focus on reproducibility and logical consistency. No intro/outro. Follow-up question: Technical/Academic focus, max 5 sentences.",
-      "template_file": "somas_academia.txt"
+      "template_file": "somas_academia.txt",
+      "recommended_models": null,
+      "show_model_hint": false
+    },
+    "research": {
+      "id": "res_05",
+      "name": "Research (Extended)",
+      "description": "Umfassende Tiefenrecherche ohne Zeichenbegrenzung. Ideal für Deep Research Modelle.",
+      "max_chars": 0,
+      "sentences_per_section": 0,
+      "reading_time_seconds": 0,
+      "system_prompt": "Role: Deep Research Analyst with Web Access. Task: Conduct comprehensive multi-source research on the video content. Output in German. Structure: Use clear sections with headers (## Heading). Include: Executive Summary, detailed analysis of all key points, cross-references to external sources, critical evaluation of claims, and a comprehensive source list at the end. No length constraints - prioritize depth and thoroughness. Always cite sources with [n] notation and list all URLs at the end.",
+      "template_file": "somas_research.txt",
+      "recommended_models": [
+        "perplexity/sonar-deep-research",
+        "perplexity/sonar-pro",
+        "anthropic/claude-3-opus",
+        "openai/gpt-4-turbo"
+      ],
+      "show_model_hint": true,
+      "model_hint_message": "⚠️ Research-Modus: Dieses Preset ist für Deep Research Modelle optimiert (z.B. Perplexity Sonar Deep Research). Diese Modelle ignorieren Zeichenbegrenzungen und liefern umfassende Analysen mit Quellenangaben. Kosten können höher sein!"
     }
   }
 }

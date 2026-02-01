@@ -1,8 +1,13 @@
-"""Prompt-Builder für SOMAS-Analyse-Prompts."""
+"""Prompt-Builder für SOMAS-Analyse-Prompts.
+
+Changelog v0.3.1:
+- Neues Research-Preset mit recommended_models und model_hint
+- Unterstützung für Presets ohne Zeichenbegrenzung (max_chars=0)
+"""
 
 import json
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from jinja2 import Environment, FileSystemLoader
@@ -21,14 +26,37 @@ class PromptPreset:
     reading_time_seconds: int
     system_prompt: str
     template_file: str
+    # Neu in v0.3.1:
+    recommended_models: Optional[List[str]] = None
+    show_model_hint: bool = False
+    model_hint_message: Optional[str] = None
 
     @property
     def reading_time_display(self) -> str:
         """Formatiert die Lesezeit für die Anzeige."""
+        if self.reading_time_seconds == 0:
+            return "variabel"
         if self.reading_time_seconds < 60:
             return f"~{self.reading_time_seconds} Sek."
         minutes = self.reading_time_seconds // 60
         return f"~{minutes} Min."
+    
+    @property
+    def max_chars_display(self) -> str:
+        """Formatiert die Zeichenbegrenzung für die Anzeige."""
+        if self.max_chars == 0:
+            return "unbegrenzt"
+        return f"max. {self.max_chars:,}".replace(',', '.')
+    
+    @property
+    def is_unlimited(self) -> bool:
+        """Prüft ob das Preset keine Zeichenbegrenzung hat."""
+        return self.max_chars == 0
+    
+    @property
+    def has_model_recommendation(self) -> bool:
+        """Prüft ob das Preset Modellempfehlungen hat."""
+        return self.recommended_models is not None and len(self.recommended_models) > 0
 
 
 def get_config_dir() -> Path:
@@ -57,6 +85,10 @@ def load_presets() -> Dict[str, PromptPreset]:
             reading_time_seconds=preset_data["reading_time_seconds"],
             system_prompt=preset_data["system_prompt"],
             template_file=preset_data["template_file"],
+            # Neue Felder mit Defaults für Rückwärtskompatibilität
+            recommended_models=preset_data.get("recommended_models"),
+            show_model_hint=preset_data.get("show_model_hint", False),
+            model_hint_message=preset_data.get("model_hint_message"),
         )
     return presets
 
@@ -72,6 +104,15 @@ def get_preset_by_name(name: str) -> Optional[PromptPreset]:
     presets = load_presets()
     for preset in presets.values():
         if preset.name == name:
+            return preset
+    return None
+
+
+def get_preset_by_id(preset_id: str) -> Optional[PromptPreset]:
+    """Findet ein Preset anhand seiner ID."""
+    presets = load_presets()
+    for preset in presets.values():
+        if preset.id == preset_id:
             return preset
     return None
 
@@ -133,8 +174,10 @@ def build_prompt(
         template_file = "somas_prompt.txt"
 
     # Verwende sentences_per_section vom Preset wenn vorhanden
+    # Bei Research-Preset (sentences_per_section=0) wird dieser Wert nicht verwendet
     sentences_per_section = (
-        preset.sentences_per_section if preset else config.sentences_per_section
+        preset.sentences_per_section if preset and preset.sentences_per_section > 0 
+        else config.sentences_per_section
     )
 
     template = env.get_template(template_file)
@@ -185,3 +228,28 @@ def build_prompt_with_preset(
         time_range=time_range,
         questions=questions.strip() if questions else "",
     )
+
+
+def get_preset_info_for_display(preset: PromptPreset) -> str:
+    """Erstellt einen Info-String für die GUI-Anzeige.
+    
+    Args:
+        preset: Das Preset
+        
+    Returns:
+        Formatierter Info-String für Tooltip oder Beschreibung
+    """
+    info_parts = [preset.description]
+    
+    if preset.is_unlimited:
+        info_parts.append("📝 Keine Zeichenbegrenzung")
+    else:
+        info_parts.append(f"📝 {preset.max_chars_display} Zeichen")
+    
+    info_parts.append(f"⏱️ Lesezeit: {preset.reading_time_display}")
+    
+    if preset.has_model_recommendation:
+        models = ", ".join(m.split("/")[-1] for m in preset.recommended_models[:3])
+        info_parts.append(f"🤖 Empfohlen: {models}")
+    
+    return "\n".join(info_parts)

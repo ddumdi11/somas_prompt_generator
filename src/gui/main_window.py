@@ -15,7 +15,7 @@ from src.core.prompt_builder import (
     build_prompt, load_presets, get_preset_by_name, PromptPreset
 )
 from src.core.linkedin_formatter import format_for_linkedin
-from src.core.export import export_to_markdown
+from src.core.export import export_to_markdown, get_suggested_filename
 from src.core.api_client import APIResponse, APIStatus
 from src.core.api_worker import APIWorker
 from src.core.perplexity_client import PerplexityClient
@@ -363,10 +363,15 @@ class MainWindow(QMainWindow):
             self.reading_time_label.setText(
                 f"Lesezeit: {self.current_preset.reading_time_display}"
             )
-            # Max-Zeichen aktualisieren
+            # Max-Zeichen aktualisieren (nutzt max_chars_display Property)
             self.max_chars_label.setText(
-                f"Max: {self.current_preset.max_chars:,} Zeichen".replace(",", ".")
+                f"Max: {self.current_preset.max_chars_display} Zeichen"
             )
+            # Model-Hint anzeigen (z.B. bei Research-Preset)
+            if self.current_preset.show_model_hint and self.current_preset.model_hint_message:
+                QMessageBox.information(
+                    self, "Preset-Hinweis", self.current_preset.model_hint_message
+                )
         else:
             # Keine Presets verfügbar
             self.preset_description.setText("Keine Presets verfügbar")
@@ -384,6 +389,7 @@ class MainWindow(QMainWindow):
         try:
             self.video_info = get_video_info(url)
             self._display_meta()
+            self._clear_stale_sources()
             self.btn_generate.setEnabled(True)
         except ValueError as e:
             QMessageBox.critical(self, "Fehler", str(e))
@@ -511,11 +517,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Fehler", "Kein Analyse-Ergebnis vorhanden.")
             return
 
-        # Dateiname vorschlagen
-        if self.video_info:
-            default_name = f"{self.video_info.title[:40]}.md"
-        else:
-            default_name = "somas_analyse.md"
+        # Dateiname vorschlagen (sanitized für sichere Dateinamen)
+        preset_name = self.current_preset.name if self.current_preset else ""
+        suggested = get_suggested_filename(self.video_info, preset_name)
+        default_name = f"{suggested}.md"
 
         # Datei-Dialog
         file_path, _ = QFileDialog.getSaveFileName(
@@ -780,6 +785,7 @@ class MainWindow(QMainWindow):
     def _on_api_response(self, response: APIResponse) -> None:
         """Handler für erfolgreiche API-Antwort."""
         self._last_api_response = response
+        self._clear_stale_sources()
         self.result_text.setText(response.content)
         logger.info(
             f"API-Antwort: {len(response.content)} Zeichen, "
@@ -800,6 +806,11 @@ class MainWindow(QMainWindow):
         # UI entsperren
         self.btn_generate.setEnabled(True)
         self.btn_generate.setText("Generate Prompt")
+
+    def _clear_stale_sources(self) -> None:
+        """Setzt den Quellen-Button und -Puffer zurück (verhindert Stale-State)."""
+        self._detailed_sources = ""
+        self.btn_sources_detail.setVisible(False)
 
     def _show_button_feedback(self, button: QPushButton, message: str):
         """Zeigt kurzes Feedback auf einem Button."""

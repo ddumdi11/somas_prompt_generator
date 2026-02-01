@@ -1,0 +1,44 @@
+Führe eine umfassende Tiefenrecherche zum folgenden YouTube-Video durch.
+
+AUFTRAG:
+Analysiere das Video gründlich und recherchiere zusätzliche Hintergrundinformationen aus externen Quellen. Erstelle einen umfassenden Forschungsbericht.
+
+STRUKTUR (flexibel, passe an den Inhalt an):
+
+## Executive Summary
+[Kernaussagen in 3-5 Sätzen]
+
+## Kontext & Hintergrund
+[Wer ist der Sprecher? Welche Agenda? Historischer/thematischer Kontext]
+
+## Detailanalyse
+[Alle wichtigen Punkte des Videos mit kritischer Einordnung]
+
+## Faktencheck & Quellenabgleich
+[Verifizierung der Behauptungen gegen externe Quellen]
+
+## Kritische Bewertung
+[Bias, fehlende Perspektiven, Stärken/Schwächen der Argumentation]
+
+## Weiterführende Recherche
+[Verwandte Themen, offene Fragen, Empfehlungen für tieferes Verständnis]
+
+## Quellen
+[Nummerierte Liste aller verwendeten Quellen mit URLs]
+
+WICHTIG:
+- Keine Zeichenbegrenzung - Tiefe vor Kürze
+- Alle Behauptungen mit [n] referenzieren
+- Quellen-URLs am Ende auflisten
+- Sprache: Deutsch
+{% if questions %}
+ZUSÄTZLICHE FORSCHUNGSFRAGEN:
+{{ questions }}
+{% endif %}
+
+QUELLE:
+YouTube-Video: "{{ video_title }}" von {{ channel_name }}
+URL: {{ video_url }}
+{% if time_range %}
+Zeitbereich: {{ time_range }}
+{% endif %}
