@@ -242,6 +242,11 @@ class MainWindow(QMainWindow):
         self.model_combo.setMinimumWidth(200)
         controls_layout.addWidget(self.model_combo)
 
+        # OpenRouter: FilterableModelSelector (Popup-Dropdown, initial versteckt)
+        self.model_selector = FilterableModelSelector()
+        self.model_selector.setVisible(False)
+        controls_layout.addWidget(self.model_selector)
+
         self.btn_settings = QPushButton("Settings")
         self.btn_settings.setMaximumWidth(80)
         controls_layout.addWidget(self.btn_settings)
@@ -264,11 +269,6 @@ class MainWindow(QMainWindow):
         controls_layout.addWidget(self.api_status_label)
 
         layout.addLayout(controls_layout)
-
-        # OpenRouter FilterableModelSelector (unterhalb der Controls, initial versteckt)
-        self.model_selector = FilterableModelSelector()
-        self.model_selector.setVisible(False)
-        layout.addWidget(self.model_selector)
 
         # Initial: Controls deaktiviert bis Checkbox aktiv
         self._set_api_controls_enabled(False)
