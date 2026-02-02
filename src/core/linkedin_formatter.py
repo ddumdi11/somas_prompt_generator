@@ -153,6 +153,7 @@ def extract_domain_name(url: str) -> str:
 def format_for_linkedin(
     text: str, video_title: str = "", video_channel: str = "",
     model_name: str = "", provider_name: str = "",
+    citations: list[str] | None = None,
 ) -> tuple[str, str]:
     """Konvertiert Markdown-formatierten Text zu LinkedIn-kompatiblem Format.
 
@@ -168,6 +169,11 @@ def format_for_linkedin(
         text: Markdown-formatierter Text
         video_title: Optional - Video-Titel für Post-Header
         video_channel: Optional - Kanal-Name für Post-Header
+        model_name: Optional - Name des verwendeten Modells
+        provider_name: Optional - Name des API-Providers
+        citations: Optional - Liste von Quell-URLs (z.B. von Perplexity API).
+            Wenn vorhanden, werden diese als Quellen übernommen. Die [N]-Marker
+            im Text (von der API gesetzt) bleiben erhalten.
 
     Returns:
         Tuple aus (LinkedIn-Text, Detail-Quellen).
@@ -181,6 +187,14 @@ def format_for_linkedin(
     result_lines: list[str] = []
     collected_sources: list[tuple[int, str, str, str]] = []  # (nr, name, url, domain)
     footnote_counter = 0
+
+    # API-Citations vorbelegen (z.B. Perplexity gibt URLs separat zurück,
+    # der Text enthält bereits [1][2]-Marker ohne die eigentlichen URLs)
+    if citations:
+        for i, url in enumerate(citations, start=1):
+            domain = extract_domain_name(url)
+            collected_sources.append((i, domain, url, domain))
+            footnote_counter = i
 
     # SOMAS-Abschnittsüberschriften (mit und ohne Markdown-Hashes)
     somas_headers = [

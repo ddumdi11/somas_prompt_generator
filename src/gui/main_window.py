@@ -485,9 +485,15 @@ class MainWindow(QMainWindow):
                 )
                 provider_name = self._last_api_response.provider_used
 
+            # Quellen aus API-Response (z.B. Perplexity citations)
+            api_citations = None
+            if self._last_api_response and self._last_api_response.citations:
+                api_citations = self._last_api_response.citations
+
             logger.info(f"LinkedIn-Export: {len(result)} Zeichen Eingabe")
             linkedin_text, detailed_sources = format_for_linkedin(
-                result, video_title, video_channel, model_name, provider_name
+                result, video_title, video_channel, model_name, provider_name,
+                citations=api_citations,
             )
             logger.info(f"LinkedIn-Export: {len(linkedin_text)} Zeichen Ausgabe")
 
