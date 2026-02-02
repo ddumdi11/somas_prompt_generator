@@ -398,7 +398,7 @@ class FilterableModelSelector(QWidget):
             "Modell suchen... (free, cheap)"
         )
         self.search_field.setClearButtonEnabled(True)
-        self.search_field.setMinimumWidth(250)
+        self.search_field.setMinimumWidth(350)
         layout.addWidget(self.search_field)
 
         # Source Model + Filter Proxy

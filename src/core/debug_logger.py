@@ -7,6 +7,7 @@ für Fehleranalyse bei Halluzinationen, Fehlidentifikationen und unerwarteten Ou
 import json
 import logging
 import os
+import re
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -56,7 +57,7 @@ class DebugLogger:
 
         now = datetime.now()
         timestamp = now.strftime('%Y-%m-%d_%H-%M-%S')
-        safe_model = model.replace('/', '_').replace(':', '_')
+        safe_model = re.sub(r'[<>:"/\\|?*]', '_', model)
         log_dir = self.base_dir / f"{timestamp}_{provider}_{safe_model}"
         log_dir.mkdir(parents=True, exist_ok=True)
 
