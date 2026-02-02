@@ -21,6 +21,7 @@ from src.core.api_worker import APIWorker
 from src.core.debug_logger import DebugLogger, APP_VERSION
 from src.core.perplexity_client import PerplexityClient
 from src.core.openrouter_client import OpenRouterClient
+from src.gui.model_selector import FilterableModelSelector, ModelData, extract_provider
 from src.config.api_config import (
     load_providers, get_api_key, has_api_key,
     get_last_provider, get_last_model, save_last_selection,
@@ -53,6 +54,7 @@ class MainWindow(QMainWindow):
         self._api_worker: APIWorker | None = None
         self._api_providers = load_providers()
         self._last_api_response: APIResponse | None = None
+        self._openrouter_raw_models: list[dict] = []
 
         # Debug-Logger (Preference-gesteuert)
         prefs = load_preferences()
@@ -234,7 +236,8 @@ class MainWindow(QMainWindow):
             self.provider_combo.addItem(provider.name, provider.id)
         controls_layout.addWidget(self.provider_combo)
 
-        controls_layout.addWidget(QLabel("Modell:"))
+        self.model_label = QLabel("Modell:")
+        controls_layout.addWidget(self.model_label)
         self.model_combo = QComboBox()
         self.model_combo.setMinimumWidth(200)
         controls_layout.addWidget(self.model_combo)
@@ -261,6 +264,11 @@ class MainWindow(QMainWindow):
         controls_layout.addWidget(self.api_status_label)
 
         layout.addLayout(controls_layout)
+
+        # OpenRouter FilterableModelSelector (unterhalb der Controls, initial versteckt)
+        self.model_selector = FilterableModelSelector()
+        self.model_selector.setVisible(False)
+        layout.addWidget(self.model_selector)
 
         # Initial: Controls deaktiviert bis Checkbox aktiv
         self._set_api_controls_enabled(False)
@@ -361,6 +369,7 @@ class MainWindow(QMainWindow):
         self.api_checkbox.toggled.connect(self._on_api_toggle)
         self.provider_combo.currentIndexChanged.connect(self._on_provider_changed)
         self.model_combo.currentIndexChanged.connect(self._on_model_changed)
+        self.model_selector.model_selected.connect(self._on_openrouter_model_selected)
         self.btn_settings.clicked.connect(self._on_settings)
 
     @pyqtSlot()
@@ -595,11 +604,44 @@ class MainWindow(QMainWindow):
                     return model.name
         return model_id
 
+    def _get_active_model_id(self) -> str | None:
+        """Gibt die Model-ID des aktuell sichtbaren Modell-Selectors zurück."""
+        provider_id = self.provider_combo.currentData()
+        if provider_id == "openrouter":
+            return self.model_selector.get_selected_model_id()
+        return self.model_combo.currentData()
+
+    def _convert_to_model_data(self, raw_models: list[dict]) -> list[ModelData]:
+        """Konvertiert Roh-Modell-Dicts (von OpenRouter) zu ModelData-Objekten."""
+        result = []
+        for m in raw_models:
+            try:
+                price_prompt = float(m.get("pricing_prompt") or "0")
+                price_completion = float(m.get("pricing_completion") or "0")
+            except (ValueError, TypeError):
+                price_prompt = 0.0
+                price_completion = 0.0
+
+            price_input = price_prompt * 1_000_000
+            price_output = price_completion * 1_000_000
+
+            result.append(ModelData(
+                id=m["id"],
+                name=m.get("name", m["id"].split("/")[-1]),
+                provider=extract_provider(m["id"]),
+                context_length=m.get("context_length", 0) or 0,
+                price_input=price_input,
+                price_output=price_output,
+                is_free=(price_prompt == 0 and price_completion == 0),
+            ))
+        return result
+
     def _load_dynamic_models(self, provider_id: str) -> None:
         """Lädt Modell-Liste dynamisch von der API (z.B. OpenRouter /models).
 
         Aktualisiert die models-Liste im Provider, sodass das Dropdown
-        immer die aktuelle Modell-Liste anzeigt.
+        immer die aktuelle Modell-Liste anzeigt. Speichert Roh-Daten
+        für den FilterableModelSelector (Preise, Context-Length).
         """
         from src.config.api_config import ProviderModel
 
@@ -615,6 +657,7 @@ class MainWindow(QMainWindow):
         try:
             models_data = client.get_available_models()
             if models_data:
+                self._openrouter_raw_models = models_data
                 provider = self._api_providers[provider_id]
                 provider.models = [
                     ProviderModel(
@@ -637,6 +680,7 @@ class MainWindow(QMainWindow):
         """Aktiviert/deaktiviert die API-Controls (Provider, Modell, Settings)."""
         self.provider_combo.setEnabled(enabled)
         self.model_combo.setEnabled(enabled)
+        self.model_selector.setEnabled(enabled)
         self.btn_settings.setEnabled(enabled)
 
     @pyqtSlot(bool)
@@ -675,29 +719,58 @@ class MainWindow(QMainWindow):
             self._load_dynamic_models(provider_id)
             provider = self._api_providers[provider_id]
 
-        # Modell-Dropdown aktualisieren
-        self.model_combo.blockSignals(True)
-        self.model_combo.clear()
-        for model in provider.models:
-            self.model_combo.addItem(
-                f"{model.name} - {model.description}", model.id
+        if provider_id == "openrouter":
+            # OpenRouter: FilterableModelSelector anzeigen
+            self.model_combo.setVisible(False)
+            self.model_label.setVisible(False)
+            self.model_selector.setVisible(True)
+
+            # Roh-Daten zu ModelData konvertieren und an Widget übergeben
+            model_data_list = self._convert_to_model_data(
+                self._openrouter_raw_models or [
+                    {
+                        "id": m.id, "name": m.name,
+                        "context_length": 0,
+                        "pricing_prompt": "0", "pricing_completion": "0",
+                    }
+                    for m in provider.models
+                ]
             )
+            self.model_selector.set_models(model_data_list)
 
-        # Letztes Modell wiederherstellen oder Default
-        last_model = get_last_model(provider_id)
-        if last_model:
-            for i in range(self.model_combo.count()):
-                if self.model_combo.itemData(i) == last_model:
-                    self.model_combo.setCurrentIndex(i)
-                    break
+            # Letztes Modell wiederherstellen oder Default
+            last_model = get_last_model(provider_id)
+            if last_model:
+                self.model_selector.set_selected_model_id(last_model)
+            elif provider.default_model:
+                self.model_selector.set_selected_model_id(provider.default_model)
         else:
-            # Default-Modell des Providers setzen
-            for i in range(self.model_combo.count()):
-                if self.model_combo.itemData(i) == provider.default_model:
-                    self.model_combo.setCurrentIndex(i)
-                    break
+            # Andere Provider: Standard-QComboBox
+            self.model_combo.setVisible(True)
+            self.model_label.setVisible(True)
+            self.model_selector.setVisible(False)
 
-        self.model_combo.blockSignals(False)
+            self.model_combo.blockSignals(True)
+            self.model_combo.clear()
+            for model in provider.models:
+                self.model_combo.addItem(
+                    f"{model.name} - {model.description}", model.id
+                )
+
+            # Letztes Modell wiederherstellen oder Default
+            last_model = get_last_model(provider_id)
+            if last_model:
+                for i in range(self.model_combo.count()):
+                    if self.model_combo.itemData(i) == last_model:
+                        self.model_combo.setCurrentIndex(i)
+                        break
+            else:
+                for i in range(self.model_combo.count()):
+                    if self.model_combo.itemData(i) == provider.default_model:
+                        self.model_combo.setCurrentIndex(i)
+                        break
+
+            self.model_combo.blockSignals(False)
 
         # Key-Status prüfen wenn API aktiv
         if self.api_checkbox.isChecked():
@@ -707,9 +780,16 @@ class MainWindow(QMainWindow):
                 self._update_api_status("error")
                 self.api_status_label.setText("Kein API-Key")
 
+    @pyqtSlot(str)
+    def _on_openrouter_model_selected(self, model_id: str) -> None:
+        """Handler für FilterableModelSelector-Auswahl."""
+        provider_id = self.provider_combo.currentData()
+        if provider_id and model_id:
+            save_last_selection(provider_id, model_id)
+
     @pyqtSlot(int)
     def _on_model_changed(self, index: int) -> None:
-        """Handler für Modell-Dropdown-Änderung."""
+        """Handler für Modell-Dropdown-Änderung (Perplexity QComboBox)."""
         # Auswahl speichern
         provider_id = self.provider_combo.currentData()
         model_id = self.model_combo.currentData()
@@ -758,7 +838,7 @@ class MainWindow(QMainWindow):
     def _start_api_call(self, prompt: str) -> None:
         """Startet einen API-Call im Worker-Thread."""
         provider_id = self.provider_combo.currentData()
-        model_id = self.model_combo.currentData()
+        model_id = self._get_active_model_id()
 
         if not provider_id or not model_id:
             return
