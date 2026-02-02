@@ -18,11 +18,13 @@ from src.core.linkedin_formatter import format_for_linkedin
 from src.core.export import export_to_markdown, get_suggested_filename
 from src.core.api_client import APIResponse, APIStatus
 from src.core.api_worker import APIWorker
+from src.core.debug_logger import DebugLogger, APP_VERSION
 from src.core.perplexity_client import PerplexityClient
 from src.core.openrouter_client import OpenRouterClient
 from src.config.api_config import (
     load_providers, get_api_key, has_api_key,
     get_last_provider, get_last_model, save_last_selection,
+    load_preferences,
 )
 
 
@@ -51,6 +53,10 @@ class MainWindow(QMainWindow):
         self._api_worker: APIWorker | None = None
         self._api_providers = load_providers()
         self._last_api_response: APIResponse | None = None
+
+        # Debug-Logger (Preference-gesteuert)
+        prefs = load_preferences()
+        self._debug_logger = DebugLogger(enabled=prefs.get("debug_logging", False))
 
         # Lade Presets mit Fehlerbehandlung
         try:
@@ -238,6 +244,12 @@ class MainWindow(QMainWindow):
         controls_layout.addWidget(self.btn_settings)
 
         controls_layout.addStretch()
+
+        # Debug-Icon (nur sichtbar wenn Debug-Logging aktiv)
+        self.debug_icon_label = QLabel("")
+        self.debug_icon_label.setToolTip("Debug-Logging aktiv — Logs in %TEMP%/somas_debug/")
+        self.debug_icon_label.setVisible(self._debug_logger.enabled)
+        controls_layout.addWidget(self.debug_icon_label)
 
         # Status-Anzeige
         self.api_status_label = QLabel("Bereit")
@@ -718,6 +730,11 @@ class MainWindow(QMainWindow):
                     self._update_api_status("error")
                     self.api_status_label.setText("Kein API-Key")
 
+            # Debug-Logger-Status aktualisieren
+            prefs = load_preferences()
+            self._debug_logger.enabled = prefs.get("debug_logging", False)
+            self.debug_icon_label.setVisible(self._debug_logger.enabled)
+
     def _restore_api_selection(self) -> None:
         """Stellt die letzte Provider/Modell-Auswahl wieder her."""
         last_provider = get_last_provider()
@@ -771,8 +788,24 @@ class MainWindow(QMainWindow):
             self.api_status_label.setText("Provider nicht unterstützt")
             return
 
+        # Debug-Meta zusammenbauen
+        debug_meta = {
+            "app_version": APP_VERSION,
+            "preset_name": self.current_preset.name if self.current_preset else "",
+            "depth": self.config.depth,
+            "language": self.config.language,
+            "api_mode": "automatic",
+            "video_url": self.video_info.url if self.video_info else "",
+            "video_title": self.video_info.title if self.video_info else "",
+            "questions": self.questions_text.toPlainText(),
+        }
+
         # Worker starten
-        self._api_worker = APIWorker(client, prompt, model_id)
+        self._api_worker = APIWorker(
+            client, prompt, model_id,
+            debug_logger=self._debug_logger,
+            debug_meta=debug_meta,
+        )
         self._api_worker.status_changed.connect(self._on_api_status_changed)
         self._api_worker.response_received.connect(self._on_api_response)
         self._api_worker.error_occurred.connect(self._on_api_error)
