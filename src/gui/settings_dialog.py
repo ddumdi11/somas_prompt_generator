@@ -43,6 +43,7 @@ class SettingsDialog(QDialog):
         self._key_inputs: dict[str, QLineEdit] = {}
         self._visibility_buttons: dict[str, QPushButton] = {}
         self._status_labels: dict[str, QLabel] = {}
+        self._debug_logger = DebugLogger()
 
         self._setup_ui()
         self._load_current_keys()
@@ -160,7 +161,7 @@ class SettingsDialog(QDialog):
         group_layout.addRow(self.debug_checkbox)
 
         # Pfadanzeige
-        debug_dir = DebugLogger().base_dir
+        debug_dir = self._debug_logger.base_dir
         path_label = QLabel(str(debug_dir))
         path_label.setStyleSheet("color: gray; font-size: 11px;")
         path_label.setWordWrap(True)
@@ -191,7 +192,7 @@ class SettingsDialog(QDialog):
 
     def _update_debug_log_count(self) -> None:
         """Aktualisiert die Anzeige der Debug-Log-Anzahl."""
-        count = DebugLogger().get_log_count()
+        count = self._debug_logger.get_log_count()
         self.debug_log_count_label.setText(
             f"{count} Log-Einträge" if count > 0 else "Keine Logs vorhanden"
         )
@@ -202,20 +203,25 @@ class SettingsDialog(QDialog):
     @pyqtSlot()
     def _on_open_debug_folder(self) -> None:
         """Öffnet den Debug-Log-Ordner im Dateimanager."""
-        debug_dir = DebugLogger().base_dir
+        debug_dir = self._debug_logger.base_dir
         debug_dir.mkdir(parents=True, exist_ok=True)
-        if sys.platform == "win32":
-            os.startfile(str(debug_dir))
-        elif sys.platform == "darwin":
-            subprocess.run(["open", str(debug_dir)])
-        else:
-            subprocess.run(["xdg-open", str(debug_dir)])
+        try:
+            if sys.platform == "win32":
+                os.startfile(str(debug_dir))
+            elif sys.platform == "darwin":
+                subprocess.run(["open", str(debug_dir)], check=True)
+            else:
+                subprocess.run(["xdg-open", str(debug_dir)], check=True)
+        except Exception as e:
+            logger.warning(f"Ordner konnte nicht geöffnet werden: {e}")
+            QMessageBox.warning(
+                self, "Fehler", f"Ordner konnte nicht geöffnet werden:\n{debug_dir}"
+            )
 
     @pyqtSlot()
     def _on_clear_debug_logs(self) -> None:
         """Löscht alle Debug-Logs nach Bestätigung."""
-        debug_logger = DebugLogger()
-        count = debug_logger.get_log_count()
+        count = self._debug_logger.get_log_count()
         if count == 0:
             QMessageBox.information(self, "Debug-Logs", "Keine Logs vorhanden.")
             return
@@ -227,7 +233,7 @@ class SettingsDialog(QDialog):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply == QMessageBox.StandardButton.Yes:
-            deleted = debug_logger.clear_logs()
+            deleted = self._debug_logger.clear_logs()
             self._update_debug_log_count()
             QMessageBox.information(
                 self, "Debug-Logs", f"{deleted} Log-Einträge gelöscht."

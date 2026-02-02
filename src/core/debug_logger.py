@@ -54,13 +54,14 @@ class DebugLogger:
         if not self.enabled:
             return None
 
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        now = datetime.now()
+        timestamp = now.strftime('%Y-%m-%d_%H-%M-%S')
         safe_model = model.replace('/', '_')
         log_dir = self.base_dir / f"{timestamp}_{provider}_{safe_model}"
         log_dir.mkdir(parents=True, exist_ok=True)
 
         request_data = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": now.isoformat(),
             "provider": provider,
             "model": model,
             "endpoint": endpoint,
@@ -155,8 +156,13 @@ class DebugLogger:
         count = 0
         for d in self.base_dir.iterdir():
             if d.is_dir():
-                shutil.rmtree(d)
-                count += 1
+                try:
+                    shutil.rmtree(d)
+                    count += 1
+                except OSError as e:
+                    logger.warning(
+                        f"Log-Verzeichnis konnte nicht gelöscht werden: {d} - {e}"
+                    )
 
         logger.info(f"Debug-Logs gelöscht: {count} Einträge")
         return count

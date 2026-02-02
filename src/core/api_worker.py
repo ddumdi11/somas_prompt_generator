@@ -100,7 +100,7 @@ class APIWorker(QThread):
                         tokens={"total": response.tokens_used},
                         duration=duration,
                         model_used=response.model_used,
-                        citations=response.citations or None,
+                        citations=response.citations,
                     )
             else:
                 self.status_changed.emit(APIStatus.ERROR.value)

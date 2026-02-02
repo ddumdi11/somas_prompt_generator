@@ -246,7 +246,8 @@ class MainWindow(QMainWindow):
         controls_layout.addStretch()
 
         # Debug-Icon (nur sichtbar wenn Debug-Logging aktiv)
-        self.debug_icon_label = QLabel("")
+        self.debug_icon_label = QLabel("Debug")
+        self.debug_icon_label.setStyleSheet("color: #FFC107; font-weight: bold;")
         self.debug_icon_label.setToolTip("Debug-Logging aktiv — Logs in %TEMP%/somas_debug/")
         self.debug_icon_label.setVisible(self._debug_logger.enabled)
         controls_layout.addWidget(self.debug_icon_label)
