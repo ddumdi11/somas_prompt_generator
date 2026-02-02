@@ -1,12 +1,16 @@
-"""Settings-Dialog für API-Key-Verwaltung."""
+"""Settings-Dialog für API-Key-Verwaltung und Debug-Einstellungen."""
 
 import logging
+import os
+import subprocess
+import sys
 
 from typing import Optional
 
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QGroupBox, QFormLayout, QMessageBox, QComboBox, QWidget,
+    QCheckBox,
 )
 from PyQt6.QtCore import pyqtSlot
 from PyQt6.QtGui import QFont
@@ -18,6 +22,7 @@ from src.config.api_config import (
 )
 from src.core.perplexity_client import PerplexityClient
 from src.core.openrouter_client import OpenRouterClient
+from src.core.debug_logger import DebugLogger
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +43,7 @@ class SettingsDialog(QDialog):
         self._key_inputs: dict[str, QLineEdit] = {}
         self._visibility_buttons: dict[str, QPushButton] = {}
         self._status_labels: dict[str, QLabel] = {}
+        self._debug_logger = DebugLogger()
 
         self._setup_ui()
         self._load_current_keys()
@@ -54,6 +60,9 @@ class SettingsDialog(QDialog):
 
         # Default-Einstellungen
         layout.addWidget(self._create_defaults_group())
+
+        # Debug-Einstellungen
+        layout.addWidget(self._create_debug_group())
 
         # Buttons
         btn_layout = QHBoxLayout()
@@ -139,6 +148,96 @@ class SettingsDialog(QDialog):
         group_layout.addRow("Default-Provider:", self.default_provider_combo)
 
         return group
+
+    def _create_debug_group(self) -> QGroupBox:
+        """Erstellt die Debug-Logging-Gruppe."""
+        group = QGroupBox("Debug-Logging")
+        group_layout = QFormLayout(group)
+
+        # Checkbox
+        self.debug_checkbox = QCheckBox("Debug-Logging aktivieren")
+        prefs = load_preferences()
+        self.debug_checkbox.setChecked(prefs.get("debug_logging", False))
+        group_layout.addRow(self.debug_checkbox)
+
+        # Pfadanzeige
+        debug_dir = self._debug_logger.base_dir
+        path_label = QLabel(str(debug_dir))
+        path_label.setStyleSheet("color: gray; font-size: 11px;")
+        path_label.setWordWrap(True)
+        group_layout.addRow("Speicherort:", path_label)
+
+        # Log-Count + Buttons
+        btn_layout = QHBoxLayout()
+
+        self.debug_log_count_label = QLabel("")
+        self._update_debug_log_count()
+        btn_layout.addWidget(self.debug_log_count_label)
+
+        btn_layout.addStretch()
+
+        btn_open = QPushButton("Ordner öffnen")
+        btn_open.setMaximumWidth(120)
+        btn_open.clicked.connect(self._on_open_debug_folder)
+        btn_layout.addWidget(btn_open)
+
+        btn_clear = QPushButton("Logs löschen")
+        btn_clear.setMaximumWidth(120)
+        btn_clear.clicked.connect(self._on_clear_debug_logs)
+        btn_layout.addWidget(btn_clear)
+
+        group_layout.addRow(btn_layout)
+
+        return group
+
+    def _update_debug_log_count(self) -> None:
+        """Aktualisiert die Anzeige der Debug-Log-Anzahl."""
+        count = self._debug_logger.get_log_count()
+        self.debug_log_count_label.setText(
+            f"{count} Log-Einträge" if count > 0 else "Keine Logs vorhanden"
+        )
+        self.debug_log_count_label.setStyleSheet(
+            "color: gray; font-style: italic;"
+        )
+
+    @pyqtSlot()
+    def _on_open_debug_folder(self) -> None:
+        """Öffnet den Debug-Log-Ordner im Dateimanager."""
+        debug_dir = self._debug_logger.base_dir
+        debug_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            if sys.platform == "win32":
+                os.startfile(str(debug_dir))
+            elif sys.platform == "darwin":
+                subprocess.run(["open", str(debug_dir)], check=True)
+            else:
+                subprocess.run(["xdg-open", str(debug_dir)], check=True)
+        except Exception as e:
+            logger.warning(f"Ordner konnte nicht geöffnet werden: {e}")
+            QMessageBox.warning(
+                self, "Fehler", f"Ordner konnte nicht geöffnet werden:\n{debug_dir}"
+            )
+
+    @pyqtSlot()
+    def _on_clear_debug_logs(self) -> None:
+        """Löscht alle Debug-Logs nach Bestätigung."""
+        count = self._debug_logger.get_log_count()
+        if count == 0:
+            QMessageBox.information(self, "Debug-Logs", "Keine Logs vorhanden.")
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "Logs löschen",
+            f"{count} Debug-Log-Einträge wirklich löschen?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            deleted = self._debug_logger.clear_logs()
+            self._update_debug_log_count()
+            QMessageBox.information(
+                self, "Debug-Logs", f"{deleted} Log-Einträge gelöscht."
+            )
 
     def _load_current_keys(self) -> None:
         """Lädt vorhandene API-Keys und zeigt Status an."""
@@ -228,12 +327,13 @@ class SettingsDialog(QDialog):
                 saved_count += 1
                 logger.info(f"API-Key für '{provider_id}' gespeichert")
 
-        # Default-Provider speichern
+        # Default-Provider und Debug-Setting speichern
+        prefs = load_preferences()
         default_provider = self.default_provider_combo.currentData()
         if default_provider:
-            prefs = load_preferences()
             prefs["last_provider"] = default_provider
-            save_preferences(prefs)
+        prefs["debug_logging"] = self.debug_checkbox.isChecked()
+        save_preferences(prefs)
 
         logger.info(f"{saved_count} API-Key(s) gespeichert")
         self.accept()
