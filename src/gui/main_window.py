@@ -606,6 +606,14 @@ class MainWindow(QMainWindow):
                         f"Ende wurde auf die Videodauer "
                         f"({self.video_info.duration_formatted}) begrenzt."
                     )
+                    # Nach Clamping erneut prüfen: Start < neues Ende
+                    if time_to_seconds(start) >= time_to_seconds(end):
+                        QMessageBox.warning(
+                            self, "Zeitbereich ungültig",
+                            "Start liegt nach der Videodauer — "
+                            "bitte Zeitbereich korrigieren."
+                        )
+                        return
 
             self.config.time_range = TimeRange(
                 start=start,
