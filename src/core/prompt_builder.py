@@ -243,6 +243,10 @@ def build_prompt_from_transcript(
         author=author,
         url=url,
         transcript=transcript,
+        # Aliase für Kompatibilität mit Video-Templates
+        video_title=title,
+        channel_name=author,
+        video_url=url or "",
         depth=config.depth,
         depth_description=config.depth_description,
         sentences_per_section=sentences_per_section,

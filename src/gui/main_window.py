@@ -468,6 +468,7 @@ class MainWindow(QMainWindow):
         self.btn_sources_detail.clicked.connect(self._on_copy_sources_detail)
         # Input-Tabs (YouTube / Transkript)
         self.input_tabs.currentChanged.connect(self._on_input_tab_changed)
+        self.transcript_widget.data_changed.connect(self._update_generate_enabled)
         # Zeitbereich
         self.time_range_checkbox.toggled.connect(self._toggle_time_range_fields)
         # API-Controls
@@ -511,16 +512,24 @@ class MainWindow(QMainWindow):
         is_youtube = index == 0
         # Zeitbereich nur für YouTube-Tab sinnvoll
         self.time_range_frame.setVisible(is_youtube)
-        # Generate-Button aktivieren je nach Tab
-        if is_youtube:
-            # Nur aktivieren wenn echte YouTube-Metadaten vorliegen
+        self._update_generate_enabled()
+
+    @pyqtSlot()
+    def _update_generate_enabled(self) -> None:
+        """Aktualisiert den Enable-Status des Generate-Buttons."""
+        if self._api_worker and self._api_worker.isRunning():
+            self.btn_generate.setEnabled(False)
+            return
+        if self.input_tabs.currentIndex() == 0:
             has_youtube_meta = (
                 self.video_info is not None
                 and self.video_info_source == "youtube"
             )
             self.btn_generate.setEnabled(has_youtube_meta)
         else:
-            self.btn_generate.setEnabled(True)
+            self.btn_generate.setEnabled(
+                self.transcript_widget.has_valid_data()
+            )
 
     @pyqtSlot(bool)
     def _toggle_time_range_fields(self, enabled: bool) -> None:
@@ -606,6 +615,14 @@ class MainWindow(QMainWindow):
                         f"Ende wurde auf die Videodauer "
                         f"({self.video_info.duration_formatted}) begrenzt."
                     )
+                    # Nach Clamping erneut prüfen: Start < neues Ende
+                    if time_to_seconds(start) >= time_to_seconds(end):
+                        QMessageBox.warning(
+                            self, "Zeitbereich ungültig",
+                            "Start liegt nach der Videodauer — "
+                            "bitte Zeitbereich korrigieren."
+                        )
+                        return
 
             self.config.time_range = TimeRange(
                 start=start,
@@ -1145,7 +1162,7 @@ class MainWindow(QMainWindow):
         )
 
         # UI entsperren
-        self.btn_generate.setEnabled(True)
+        self._update_generate_enabled()
         self.btn_generate.setText("Generate Prompt")
 
     @pyqtSlot(str)
@@ -1156,7 +1173,7 @@ class MainWindow(QMainWindow):
         QMessageBox.warning(self, "API-Fehler", error_message)
 
         # UI entsperren
-        self.btn_generate.setEnabled(True)
+        self._update_generate_enabled()
         self.btn_generate.setText("Generate Prompt")
 
     def _clear_stale_sources(self) -> None:
