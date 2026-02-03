@@ -195,6 +195,62 @@ def build_prompt(
     )
 
 
+def build_prompt_from_transcript(
+    title: str,
+    author: str,
+    transcript: str,
+    config: SomasConfig,
+    url: Optional[str] = None,
+    questions: str = "",
+    preset_name: Optional[str] = None,
+) -> str:
+    """Generiert einen SOMAS-Prompt aus manuellem Transkript.
+
+    Verwendet ein eigenes Template (somas_prompt_transcript.txt), das
+    den Transkript-Text direkt in den Prompt einbettet.
+
+    Args:
+        title: Titel der Quelle.
+        author: Autor/Kanal/Sprecher.
+        transcript: Der Transkript-Text.
+        config: SOMAS-Konfiguration (Tiefe, Sprache).
+        url: Optionale Quellen-URL.
+        questions: Optionale Anschlussfragen.
+        preset_name: Name des Presets (für sentences_per_section).
+
+    Returns:
+        Fertig gerenderte Prompt-Zeichenkette.
+    """
+    template_dir = get_template_dir()
+    env = Environment(
+        loader=FileSystemLoader(template_dir),
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+
+    # Sentences_per_section vom Preset wenn vorhanden
+    preset = None
+    sentences_per_section = config.sentences_per_section
+    if preset_name:
+        preset = get_preset_by_name(preset_name)
+        if preset and preset.sentences_per_section > 0:
+            sentences_per_section = preset.sentences_per_section
+
+    template = env.get_template("somas_prompt_transcript.txt")
+
+    return template.render(
+        title=title,
+        author=author,
+        url=url,
+        transcript=transcript,
+        depth=config.depth,
+        depth_description=config.depth_description,
+        sentences_per_section=sentences_per_section,
+        language=config.language,
+        questions=questions.strip() if questions else "",
+    )
+
+
 def build_prompt_with_preset(
     video_info: VideoInfo,
     preset: PromptPreset,

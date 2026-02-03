@@ -22,8 +22,10 @@ DEPTH_SENTENCES = {
 @dataclass
 class TimeRange:
     """Optionaler Zeitbereich für die Analyse."""
-    start: str  # Format: "MM:SS" oder "HH:MM:SS"
+    start: str  # Format: "HH:MM:SS" (normalisiert)
     end: str
+    include_context: bool = False
+    video_duration_formatted: str = ""  # z.B. "45:32" für Kontext-Text
 
 
 @dataclass

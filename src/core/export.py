@@ -195,8 +195,10 @@ def get_markdown_content(
         safe_title = sanitize_unicode_for_export(video_info.title)
         parts.append(f"# SOMAS-Analyse: {safe_title}\n")
         parts.append(f"**Kanal:** {video_info.channel}  ")
-        parts.append(f"**Dauer:** {video_info.duration_formatted}  ")
-        parts.append(f"**URL:** {video_info.url}  ")
+        if video_info.duration > 0:
+            parts.append(f"**Dauer:** {video_info.duration_formatted}  ")
+        if video_info.url:
+            parts.append(f"**URL:** {video_info.url}  ")
         if model_name and provider_name:
             parts.append(f"**Modell:** {model_name} ({provider_name})")
         parts.append("")

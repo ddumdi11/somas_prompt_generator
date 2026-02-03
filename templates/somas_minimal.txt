@@ -6,8 +6,9 @@ STRIKTE FORMATVORGABEN:
 3. Absoluter Fokus auf Kernfakten.
 4. GESAMTZEICHENLIMIT: Der gesamte Output MUSS unter 800 Zeichen bleiben.
 {% if time_range %}
-Zeitbereich: {{ time_range.start }} bis {{ time_range.end }}
-{% endif %}
+{% if time_range.include_context %}Zeitbereich: Ausschnitt {{ time_range.start }} bis {{ time_range.end }} im Kontext des Gesamtvideos (Dauer: {{ time_range.video_duration_formatted }})
+{% else %}Zeitbereich: AUSSCHLIESSLICH {{ time_range.start }} bis {{ time_range.end }}
+{% endif %}{% endif %}
 STRUKTUR:
 ### FRAMING
 [1 präziser Satz zu Sprecher & Kontext]
