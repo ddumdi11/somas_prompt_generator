@@ -93,6 +93,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.video_info: VideoInfo | None = None
+        self.video_info_source: str | None = None  # "youtube" | "transcript"
         self.config = SomasConfig()
         self.current_preset: PromptPreset | None = None
 
@@ -512,7 +513,12 @@ class MainWindow(QMainWindow):
         self.time_range_frame.setVisible(is_youtube)
         # Generate-Button aktivieren je nach Tab
         if is_youtube:
-            self.btn_generate.setEnabled(self.video_info is not None)
+            # Nur aktivieren wenn echte YouTube-Metadaten vorliegen
+            has_youtube_meta = (
+                self.video_info is not None
+                and self.video_info_source == "youtube"
+            )
+            self.btn_generate.setEnabled(has_youtube_meta)
         else:
             self.btn_generate.setEnabled(True)
 
@@ -537,6 +543,7 @@ class MainWindow(QMainWindow):
 
         try:
             self.video_info = get_video_info(url)
+            self.video_info_source = "youtube"
             self._display_meta()
             self._clear_stale_sources()
             self.btn_generate.setEnabled(True)
@@ -565,7 +572,7 @@ class MainWindow(QMainWindow):
             self._generate_from_transcript()
             return
 
-        if not self.video_info:
+        if not self.video_info or self.video_info_source != "youtube":
             QMessageBox.warning(self, "Fehler", "Bitte zuerst Metadaten abrufen.")
             return
 
@@ -646,6 +653,7 @@ class MainWindow(QMainWindow):
             duration=0,
             url=data["url"] or "",
         )
+        self.video_info_source = "transcript"
 
         # Kein Zeitbereich bei Transkript-Modus
         self.config.time_range = None
