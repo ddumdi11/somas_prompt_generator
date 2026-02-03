@@ -11,7 +11,7 @@ import logging
 from dataclasses import dataclass
 
 from PyQt6.QtCore import (
-    QModelIndex, QPoint, QSize, QSortFilterProxyModel, Qt, pyqtSignal,
+    QModelIndex, QPoint, QSize, QSortFilterProxyModel, Qt, pyqtSignal, pyqtSlot,
 )
 from PyQt6.QtGui import (
     QColor, QPainter, QPen, QStandardItem, QStandardItemModel,
@@ -298,7 +298,7 @@ class ModelItemDelegate(QStyledItemDelegate):
             right_text,
         )
 
-    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex):
+    def sizeHint(self, _option: QStyleOptionViewItem, index: QModelIndex) -> QSize:
         """Gibt die bevorzugte Zeilenhöhe zurück."""
         is_header = index.data(ROLE_IS_HEADER)
         if is_header:
@@ -462,6 +462,7 @@ class FilterableModelSelector(QWidget):
 
     # --- Search & Filter ---
 
+    @pyqtSlot(str)
     def _on_search_text_edited(self, text: str) -> None:
         """Handler für Texteingabe im Suchfeld."""
         self._showing_selection = False
@@ -499,6 +500,7 @@ class FilterableModelSelector(QWidget):
 
     # --- Item Selection ---
 
+    @pyqtSlot(QModelIndex)
     def _on_item_clicked(self, proxy_index: QModelIndex) -> None:
         """Handler für Klick auf ein Listen-Item."""
         source_index = self._proxy_model.mapToSource(proxy_index)

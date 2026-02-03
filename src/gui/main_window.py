@@ -744,6 +744,9 @@ class MainWindow(QMainWindow):
                 self.model_selector.set_selected_model_id(last_model)
             elif provider.default_model:
                 self.model_selector.set_selected_model_id(provider.default_model)
+            # Fallback: falls gespeichertes Modell nicht mehr verfügbar
+            if not self.model_selector.get_selected_model_id() and model_data_list:
+                self.model_selector.set_selected_model_id(model_data_list[0].id)
         else:
             # Andere Provider: Standard-QComboBox
             self.model_combo.setVisible(True)
@@ -788,7 +791,7 @@ class MainWindow(QMainWindow):
             save_last_selection(provider_id, model_id)
 
     @pyqtSlot(int)
-    def _on_model_changed(self, index: int) -> None:
+    def _on_model_changed(self, _index: int) -> None:
         """Handler für Modell-Dropdown-Änderung (Perplexity QComboBox)."""
         # Auswahl speichern
         provider_id = self.provider_combo.currentData()
