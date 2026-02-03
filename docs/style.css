@@ -1,5 +1,5 @@
 /* SOMAS Prompt Generator - Landing Page Styles */
-/* Updated for v0.3 with API Integration */
+/* Updated for v0.4.0 with Zeitbereich & Manual Transcript */
 
 /* ========== Reset & Base ========== */
 * {
@@ -128,7 +128,79 @@ a:hover {
     font-style: italic;
 }
 
-/* ========== API Section (NEW) ========== */
+/* ========== Precision Section (NEW in v0.4.0) ========== */
+.precision-section {
+    padding: 80px 20px;
+    background: linear-gradient(180deg, #fef3c7 0%, #fde68a 100%);
+}
+
+.precision-section h2 {
+    text-align: center;
+    font-size: 2rem;
+    margin-bottom: 16px;
+    color: #92400e;
+}
+
+.precision-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+    margin-bottom: 0;
+}
+
+.precision-card {
+    background: white;
+    padding: 32px;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transition: transform 0.2s, box-shadow 0.2s;
+    border-top: 4px solid #f59e0b;
+}
+
+.precision-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+}
+
+.precision-icon {
+    font-size: 2.5rem;
+    display: block;
+    margin-bottom: 16px;
+}
+
+.precision-card h3 {
+    font-size: 1.4rem;
+    margin-bottom: 8px;
+    color: #92400e;
+}
+
+.precision-card > p {
+    color: #666;
+    margin-bottom: 16px;
+}
+
+.precision-features {
+    list-style: none;
+    padding: 0;
+}
+
+.precision-features li {
+    padding: 6px 0;
+    padding-left: 24px;
+    position: relative;
+    color: #555;
+    font-size: 0.95rem;
+}
+
+.precision-features li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: #f59e0b;
+    font-weight: bold;
+}
+
+/* ========== API Section ========== */
 .api-section {
     padding: 80px 20px;
     background: linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 100%);
@@ -272,7 +344,7 @@ a:hover {
 
 .preset-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 24px;
 }
 
@@ -362,6 +434,10 @@ a:hover {
 .step p {
     font-size: 0.95rem;
     color: #666;
+}
+
+.step p strong {
+    color: #2563eb;
 }
 
 .step-arrow {
@@ -519,11 +595,13 @@ a:hover {
     .how-it-works h2,
     .schema-section h2,
     .installation h2,
-    .api-section h2 {
+    .api-section h2,
+    .precision-section h2 {
         font-size: 1.6rem;
     }
     
-    .provider-grid {
+    .provider-grid,
+    .precision-grid {
         grid-template-columns: 1fr;
     }
     
@@ -531,5 +609,9 @@ a:hover {
         top: -10px;
         right: 12px;
         font-size: 0.75rem;
+    }
+    
+    .preset-grid {
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     }
 }
