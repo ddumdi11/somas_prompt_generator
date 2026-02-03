@@ -1,12 +1,10 @@
-Analysiere das folgende YouTube-Video nach dem SOMAS-Schema (Source Overview Mapping And extraction Schema).
+Analysiere das folgende Transkript nach dem SOMAS-Schema (Source Overview Mapping And extraction Schema).
 
 KONFIGURATION:
 - Tiefe: {{ depth }} ({{ depth_description }})
 - Abschnitte: FRAMING, KERNTHESE, ELABORATION, IMPLIKATION + 1 passendes Erweiterungsmodul
 - Sprache: {{ language }}
-{% if time_range %}{% if time_range.include_context %}- Zeitbereich: Analysiere den Ausschnitt {{ time_range.start }} bis {{ time_range.end }} im Kontext des Gesamtvideos (Dauer: {{ time_range.video_duration_formatted }})
-{% else %}- Zeitbereich: Analysiere AUSSCHLIESSLICH {{ time_range.start }} bis {{ time_range.end }}
-{% endif %}{% endif %}
+
 MODUL-AUSWAHL:
 Wähle das Erweiterungsmodul basierend auf dem Inhalt:
 - KRITIK (bei werblichen/einseitigen Inhalten)
@@ -33,10 +31,15 @@ Erstelle genau 5 Absätze mit jeweils {{ sentences_per_section }} Sätzen. Verwe
 [Inhalt des gewählten Erweiterungsmoduls – {{ sentences_per_section }} Sätze]
 
 QUELLE:
-YouTube-Video: "{{ video_title }}" von {{ channel_name }}
-URL: {{ video_url }}
+Titel: "{{ title }}" von {{ author }}
+{% if url %}URL: {{ url }}
+{% endif %}
+TRANSKRIPT:
+"""
+{{ transcript }}
+"""
 {% if questions %}
 ---
-WICHTIG: Analysiere ZUERST das Video vollständig. Anschlussfragen werden NACH der Analyse bearbeitet:
+WICHTIG: Analysiere ZUERST das Transkript vollständig. Anschlussfragen werden NACH der Analyse bearbeitet:
 {{ questions }}
 {% endif %}

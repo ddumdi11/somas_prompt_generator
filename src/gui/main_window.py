@@ -1,18 +1,20 @@
 """Hauptfenster der SOMAS Prompt Generator App."""
 
 import logging
+import re
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QTextEdit, QMessageBox,
-    QFrame, QApplication, QComboBox, QCheckBox
+    QFrame, QApplication, QComboBox, QCheckBox, QTabWidget,
 )
 from PyQt6.QtCore import Qt, pyqtSlot
 from PyQt6.QtGui import QFont
 
-from src.config.defaults import VideoInfo, SomasConfig
+from src.config.defaults import VideoInfo, SomasConfig, TimeRange
 from src.core.youtube_client import get_video_info
 from src.core.prompt_builder import (
-    build_prompt, load_presets, get_preset_by_name, PromptPreset
+    build_prompt, build_prompt_from_transcript,
+    load_presets, get_preset_by_name, PromptPreset,
 )
 from src.core.linkedin_formatter import format_for_linkedin
 from src.core.export import export_to_markdown, get_suggested_filename
@@ -22,6 +24,7 @@ from src.core.debug_logger import DebugLogger, APP_VERSION
 from src.core.perplexity_client import PerplexityClient
 from src.core.openrouter_client import OpenRouterClient
 from src.gui.model_selector import FilterableModelSelector, ModelData, extract_provider
+from src.gui.transcript_widget import TranscriptInputWidget
 from src.config.api_config import (
     load_providers, get_api_key, has_api_key,
     get_last_provider, get_last_model, save_last_selection,
@@ -41,12 +44,56 @@ STATUS_DISPLAY = {
 }
 
 
+def parse_time_input(time_str: str) -> str | None:
+    """Konvertiert MM:SS oder HH:MM:SS zu normalisiertem HH:MM:SS.
+
+    Args:
+        time_str: Zeiteingabe im Format MM:SS oder HH:MM:SS.
+
+    Returns:
+        Normalisiertes HH:MM:SS oder None bei ungültigem Format.
+    """
+    time_str = time_str.strip()
+
+    # HH:MM:SS
+    if re.match(r'^\d{1,2}:\d{2}:\d{2}$', time_str):
+        parts = time_str.split(':')
+        h, m, s = int(parts[0]), int(parts[1]), int(parts[2])
+        if m > 59 or s > 59:
+            return None
+        return f"{h:02d}:{m:02d}:{s:02d}"
+
+    # MM:SS → 00:MM:SS
+    if re.match(r'^\d{1,2}:\d{2}$', time_str):
+        parts = time_str.split(':')
+        m, s = int(parts[0]), int(parts[1])
+        if m > 59 or s > 59:
+            return None
+        return f"00:{m:02d}:{s:02d}"
+
+    return None
+
+
+def time_to_seconds(time_str: str) -> int:
+    """Konvertiert HH:MM:SS zu Gesamtsekunden.
+
+    Args:
+        time_str: Zeitangabe im Format HH:MM:SS.
+
+    Returns:
+        Gesamtsekunden.
+    """
+    parts = time_str.split(':')
+    return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+
+
 class MainWindow(QMainWindow):
     """Hauptfenster der SOMAS Prompt Generator Anwendung."""
 
     def __init__(self):
         super().__init__()
         self.video_info: VideoInfo | None = None
+        self.video_info_source: str | None = None  # "youtube" | "transcript"
         self.config = SomasConfig()
         self.current_preset: PromptPreset | None = None
 
@@ -90,11 +137,26 @@ class MainWindow(QMainWindow):
         main_layout.setSpacing(15)
         main_layout.setContentsMargins(20, 20, 20, 20)
 
-        # URL-Eingabe
-        main_layout.addLayout(self._create_url_section())
+        # Eingabe-Tabs: YouTube URL / Manuelles Transkript
+        self.input_tabs = QTabWidget()
 
-        # Meta-Informationen
-        main_layout.addWidget(self._create_meta_section())
+        # Tab 1: YouTube URL + Meta
+        youtube_tab = QWidget()
+        youtube_layout = QVBoxLayout(youtube_tab)
+        youtube_layout.setContentsMargins(5, 10, 5, 5)
+        youtube_layout.addLayout(self._create_url_section())
+        youtube_layout.addWidget(self._create_meta_section())
+        self.input_tabs.addTab(youtube_tab, "YouTube URL")
+
+        # Tab 2: Manuelles Transkript
+        self.transcript_widget = TranscriptInputWidget()
+        self.input_tabs.addTab(self.transcript_widget, "Manuelles Transkript")
+
+        main_layout.addWidget(self.input_tabs)
+
+        # Zeitbereich (optional, nur für YouTube-Tab sichtbar)
+        self.time_range_frame = self._create_time_range_section()
+        main_layout.addWidget(self.time_range_frame)
 
         # Fragen-Sektion
         main_layout.addWidget(self._create_questions_section())
@@ -157,6 +219,45 @@ class MainWindow(QMainWindow):
         self.meta_text.setMaximumHeight(100)
         self.meta_text.setPlaceholderText("Metadaten werden hier angezeigt...")
         layout.addWidget(self.meta_text)
+
+        return frame
+
+    def _create_time_range_section(self) -> QFrame:
+        """Erstellt den Zeitbereich-Bereich (optional)."""
+        frame = QFrame()
+        frame.setFrameStyle(QFrame.Shape.StyledPanel)
+        layout = QVBoxLayout(frame)
+
+        # Haupt-Checkbox
+        self.time_range_checkbox = QCheckBox("Nur Ausschnitt analysieren")
+        layout.addWidget(self.time_range_checkbox)
+
+        # Start/Ende-Eingabefelder
+        time_layout = QHBoxLayout()
+        time_layout.addWidget(QLabel("Start:"))
+        self.time_start_edit = QLineEdit()
+        self.time_start_edit.setPlaceholderText("00:00:00")
+        self.time_start_edit.setMaximumWidth(100)
+        time_layout.addWidget(self.time_start_edit)
+
+        time_layout.addWidget(QLabel("Ende:"))
+        self.time_end_edit = QLineEdit()
+        self.time_end_edit.setPlaceholderText("00:00:00")
+        self.time_end_edit.setMaximumWidth(100)
+        time_layout.addWidget(self.time_end_edit)
+        time_layout.addStretch()
+        layout.addLayout(time_layout)
+
+        # Kontext-Checkbox
+        self.time_context_checkbox = QCheckBox(
+            "Kontext des Gesamtvideos einbeziehen"
+        )
+        layout.addWidget(self.time_context_checkbox)
+
+        # Initial deaktiviert
+        self.time_start_edit.setEnabled(False)
+        self.time_end_edit.setEnabled(False)
+        self.time_context_checkbox.setEnabled(False)
 
         return frame
 
@@ -365,6 +466,10 @@ class MainWindow(QMainWindow):
         self.btn_export_linkedin.clicked.connect(self._on_export_linkedin)
         self.btn_export_markdown.clicked.connect(self._on_export_markdown)
         self.btn_sources_detail.clicked.connect(self._on_copy_sources_detail)
+        # Input-Tabs (YouTube / Transkript)
+        self.input_tabs.currentChanged.connect(self._on_input_tab_changed)
+        # Zeitbereich
+        self.time_range_checkbox.toggled.connect(self._toggle_time_range_fields)
         # API-Controls
         self.api_checkbox.toggled.connect(self._on_api_toggle)
         self.provider_combo.currentIndexChanged.connect(self._on_provider_changed)
@@ -400,6 +505,34 @@ class MainWindow(QMainWindow):
             self.reading_time_label.setText("")
             self.max_chars_label.setText("")
 
+    @pyqtSlot(int)
+    def _on_input_tab_changed(self, index: int) -> None:
+        """Handler für Tab-Wechsel zwischen YouTube und Transkript."""
+        is_youtube = index == 0
+        # Zeitbereich nur für YouTube-Tab sinnvoll
+        self.time_range_frame.setVisible(is_youtube)
+        # Generate-Button aktivieren je nach Tab
+        if is_youtube:
+            # Nur aktivieren wenn echte YouTube-Metadaten vorliegen
+            has_youtube_meta = (
+                self.video_info is not None
+                and self.video_info_source == "youtube"
+            )
+            self.btn_generate.setEnabled(has_youtube_meta)
+        else:
+            self.btn_generate.setEnabled(True)
+
+    @pyqtSlot(bool)
+    def _toggle_time_range_fields(self, enabled: bool) -> None:
+        """Aktiviert/deaktiviert die Zeitbereich-Eingabefelder."""
+        self.time_start_edit.setEnabled(enabled)
+        self.time_end_edit.setEnabled(enabled)
+        self.time_context_checkbox.setEnabled(enabled)
+        if not enabled:
+            self.time_start_edit.clear()
+            self.time_end_edit.clear()
+            self.time_context_checkbox.setChecked(False)
+
     @pyqtSlot()
     def _on_get_meta(self):
         """Handler für 'Get Meta' Button."""
@@ -410,6 +543,7 @@ class MainWindow(QMainWindow):
 
         try:
             self.video_info = get_video_info(url)
+            self.video_info_source = "youtube"
             self._display_meta()
             self._clear_stale_sources()
             self.btn_generate.setEnabled(True)
@@ -433,9 +567,58 @@ class MainWindow(QMainWindow):
     @pyqtSlot()
     def _on_generate_prompt(self):
         """Handler für 'Generate Prompt' Button."""
-        if not self.video_info:
+        # Transcript-Tab aktiv → eigene Generierungslogik
+        if self.input_tabs.currentIndex() == 1:
+            self._generate_from_transcript()
+            return
+
+        if not self.video_info or self.video_info_source != "youtube":
             QMessageBox.warning(self, "Fehler", "Bitte zuerst Metadaten abrufen.")
             return
+
+        # Zeitbereich validieren und setzen
+        if self.time_range_checkbox.isChecked():
+            start = parse_time_input(self.time_start_edit.text())
+            end = parse_time_input(self.time_end_edit.text())
+
+            if not start or not end:
+                QMessageBox.warning(
+                    self, "Zeitbereich ungültig",
+                    "Bitte Start und Ende im Format MM:SS oder HH:MM:SS eingeben."
+                )
+                return
+
+            if time_to_seconds(start) >= time_to_seconds(end):
+                QMessageBox.warning(
+                    self, "Zeitbereich ungültig",
+                    "Start muss vor Ende liegen."
+                )
+                return
+
+            # Ende auf Videodauer begrenzen
+            if self.video_info and self.video_info.duration > 0:
+                if time_to_seconds(end) > self.video_info.duration:
+                    dur = self.video_info.duration
+                    end = f"{dur // 3600:02d}:{(dur % 3600) // 60:02d}:{dur % 60:02d}"
+                    self.time_end_edit.setText(end)
+                    QMessageBox.information(
+                        self, "Zeitbereich angepasst",
+                        f"Ende wurde auf die Videodauer "
+                        f"({self.video_info.duration_formatted}) begrenzt."
+                    )
+
+            self.config.time_range = TimeRange(
+                start=start,
+                end=end,
+                include_context=self.time_context_checkbox.isChecked(),
+                video_duration_formatted=(
+                    self.video_info.duration_formatted
+                    if self.video_info and self.video_info.duration > 0
+                    else ""
+                ),
+            )
+        else:
+            self.config.time_range = None
 
         questions = self.questions_text.toPlainText()
 
@@ -450,6 +633,52 @@ class MainWindow(QMainWindow):
         logger.info(f"Prompt generiert: {char_count} Zeichen (Max: {max_chars})")
 
         # API-Automatik: Falls aktiv, automatisch API-Call starten
+        if self.api_checkbox.isChecked():
+            self._start_api_call(prompt)
+
+    def _generate_from_transcript(self) -> None:
+        """Generiert einen SOMAS-Prompt aus manuellem Transkript."""
+        data = self.transcript_widget.get_data()
+        if not data:
+            QMessageBox.warning(
+                self, "Fehlende Eingaben",
+                "Bitte Titel und Transkript eingeben."
+            )
+            return
+
+        # VideoInfo für Export-Kompatibilität erstellen
+        self.video_info = VideoInfo(
+            title=data["title"],
+            channel=data["author"],
+            duration=0,
+            url=data["url"] or "",
+        )
+        self.video_info_source = "transcript"
+
+        # Kein Zeitbereich bei Transkript-Modus
+        self.config.time_range = None
+
+        questions = self.questions_text.toPlainText()
+        preset_name = self.current_preset.name if self.current_preset else None
+
+        prompt = build_prompt_from_transcript(
+            title=data["title"],
+            author=data["author"],
+            transcript=data["transcript"],
+            config=self.config,
+            url=data["url"],
+            questions=questions,
+            preset_name=preset_name,
+        )
+        self.prompt_text.setText(prompt)
+
+        char_count = len(prompt)
+        logger.info(
+            f"Transkript-Prompt generiert: {char_count} Zeichen, "
+            f"{data['word_count']} Wörter Transkript"
+        )
+
+        # API-Automatik
         if self.api_checkbox.isChecked():
             self._start_api_call(prompt)
 
