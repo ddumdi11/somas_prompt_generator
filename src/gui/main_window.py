@@ -58,12 +58,18 @@ def parse_time_input(time_str: str) -> str | None:
     # HH:MM:SS
     if re.match(r'^\d{1,2}:\d{2}:\d{2}$', time_str):
         parts = time_str.split(':')
-        return f"{int(parts[0]):02d}:{parts[1]}:{parts[2]}"
+        h, m, s = int(parts[0]), int(parts[1]), int(parts[2])
+        if m > 59 or s > 59:
+            return None
+        return f"{h:02d}:{m:02d}:{s:02d}"
 
     # MM:SS → 00:MM:SS
     if re.match(r'^\d{1,2}:\d{2}$', time_str):
         parts = time_str.split(':')
-        return f"00:{int(parts[0]):02d}:{parts[1]}"
+        m, s = int(parts[0]), int(parts[1])
+        if m > 59 or s > 59:
+            return None
+        return f"00:{m:02d}:{s:02d}"
 
     return None
 
@@ -582,13 +588,16 @@ class MainWindow(QMainWindow):
                 )
                 return
 
-            # Warnung wenn Ende > Videodauer
+            # Ende auf Videodauer begrenzen
             if self.video_info and self.video_info.duration > 0:
                 if time_to_seconds(end) > self.video_info.duration:
-                    QMessageBox.warning(
-                        self, "Zeitbereich-Hinweis",
-                        f"Ende ({end}) liegt nach der Videodauer "
-                        f"({self.video_info.duration_formatted})."
+                    dur = self.video_info.duration
+                    end = f"{dur // 3600:02d}:{(dur % 3600) // 60:02d}:{dur % 60:02d}"
+                    self.time_end_edit.setText(end)
+                    QMessageBox.information(
+                        self, "Zeitbereich angepasst",
+                        f"Ende wurde auf die Videodauer "
+                        f"({self.video_info.duration_formatted}) begrenzt."
                     )
 
             self.config.time_range = TimeRange(
