@@ -23,31 +23,46 @@ class OpenRouterClient(LLMClient):
     PROVIDER_NAME = "OpenRouter"
 
     # Fallback-Modelle falls /models nicht erreichbar (Stand Januar 2026)
-    FALLBACK_MODELS: ClassVar[list[dict[str, str]]] = [
+    FALLBACK_MODELS: ClassVar[list[dict]] = [
         {
             "id": "anthropic/claude-sonnet-4.5",
             "name": "Claude Sonnet 4.5",
             "description": "Anthropic's beliebtestes Modell",
+            "context_length": 200000,
+            "pricing_prompt": "0.000003",
+            "pricing_completion": "0.000015",
         },
         {
             "id": "anthropic/claude-opus-4.5",
             "name": "Claude Opus 4.5",
             "description": "Frontier Reasoning & Coding",
+            "context_length": 200000,
+            "pricing_prompt": "0.000015",
+            "pricing_completion": "0.000075",
         },
         {
             "id": "anthropic/claude-3.5-haiku",
             "name": "Claude 3.5 Haiku",
             "description": "Schnell und günstig",
+            "context_length": 200000,
+            "pricing_prompt": "0.0000008",
+            "pricing_completion": "0.000004",
         },
         {
             "id": "google/gemini-2.5-pro",
             "name": "Gemini 2.5 Pro",
             "description": "Google's stärkstes Modell",
+            "context_length": 1000000,
+            "pricing_prompt": "0.00000125",
+            "pricing_completion": "0.00001",
         },
         {
             "id": "google/gemini-2.5-flash-lite",
             "name": "Gemini 2.5 Flash Lite",
             "description": "Google Budget-Option",
+            "context_length": 1000000,
+            "pricing_prompt": "0",
+            "pricing_completion": "0",
         },
     ]
 
@@ -87,10 +102,14 @@ class OpenRouterClient(LLMClient):
                 for m in data.get("data", []):
                     model_id = m.get("id", "")
                     model_name = m.get("name", model_id)
+                    pricing = m.get("pricing", {})
                     models.append({
                         "id": model_id,
                         "name": model_name,
                         "description": self._format_model_description(m),
+                        "context_length": m.get("context_length", 0),
+                        "pricing_prompt": str(pricing.get("prompt") or "0"),
+                        "pricing_completion": str(pricing.get("completion") or "0"),
                     })
 
                 if models:
