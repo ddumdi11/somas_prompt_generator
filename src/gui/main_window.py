@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QTextEdit, QMessageBox,
     QFrame, QApplication, QComboBox, QCheckBox, QTabWidget,
+    QScrollArea,
 )
 from PyQt6.QtCore import Qt, pyqtSlot
 from PyQt6.QtGui import QFont
@@ -131,9 +132,14 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("SOMAS Prompt Generator")
         self.setMinimumSize(800, 700)
 
-        # Zentrales Widget
+        # ScrollArea als Container (damit CollapsibleSections Platz erzwingen können)
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.setCentralWidget(scroll_area)
+
         central_widget = QWidget()
-        self.setCentralWidget(central_widget)
+        scroll_area.setWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
         main_layout.setSpacing(15)
         main_layout.setContentsMargins(20, 20, 20, 20)

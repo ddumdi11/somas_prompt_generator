@@ -34,7 +34,7 @@ class CollapsibleSection(QWidget):
         super().__init__(parent)
         self._expanded = True
         self._title = title
-        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -91,7 +91,7 @@ class CollapsibleSection(QWidget):
         # Body-Container
         self._body = QWidget()
         self._body.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
         )
         self._body.setStyleSheet(
             "background-color: white; "
