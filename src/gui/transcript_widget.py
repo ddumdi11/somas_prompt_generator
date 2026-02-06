@@ -63,7 +63,7 @@ class TranscriptInputWidget(QWidget):
             "Unterstützt: Eigene Transkriptionen, Podcast-Mitschnitte, "
             "Vortragsnotizen, korrigierte Untertitel etc."
         )
-        self.transcript_edit.setMinimumHeight(120)
+        self.transcript_edit.setMinimumHeight(150)
         self.transcript_edit.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
