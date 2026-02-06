@@ -209,7 +209,7 @@ class MainWindow(QMainWindow):
 
     def _create_meta_section(self) -> CollapsibleSection:
         """Erstellt den Metadaten-Bereich als einklappbare Sektion."""
-        self.meta_section = CollapsibleSection("Quellen-Informationen")
+        section = CollapsibleSection("Quellen-Informationen")
 
         content = QWidget()
         layout = QVBoxLayout(content)
@@ -220,13 +220,14 @@ class MainWindow(QMainWindow):
         self.meta_text.setPlaceholderText("Metadaten werden hier angezeigt...")
         layout.addWidget(self.meta_text)
 
-        self.meta_section.set_content_widget(content)
-        return self.meta_section
+        section.set_content_widget(content)
+        self.meta_section = section
+        return section
 
     def _create_time_range_section(self) -> CollapsibleSection:
         """Erstellt den Zeitbereich-Bereich als einklappbare Sektion."""
-        self.time_range_section = CollapsibleSection("Zeitbereich (optional)")
-        self.time_range_section.set_summary("Inaktiv")
+        section = CollapsibleSection("Zeitbereich (optional)")
+        section.set_summary("Inaktiv")
 
         content = QWidget()
         layout = QVBoxLayout(content)
@@ -263,9 +264,10 @@ class MainWindow(QMainWindow):
         self.time_end_edit.setEnabled(False)
         self.time_context_checkbox.setEnabled(False)
 
-        self.time_range_section.set_content_widget(content)
-        self.time_range_section.collapse()  # Standard: eingeklappt
-        return self.time_range_section
+        section.set_content_widget(content)
+        section.collapse()  # Standard: eingeklappt
+        self.time_range_section = section
+        return section
 
     def _create_questions_section(self) -> QFrame:
         """Erstellt den Fragen-Bereich."""
@@ -565,6 +567,7 @@ class MainWindow(QMainWindow):
             self.time_context_checkbox.setChecked(False)
         self._update_time_range_summary()
 
+    @pyqtSlot()
     def _update_time_range_summary(self) -> None:
         """Aktualisiert die Zusammenfassung im Zeitbereich-Header."""
         if not self.time_range_checkbox.isChecked():
@@ -625,11 +628,11 @@ class MainWindow(QMainWindow):
         if len(self.video_info.title) > 40:
             title_short += "…"
         transcript_status = (
-            "Transkript ✓" if self.video_info.transcript else "Kein Transkript"
+            "Transkript \u2713" if self.video_info.transcript else "Kein Transkript"
         )
         self.meta_section.set_summary(
-            f"✓ {title_short} · {self.video_info.channel} "
-            f"· {self.video_info.duration_formatted} · {transcript_status}",
+            f"\u2713 {title_short} \u00b7 {self.video_info.channel} "
+            f"\u00b7 {self.video_info.duration_formatted} \u00b7 {transcript_status}",
             color="#2E7D32",
         )
         self.meta_section.collapse()

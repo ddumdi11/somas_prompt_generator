@@ -155,7 +155,14 @@ class TranscriptInputWidget(QWidget):
     def set_auto_transcript(
         self, transcript: str, title: str, author: str, url: str = ""
     ) -> None:
-        """Befüllt das Widget mit einem automatisch geholten Transkript."""
+        """Befüllt das Widget mit einem automatisch geholten Transkript.
+
+        Args:
+            transcript: Der Transkript-Text.
+            title: Titel der Quelle.
+            author: Autor/Kanal der Quelle.
+            url: Optionale URL der Quelle.
+        """
         self._original_transcript = transcript
         self._auto_source = True
         self.title_edit.setText(title)
@@ -174,6 +181,7 @@ class TranscriptInputWidget(QWidget):
         )
         self.info_section.collapse()
 
+    @pyqtSlot()
     def reset_transcript(self) -> None:
         """Stellt das Original-Transkript wieder her."""
         if self._original_transcript:

@@ -6,7 +6,7 @@ from typing import Optional
 
 import yt_dlp
 from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound
+from youtube_transcript_api import TranscriptsDisabled, NoTranscriptFound
 
 from src.config.defaults import VideoInfo
 
@@ -61,7 +61,7 @@ def get_video_info(url: str) -> VideoInfo:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
 
-        # Transkript parallel abrufen (optional, Fehler nicht kritisch)
+        # Transkript abrufen (optional, Fehler nicht kritisch)
         transcript = get_transcript(url) or ""
 
         return VideoInfo(

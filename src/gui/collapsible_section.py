@@ -8,7 +8,8 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QSizePolicy, QApplication,
 )
-from PyQt6.QtCore import pyqtSignal, Qt
+from PyQt6.QtCore import pyqtSignal, pyqtSlot, Qt
+from PyQt6.QtGui import QMouseEvent
 
 
 class ClickableHeader(QFrame):
@@ -20,7 +21,7 @@ class ClickableHeader(QFrame):
         super().__init__(parent)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
-    def mousePressEvent(self, event) -> None:
+    def mousePressEvent(self, event: QMouseEvent | None) -> None:
         self.clicked.emit()
         super().mousePressEvent(event)
 
@@ -102,6 +103,7 @@ class CollapsibleSection(QWidget):
         self._body_layout.setContentsMargins(10, 8, 10, 8)
         layout.addWidget(self._body)
 
+    @pyqtSlot()
     def _on_header_clicked(self) -> None:
         """Toggle bei Klick auf den Header."""
         if self._expanded:
