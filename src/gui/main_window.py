@@ -23,6 +23,7 @@ from src.core.api_worker import APIWorker
 from src.core.debug_logger import DebugLogger, APP_VERSION
 from src.core.perplexity_client import PerplexityClient
 from src.core.openrouter_client import OpenRouterClient
+from src.gui.collapsible_section import CollapsibleSection
 from src.gui.model_selector import FilterableModelSelector, ModelData, extract_provider
 from src.gui.transcript_widget import TranscriptInputWidget
 from src.config.api_config import (
@@ -200,27 +201,21 @@ class MainWindow(QMainWindow):
 
         return layout
 
-    def _create_meta_section(self) -> QFrame:
-        """Erstellt den Metadaten-Bereich."""
-        frame = QFrame()
-        frame.setFrameStyle(QFrame.Shape.StyledPanel)
-        layout = QVBoxLayout(frame)
+    def _create_meta_section(self) -> CollapsibleSection:
+        """Erstellt den Metadaten-Bereich als einklappbare Sektion."""
+        self.meta_section = CollapsibleSection("Quellen-Informationen")
 
-        # Header
-        header_layout = QHBoxLayout()
-        header_label = QLabel("META-INFORMATIONEN")
-        header_label.setFont(QFont("", -1, QFont.Weight.Bold))
-        header_layout.addWidget(header_label)
-        header_layout.addStretch()
-        layout.addLayout(header_layout)
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(0, 0, 0, 0)
 
-        # Metadaten-Textfeld (editierbar)
         self.meta_text = QTextEdit()
         self.meta_text.setMaximumHeight(100)
         self.meta_text.setPlaceholderText("Metadaten werden hier angezeigt...")
         layout.addWidget(self.meta_text)
 
-        return frame
+        self.meta_section.set_content_widget(content)
+        return self.meta_section
 
     def _create_time_range_section(self) -> QFrame:
         """Erstellt den Zeitbereich-Bereich (optional)."""
@@ -572,6 +567,16 @@ class MainWindow(QMainWindow):
             f"URL: {self.video_info.url}"
         )
         self.meta_text.setText(meta_text)
+
+        # Zusammenfassung setzen und einklappen
+        title_short = self.video_info.title[:40]
+        if len(self.video_info.title) > 40:
+            title_short += "…"
+        self.meta_section.set_summary(
+            f"✓ {title_short} · {self.video_info.channel} "
+            f"· {self.video_info.duration_formatted}"
+        )
+        self.meta_section.collapse()
 
     @pyqtSlot()
     def _on_generate_prompt(self):
