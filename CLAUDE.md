@@ -6,11 +6,12 @@
 
 ## 🎯 Projektkontext
 
-**Name:** SOMAS Prompt Generator  
-**Zweck:** Desktop-App zur Generierung von SOMAS-Analyse-Prompts für YouTube-Videos  
-**Sprache:** Python 3.11+  
-**GUI-Framework:** PyQt6  
-**Entwickler:** Thorsten Diederichs  
+**Name:** SOMAS Prompt Generator
+**Version:** 0.4.0
+**Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
+**Sprache:** Python 3.11+
+**GUI-Framework:** PyQt6
+**Entwickler:** Thorsten Diederichs
 
 ---
 
@@ -25,24 +26,42 @@ somas_prompt_generator/
 │
 ├── src/
 │   ├── gui/                # PyQt6-Komponenten
-│   │   └── main_window.py      # QMainWindow mit Preset-Dropdown, Export-Buttons
+│   │   ├── main_window.py      # QMainWindow mit Tabs, Preset-Dropdown, API-Controls
+│   │   ├── model_selector.py   # FilterableModelSelector (OpenRouter-Modellauswahl)
+│   │   ├── settings_dialog.py  # Einstellungsdialog (API-Keys)
+│   │   └── transcript_widget.py # Manuelles Transkript-Eingabewidget
 │   │
 │   ├── core/               # Business-Logik
 │   │   ├── youtube_client.py   # Metadaten via yt-dlp
-│   │   ├── prompt_builder.py   # SOMAS-Prompt + Preset-Handling
+│   │   ├── prompt_builder.py   # SOMAS-Prompt + Preset-Handling + Transkript-Builder
 │   │   ├── linkedin_formatter.py # Unicode-Formatierung für LinkedIn
-│   │   └── export.py           # Markdown-Export
+│   │   ├── export.py           # Markdown-Export
+│   │   ├── api_client.py       # API-Abstraktion (Provider-Routing)
+│   │   ├── api_worker.py       # QThread-Worker für async API-Calls
+│   │   ├── perplexity_client.py # Perplexity Sonar/Deep Research
+│   │   ├── openrouter_client.py # OpenRouter (200+ Modelle)
+│   │   └── debug_logger.py     # Debug-Logging mit Version/Session-Info
 │   │
 │   └── config/             # Konfiguration
-│       ├── defaults.py         # SOMAS-Defaults (VideoInfo, SomasConfig)
-│       └── prompt_presets.json # 4 Preset-Varianten (Standard, LinkedIn, Minimal, Academia)
+│       ├── defaults.py         # SOMAS-Defaults (VideoInfo, SomasConfig, TimeRange)
+│       ├── api_config.py       # API-Provider-Konfiguration
+│       ├── prompt_presets.json  # 5 Preset-Varianten
+│       ├── api_providers.json   # Provider-Definitionen (Perplexity, OpenRouter)
+│       └── user_preferences.json # Benutzereinstellungen
 │
 ├── templates/
 │   ├── somas_prompt.txt        # Basis-Prompt-Template (Jinja2)
+│   ├── somas_prompt_transcript.txt # Transkript-spezifisches Template
 │   ├── somas_standard.txt      # Standard-Preset (2.800 Zeichen)
 │   ├── somas_linkedin.txt      # LinkedIn-Preset (2.200 Zeichen)
 │   ├── somas_minimal.txt       # Minimal-Preset (800 Zeichen)
-│   └── somas_academia.txt      # Academia-Preset (3.000 Zeichen)
+│   ├── somas_academia.txt      # Academia-Preset (3.000 Zeichen)
+│   └── somas_research.txt      # Research-Preset (unbegrenzt)
+│
+├── docs/                   # GitHub Pages Landing Page
+│   ├── index.html
+│   ├── style.css
+│   └── assets/
 │
 └── tests/                  # Test-Dateien (lokal)
     └── *.md                    # SOMAS-Analyse-Beispiele
@@ -63,17 +82,25 @@ somas_prompt_generator/
 
 - Layouts: `QVBoxLayout`, `QHBoxLayout`, `QGridLayout`
 - Widgets:
-  - `QLineEdit` für URL-Eingabe
+  - `QTabWidget` für Eingabemodus-Wechsel (YouTube / Transkript)
+  - `QLineEdit` für URL-Eingabe und Zeitbereich
   - `QTextEdit` für mehrzeilige Felder (mit `setReadOnly()` bei Bedarf)
   - `QPushButton` für Aktionen
-  - `QCheckBox` für Lock/Unlock-Toggle
+  - `QCheckBox` für Toggles (Zeitbereich, API-Automatik, Kontext)
+  - `QComboBox` für Preset- und Provider-Auswahl
 - Signals/Slots: Verwende `@pyqtSlot` Decorator
 
 ### Fehlerbehandlung
 
-- `try/except` um externe API-Aufrufe (YouTube)
+- `try/except` um externe API-Aufrufe (YouTube, Perplexity, OpenRouter)
 - Benutzerfreundliche Fehlermeldungen in der GUI (`QMessageBox`)
-- Logging für Debug-Zwecke (`logging` Modul)
+- Logging über `debug_logger.py` (`logging` Modul)
+
+### State-Management
+
+- `self.video_info_source` ("youtube" | "transcript") trackt die Metadaten-Herkunft
+- Verhindert stale Metadata bei Tab-Wechsel
+- `_update_generate_enabled()` zentralisiert die Button-State-Logik
 
 ---
 
@@ -83,6 +110,9 @@ somas_prompt_generator/
 PyQt6>=6.4.0
 youtube-transcript-api>=0.6.0
 yt-dlp>=2024.1.0
+Jinja2>=3.1.0
+requests>=2.31.0
+keyring>=24.0.0
 ```
 
 **Installation:**
@@ -92,161 +122,22 @@ pip install -r requirements.txt
 
 ---
 
-## 🎨 GUI-Layout (Mockup)
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  SOMAS Prompt Generator                              [_][□][X]│
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  YouTube URL: [________________________________] [Get Meta] │
-│                                                             │
-├─────────────────────────────────────────────────────────────┤
-│  META-INFORMATIONEN                              [🔓 Edit]  │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ Titel: Example Video Title                          │   │
-│  │ Kanal: Channel Name                                 │   │
-│  │ Dauer: 15:32                                        │   │
-│  │ URL: https://youtube.com/...                        │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                                                             │
-├─────────────────────────────────────────────────────────────┤
-│  FRAGEN (optional):                                         │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │                                                     │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                                                             │
-│  [Generate Prompt]                                          │
-│                                                             │
-├─────────────────────────────────────────────────────────────┤
-│  GENERIERTER PROMPT                                [Copy]   │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ Analysiere das folgende YouTube-Video nach dem     │   │
-│  │ SOMAS-Schema...                                    │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                                                             │
-├─────────────────────────────────────────────────────────────┤
-│  ANALYSE-ERGEBNIS                          [🔒 Lock] [Paste]│
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │                                                     │   │
-│  │                                                     │   │
-│  │                                                     │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                                                             │
-│  [Export: LinkedIn] [Export: Markdown] [Export: PDF]        │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
 ## 📝 SOMAS-Prompt-Template
 
-Das Template in `templates/somas_prompt.txt`:
+Das Template in `templates/somas_prompt.txt` verwendet Jinja2 mit kontextabhängigem Zeitbereich-Rendering:
 
 ```
-Analysiere das folgende YouTube-Video nach dem SOMAS-Schema (Source Overview Mapping And extraction Schema).
-
-KONFIGURATION:
-- Tiefe: {{ depth }} ({{ depth_description }})
-- Abschnitte: FRAMING, KERNTHESE, ELABORATION, IMPLIKATION + 1 passendes Erweiterungsmodul
-- Sprache: {{ language }}
 {% if time_range %}
-- Zeitbereich: {{ time_range.start }} bis {{ time_range.end }}
+{% if time_range.include_context %}
+- Zeitbereich: Fokus auf {{ time_range.start }} bis {{ time_range.end }}
+  (mit Gesamtkontext des Videos von {{ time_range.video_duration_formatted }})
+{% else %}
+- Zeitbereich: Nur {{ time_range.start }} bis {{ time_range.end }} analysieren
 {% endif %}
-
-MODUL-AUSWAHL:
-Wähle das Erweiterungsmodul basierend auf dem Inhalt:
-- KRITIK (bei werblichen/einseitigen Inhalten)
-- OFFENE_FRAGEN (bei komplexen/unvollständigen Themen)
-- ZITATE (bei Interviews mit starken O-Tönen)
-- VERBINDUNGEN (bei Themen mit historischen Bezügen)
-
-OUTPUT-FORMAT:
-Erstelle genau 5 Absätze mit jeweils {{ sentences_per_section }} Sätzen:
-
-### FRAMING
-[Wer spricht, welches Format, welcher Kontext – {{ sentences_per_section }} Sätze]
-
-### KERNTHESE
-[Zentrale Aussage oder Position des Inhalts – {{ sentences_per_section }} Sätze]
-
-### ELABORATION
-[Vertiefung, Mechanismen, Belege oder Wendepunkte – {{ sentences_per_section }} Sätze]
-
-### IMPLIKATION
-[Fazit, Empfehlung, Zielgruppe, Bedeutung – {{ sentences_per_section }} Sätze]
-
-### [GEWÄHLTES MODUL]
-[Inhalt des gewählten Erweiterungsmoduls – {{ sentences_per_section }} Sätze]
-
-QUELLE:
-YouTube-Video: "{{ video_title }}" von {{ channel_name }}
-URL: {{ video_url }}
-{% if questions %}
-
----
-ANSCHLUSSFRAGEN (nach der Analyse separat beantworten):
-{{ questions }}
 {% endif %}
 ```
 
----
-
-## 🔄 Workflow
-
-### 1. URL eingeben → Metadaten abrufen
-
-```python
-# youtube_client.py
-def get_video_info(url: str) -> VideoInfo:
-    """Holt Metadaten via yt-dlp."""
-    ydl_opts = {'quiet': True, 'no_warnings': True}
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=False)
-    return VideoInfo(
-        title=info['title'],
-        channel=info['uploader'],
-        duration=info['duration'],
-        url=url
-    )
-```
-
-### 2. Prompt generieren
-
-```python
-# prompt_builder.py
-def build_prompt(video_info: VideoInfo, config: SomasConfig, questions: str = "") -> str:
-    """Generiert SOMAS-Prompt aus Template."""
-    template = load_template('somas_prompt.txt')
-    return template.render(
-        video_title=video_info.title,
-        channel_name=video_info.channel,
-        video_url=video_info.url,
-        depth=config.depth,
-        depth_description=DEPTH_DESCRIPTIONS[config.depth],
-        sentences_per_section=DEPTH_SENTENCES[config.depth],
-        language=config.language,
-        time_range=config.time_range,
-        questions=questions
-    )
-```
-
-### 3. LinkedIn-Formatierung
-
-```python
-# linkedin_formatter.py
-UNICODE_BOLD = {
-    'A': '𝗔', 'B': '𝗕', 'C': '𝗖', ...
-}
-
-def format_for_linkedin(text: str) -> str:
-    """Konvertiert Markdown zu LinkedIn-kompatiblem Format."""
-    # ### HEADING → 𝗛𝗘𝗔𝗗𝗜𝗡𝗚
-    # **bold** → 𝗯𝗼𝗹𝗱
-    # - item → • item
-    pass
-```
+Für manuelles Transkript wird `templates/somas_prompt_transcript.txt` verwendet mit den Variablen `title`, `author`, `transcript` (+ Aliase `video_title`, `channel_name`, `video_url`).
 
 ---
 
@@ -255,6 +146,7 @@ def format_for_linkedin(text: str) -> str:
 1. **YouTube Shorts** – Sehr kurze Videos (< 60s) haben oft kein ausreichendes Transkript
 2. **Neue Videos** – Transkripte sind erst nach einigen Stunden verfügbar
 3. **LinkedIn** – Keine echte Markdown-Unterstützung, nur Unicode-Workarounds
+4. **Window-Sizing** – Meta-Bereich erfordert ggf. Fenstervergrößerung (Design-Frage für spätere Releases)
 
 ---
 
@@ -266,10 +158,10 @@ Für Entwicklungstests:
 TEST_URLS = [
     # Standard-Video (lang genug für Standard-Analyse)
     "https://www.youtube.com/watch?v=2yVJffNplJc",  # Taylor Lorenz
-    
+
     # Kürzeres Video
     "https://www.youtube.com/watch?v=MZWansUMeS8",  # Based Camp Collins
-    
+
     # YouTube Short (für Kurzquellen-Handling)
     "https://www.youtube.com/shorts/8tYx3kJNnhI",  # Candace Owens Short
 ]
@@ -287,13 +179,13 @@ TEST_URLS = [
 - [x] `prompt_builder.py` – Prompt-Generierung mit Preset-Unterstützung
 - [x] Templates-Ordner mit 5 Templates (Basis + 4 Presets)
 
-### Phase 2: Vollständige GUI (teilweise erledigt)
+### Phase 2: Vollständige GUI ✅
 
-- [x] Meta-Eingabe – Editierbares Metadaten-Feld in main_window.py
+- [x] Meta-Eingabe – Editierbares Metadaten-Feld
 - [x] Prompt-Anzeige – Mit Copy-Button
 - [x] Ergebnis-Feld – Mit Paste-Button
 - [x] Preset-Auswahl – Dropdown mit Beschreibung, Lesezeit, Zeichenlimit
-- [ ] Lock-Toggle für Ergebnis-Feld (optional)
+- [x] 5 Presets (Standard, LinkedIn, Minimal, Academia, Research)
 
 ### Phase 3: Export ✅
 
@@ -301,11 +193,28 @@ TEST_URLS = [
 - [x] `export.py` – Markdown-Export
 - [ ] PDF-Export (später/optional)
 
-### Phase 4: Erweiterungen
+### Phase 4: API-Integration ✅ (v0.3.0)
 
-- [ ] API-Integration (Gemini/Claude – Modell wählbar)
-- [ ] Konfigurationsdialog
+- [x] Perplexity AI (Sonar, Sonar Pro, Deep Research)
+- [x] OpenRouter (200+ Modelle, dynamische Preisanzeige)
+- [x] FilterableModelSelector mit Suchfeld und Filtern
+- [x] API-Keys im System-Keyring (Windows Credential Manager)
+- [x] Ein-Klick-Analyse (API-Automatik)
+- [x] Debug-Logger mit Session-Tracking
+
+### Phase 5: Präzise Analyse ✅ (v0.4.0)
+
+- [x] Zeitbereich-Analyse (Start/Ende, Kontext-Option)
+- [x] Manuelles Transkript (Podcasts, Vorträge, etc.)
+- [x] Tab-basierte Eingabe (YouTube / Transkript)
+- [x] video_info_source Tracking
+- [x] Landing Page aktualisiert
+
+### Phase 6: Geplant
+
+- [ ] Konfigurationsdialog erweitern
 - [ ] Batch-Modus
+- [ ] Window-Sizing optimieren
 
 ---
 
@@ -317,8 +226,6 @@ TEST_URLS = [
 | **Programmierer** | Claude Code (VS Code) | Implementierung, Code schreiben, Tests ausführen |
 | **Supervisor/PO** | Thorsten | Entscheidungen, manuelles Testing, Feedback, Richtung vorgeben |
 
-**Kilo-Code** = API-Anbindung im fertigen Produkt (nicht Entwicklungstool)
-
 ---
 
 ## 📞 Kontakt / Fragen
@@ -327,4 +234,4 @@ Bei Unklarheiten: Frag nach! Lieber einmal zu viel als eine falsche Annahme tref
 
 ---
 
-*Letzte Aktualisierung: 2025-01-28*
+*Letzte Aktualisierung: 2026-02-06*
