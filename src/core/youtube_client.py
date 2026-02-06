@@ -92,8 +92,8 @@ def get_transcript(url: str, language: str = "de") -> Optional[str]:
         return None
 
     try:
-        # Versuche zuerst die bevorzugte Sprache
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        api = YouTubeTranscriptApi()
+        transcript_list = api.list(video_id)
 
         try:
             transcript = transcript_list.find_transcript([language])
@@ -107,7 +107,7 @@ def get_transcript(url: str, language: str = "de") -> Optional[str]:
 
         # Transkript-Einträge zu Text zusammenfügen
         entries = transcript.fetch()
-        text_parts = [entry['text'] for entry in entries]
+        text_parts = [snippet.text for snippet in entries]
         return ' '.join(text_parts)
 
     except TranscriptsDisabled:
