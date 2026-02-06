@@ -6,7 +6,7 @@ from typing import Optional
 
 import yt_dlp
 from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound
+from youtube_transcript_api import TranscriptsDisabled, NoTranscriptFound
 
 from src.config.defaults import VideoInfo
 
@@ -61,11 +61,15 @@ def get_video_info(url: str) -> VideoInfo:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
 
+        # Transkript abrufen (optional, Fehler nicht kritisch)
+        transcript = get_transcript(url) or ""
+
         return VideoInfo(
             title=info.get('title', 'Unbekannter Titel'),
             channel=info.get('uploader', 'Unbekannter Kanal'),
             duration=info.get('duration', 0),
             url=url,
+            transcript=transcript,
         )
     except Exception as e:
         logger.error(f"Fehler beim Abruf der Metadaten: {e}")
@@ -88,8 +92,8 @@ def get_transcript(url: str, language: str = "de") -> Optional[str]:
         return None
 
     try:
-        # Versuche zuerst die bevorzugte Sprache
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        api = YouTubeTranscriptApi()
+        transcript_list = api.list(video_id)
 
         try:
             transcript = transcript_list.find_transcript([language])
@@ -103,7 +107,7 @@ def get_transcript(url: str, language: str = "de") -> Optional[str]:
 
         # Transkript-Einträge zu Text zusammenfügen
         entries = transcript.fetch()
-        text_parts = [entry['text'] for entry in entries]
+        text_parts = [snippet.text for snippet in entries]
         return ' '.join(text_parts)
 
     except TranscriptsDisabled:

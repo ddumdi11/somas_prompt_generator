@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QTextEdit, QMessageBox,
     QFrame, QApplication, QComboBox, QCheckBox, QTabWidget,
+    QScrollArea,
 )
 from PyQt6.QtCore import Qt, pyqtSlot
 from PyQt6.QtGui import QFont
@@ -23,6 +24,7 @@ from src.core.api_worker import APIWorker
 from src.core.debug_logger import DebugLogger, APP_VERSION
 from src.core.perplexity_client import PerplexityClient
 from src.core.openrouter_client import OpenRouterClient
+from src.gui.collapsible_section import CollapsibleSection
 from src.gui.model_selector import FilterableModelSelector, ModelData, extract_provider
 from src.gui.transcript_widget import TranscriptInputWidget
 from src.config.api_config import (
@@ -130,9 +132,14 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("SOMAS Prompt Generator")
         self.setMinimumSize(800, 700)
 
-        # Zentrales Widget
+        # ScrollArea als Container (damit CollapsibleSections Platz erzwingen können)
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.setCentralWidget(scroll_area)
+
         central_widget = QWidget()
-        self.setCentralWidget(central_widget)
+        scroll_area.setWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
         main_layout.setSpacing(15)
         main_layout.setContentsMargins(20, 20, 20, 20)
@@ -150,13 +157,13 @@ class MainWindow(QMainWindow):
 
         # Tab 2: Manuelles Transkript
         self.transcript_widget = TranscriptInputWidget()
-        self.input_tabs.addTab(self.transcript_widget, "Manuelles Transkript")
+        self.input_tabs.addTab(self.transcript_widget, "Transkript")
 
         main_layout.addWidget(self.input_tabs)
 
         # Zeitbereich (optional, nur für YouTube-Tab sichtbar)
-        self.time_range_frame = self._create_time_range_section()
-        main_layout.addWidget(self.time_range_frame)
+        self.time_range_section = self._create_time_range_section()
+        main_layout.addWidget(self.time_range_section)
 
         # Fragen-Sektion
         main_layout.addWidget(self._create_questions_section())
@@ -200,33 +207,31 @@ class MainWindow(QMainWindow):
 
         return layout
 
-    def _create_meta_section(self) -> QFrame:
-        """Erstellt den Metadaten-Bereich."""
-        frame = QFrame()
-        frame.setFrameStyle(QFrame.Shape.StyledPanel)
-        layout = QVBoxLayout(frame)
+    def _create_meta_section(self) -> CollapsibleSection:
+        """Erstellt den Metadaten-Bereich als einklappbare Sektion."""
+        section = CollapsibleSection("Quellen-Informationen")
 
-        # Header
-        header_layout = QHBoxLayout()
-        header_label = QLabel("META-INFORMATIONEN")
-        header_label.setFont(QFont("", -1, QFont.Weight.Bold))
-        header_layout.addWidget(header_label)
-        header_layout.addStretch()
-        layout.addLayout(header_layout)
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(0, 0, 0, 0)
 
-        # Metadaten-Textfeld (editierbar)
         self.meta_text = QTextEdit()
         self.meta_text.setMaximumHeight(100)
         self.meta_text.setPlaceholderText("Metadaten werden hier angezeigt...")
         layout.addWidget(self.meta_text)
 
-        return frame
+        section.set_content_widget(content)
+        self.meta_section = section
+        return section
 
-    def _create_time_range_section(self) -> QFrame:
-        """Erstellt den Zeitbereich-Bereich (optional)."""
-        frame = QFrame()
-        frame.setFrameStyle(QFrame.Shape.StyledPanel)
-        layout = QVBoxLayout(frame)
+    def _create_time_range_section(self) -> CollapsibleSection:
+        """Erstellt den Zeitbereich-Bereich als einklappbare Sektion."""
+        section = CollapsibleSection("Zeitbereich (optional)")
+        section.set_summary("Inaktiv")
+
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(0, 0, 0, 0)
 
         # Haupt-Checkbox
         self.time_range_checkbox = QCheckBox("Nur Ausschnitt analysieren")
@@ -259,7 +264,10 @@ class MainWindow(QMainWindow):
         self.time_end_edit.setEnabled(False)
         self.time_context_checkbox.setEnabled(False)
 
-        return frame
+        section.set_content_widget(content)
+        section.collapse()  # Standard: eingeklappt
+        self.time_range_section = section
+        return section
 
     def _create_questions_section(self) -> QFrame:
         """Erstellt den Fragen-Bereich."""
@@ -469,8 +477,16 @@ class MainWindow(QMainWindow):
         # Input-Tabs (YouTube / Transkript)
         self.input_tabs.currentChanged.connect(self._on_input_tab_changed)
         self.transcript_widget.data_changed.connect(self._update_generate_enabled)
+        self.transcript_widget.data_changed.connect(
+            lambda: self._update_transcript_tab_indicator(
+                self.transcript_widget.has_valid_data()
+            )
+        )
         # Zeitbereich
         self.time_range_checkbox.toggled.connect(self._toggle_time_range_fields)
+        self.time_start_edit.textChanged.connect(self._update_time_range_summary)
+        self.time_end_edit.textChanged.connect(self._update_time_range_summary)
+        self.time_context_checkbox.toggled.connect(self._update_time_range_summary)
         # API-Controls
         self.api_checkbox.toggled.connect(self._on_api_toggle)
         self.provider_combo.currentIndexChanged.connect(self._on_provider_changed)
@@ -511,8 +527,16 @@ class MainWindow(QMainWindow):
         """Handler für Tab-Wechsel zwischen YouTube und Transkript."""
         is_youtube = index == 0
         # Zeitbereich nur für YouTube-Tab sinnvoll
-        self.time_range_frame.setVisible(is_youtube)
+        self.time_range_section.setVisible(is_youtube)
         self._update_generate_enabled()
+
+    def _update_transcript_tab_indicator(self, has_content: bool) -> None:
+        """Zeigt/versteckt den grünen Punkt am Transkript-Tab."""
+        tab_index = 1  # Transkript-Tab
+        if has_content:
+            self.input_tabs.setTabText(tab_index, "Transkript \u25cf")
+        else:
+            self.input_tabs.setTabText(tab_index, "Transkript")
 
     @pyqtSlot()
     def _update_generate_enabled(self) -> None:
@@ -541,6 +565,20 @@ class MainWindow(QMainWindow):
             self.time_start_edit.clear()
             self.time_end_edit.clear()
             self.time_context_checkbox.setChecked(False)
+        self._update_time_range_summary()
+
+    @pyqtSlot()
+    def _update_time_range_summary(self) -> None:
+        """Aktualisiert die Zusammenfassung im Zeitbereich-Header."""
+        if not self.time_range_checkbox.isChecked():
+            self.time_range_section.set_summary("Inaktiv")
+            return
+        start = self.time_start_edit.text() or "00:00"
+        end = self.time_end_edit.text() or "?"
+        context = " (mit Kontext)" if self.time_context_checkbox.isChecked() else ""
+        self.time_range_section.set_summary(
+            f"{start} – {end}{context}", color="#2E7D32"
+        )
 
     @pyqtSlot()
     def _on_get_meta(self):
@@ -556,6 +594,18 @@ class MainWindow(QMainWindow):
             self._display_meta()
             self._clear_stale_sources()
             self.btn_generate.setEnabled(True)
+
+            # Transkript-Brücke: YouTube-Transkript in Transkript-Tab übernehmen
+            if self.video_info.transcript:
+                self.transcript_widget.set_auto_transcript(
+                    transcript=self.video_info.transcript,
+                    title=self.video_info.title,
+                    author=self.video_info.channel,
+                    url=self.video_info.url,
+                )
+                self._update_transcript_tab_indicator(has_content=True)
+            else:
+                self._update_transcript_tab_indicator(has_content=False)
         except ValueError as e:
             QMessageBox.critical(self, "Fehler", str(e))
             logger.error(f"Fehler beim Abrufen der Metadaten: {e}")
@@ -572,6 +622,20 @@ class MainWindow(QMainWindow):
             f"URL: {self.video_info.url}"
         )
         self.meta_text.setText(meta_text)
+
+        # Zusammenfassung setzen und einklappen
+        title_short = self.video_info.title[:40]
+        if len(self.video_info.title) > 40:
+            title_short += "…"
+        transcript_status = (
+            "Transkript \u2713" if self.video_info.transcript else "Kein Transkript"
+        )
+        self.meta_section.set_summary(
+            f"\u2713 {title_short} \u00b7 {self.video_info.channel} "
+            f"\u00b7 {self.video_info.duration_formatted} \u00b7 {transcript_status}",
+            color="#2E7D32",
+        )
+        self.meta_section.collapse()
 
     @pyqtSlot()
     def _on_generate_prompt(self):

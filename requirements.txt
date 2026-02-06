@@ -5,7 +5,7 @@
 PyQt6>=6.4.0
 
 # YouTube Integration
-youtube-transcript-api>=0.6.0    # Transkript-Zugriff (wie NotebookLM)
+youtube-transcript-api>=1.0.0    # Transkript-Zugriff (v1.x API)
 yt-dlp>=2024.1.0                 # Metadaten-Extraktion (Titel, Kanal, Dauer)
 
 # Template Engine (für Prompt-Generierung)
