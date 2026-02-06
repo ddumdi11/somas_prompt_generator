@@ -17,7 +17,7 @@
 
 ## 📁 Projektstruktur
 
-```
+```text
 somas_prompt_generator/
 ├── main.py                 # Entry point – startet die PyQt6-App
 ├── requirements.txt        # Dependencies
@@ -57,6 +57,12 @@ somas_prompt_generator/
 │   ├── somas_minimal.txt       # Minimal-Preset (800 Zeichen)
 │   ├── somas_academia.txt      # Academia-Preset (3.000 Zeichen)
 │   └── somas_research.txt      # Research-Preset (unbegrenzt)
+│
+├── specs/                  # Entwicklungs-Spezifikationen
+│   ├── API_INTEGRATION_SPEC.md
+│   ├── OPENROUTER_MODEL_FILTER_SPEC.md
+│   ├── MODEL_RATING_SPEC_DRAFT.md
+│   └── UI_REDESIGN_SPEC.md     # NEU: v0.4.1 Collapsible Sections
 │
 ├── docs/                   # GitHub Pages Landing Page
 │   ├── index.html
@@ -126,7 +132,7 @@ pip install -r requirements.txt
 
 Das Template in `templates/somas_prompt.txt` verwendet Jinja2 mit kontextabhängigem Zeitbereich-Rendering:
 
-```
+```jinja2
 {% if time_range %}
 {% if time_range.include_context %}
 - Zeitbereich: Fokus auf {{ time_range.start }} bis {{ time_range.end }}
@@ -146,7 +152,7 @@ Für manuelles Transkript wird `templates/somas_prompt_transcript.txt` verwendet
 1. **YouTube Shorts** – Sehr kurze Videos (< 60s) haben oft kein ausreichendes Transkript
 2. **Neue Videos** – Transkripte sind erst nach einigen Stunden verfügbar
 3. **LinkedIn** – Keine echte Markdown-Unterstützung, nur Unicode-Workarounds
-4. **Window-Sizing** – Meta-Bereich erfordert ggf. Fenstervergrößerung (Design-Frage für spätere Releases)
+4. **Window-Sizing** – Metadaten/Zeitbereich nehmen zu viel Platz ein → Lösung in v0.4.1 (CollapsibleSection, siehe `specs/UI_REDESIGN_SPEC.md`)
 
 ---
 
@@ -210,18 +216,26 @@ TEST_URLS = [
 - [x] video_info_source Tracking
 - [x] Landing Page aktualisiert
 
-### Phase 6: Geplant
+### Phase 6: UI-Optimierung (v0.4.1) — Nächster Schritt
 
-- [ ] Konfigurationsdialog erweitern
+- [ ] Einklappbare Metadaten- und Zeitbereich-Sektionen (`CollapsibleSection`)
+- [ ] Transkript-Brücke: YouTube-Transkript automatisch in Transkript-Tab übernehmen
+- [ ] Tab-Umbenennung: "Manuelles Transkript" → "Transkript"
+- [ ] Siehe: `specs/UI_REDESIGN_SPEC.md`
+
+### Phase 7+: Backlog
+
+- [ ] Modell-Bewertungssystem (non-intrusiv) — Entwurf in `specs/MODEL_RATING_SPEC_DRAFT.md`
+- [ ] Englisch-Support
+- [ ] Weitere Quellentypen
 - [ ] Batch-Modus
-- [ ] Window-Sizing optimieren
 
 ---
 
 ## 🤝 Entwicklungs-Setup (3er-Team)
 
 | Rolle | Akteur | Aufgabe |
-|-------|--------|---------|
+| ------- | -------- | --------- |
 | **Architekt/Berater** | Claude.ai | Planung, README/CLAUDE.md pflegen, Konzeption, Debugging-Support |
 | **Programmierer** | Claude Code (VS Code) | Implementierung, Code schreiben, Tests ausführen |
 | **Supervisor/PO** | Thorsten | Entscheidungen, manuelles Testing, Feedback, Richtung vorgeben |
@@ -234,4 +248,4 @@ Bei Unklarheiten: Frag nach! Lieber einmal zu viel als eine falsche Annahme tref
 
 ---
 
-*Letzte Aktualisierung: 2026-02-06*
+Letzte Aktualisierung: 2026-02-06

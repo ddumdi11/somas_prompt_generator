@@ -35,11 +35,12 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
   - Markdown (.md)
 - **Debug-Logging** – Session-Tracking mit Versionsinformation
 
-### Geplant
+### Nächste Schritte
 
+- **v0.4.1** – UI-Redesign: Einklappbare Sektionen, Transkript-Brücke (YouTube → Transkript-Tab)
+- **v0.5** – Modell-Bewertungssystem
 - PDF-Export
-- Konfigurationsdialog erweitern
-- Batch-Verarbeitung mehrerer URLs
+- Batch-Verarbeitung
 
 ---
 
