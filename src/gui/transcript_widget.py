@@ -6,7 +6,7 @@ z.B. eigene Transkriptionen, Podcast-Mitschnitte oder Vorträge.
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
-    QLabel, QLineEdit, QTextEdit, QPushButton,
+    QLabel, QLineEdit, QTextEdit, QPushButton, QSizePolicy,
 )
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
 
@@ -28,6 +28,7 @@ class TranscriptInputWidget(QWidget):
 
     def _setup_ui(self) -> None:
         """Erstellt das UI-Layout."""
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -62,7 +63,10 @@ class TranscriptInputWidget(QWidget):
             "Unterstützt: Eigene Transkriptionen, Podcast-Mitschnitte, "
             "Vortragsnotizen, korrigierte Untertitel etc."
         )
-        self.transcript_edit.setMinimumHeight(200)
+        self.transcript_edit.setMinimumHeight(120)
+        self.transcript_edit.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         layout.addWidget(self.transcript_edit)
 
         # Statistik-Zeile
