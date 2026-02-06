@@ -205,17 +205,19 @@ class SettingsDialog(QDialog):
         """Öffnet den Debug-Log-Ordner im Dateimanager."""
         debug_dir = self._debug_logger.base_dir
         debug_dir.mkdir(parents=True, exist_ok=True)
+        normalized_path = os.path.normpath(str(debug_dir))
         try:
-            if sys.platform == "win32":
-                os.startfile(str(debug_dir))
+            if sys.platform in ("win32", "cygwin"):
+                subprocess.Popen(["explorer", normalized_path])
             elif sys.platform == "darwin":
-                subprocess.run(["open", str(debug_dir)], check=True)
+                subprocess.run(["open", normalized_path], check=True)
             else:
-                subprocess.run(["xdg-open", str(debug_dir)], check=True)
+                subprocess.run(["xdg-open", normalized_path], check=True)
         except Exception as e:
             logger.warning(f"Ordner konnte nicht geöffnet werden: {e}")
             QMessageBox.warning(
-                self, "Fehler", f"Ordner konnte nicht geöffnet werden:\n{debug_dir}"
+                self, "Fehler",
+                f"Ordner konnte nicht geöffnet werden:\n{normalized_path}"
             )
 
     @pyqtSlot()
