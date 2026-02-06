@@ -567,7 +567,9 @@ class MainWindow(QMainWindow):
         start = self.time_start_edit.text() or "00:00"
         end = self.time_end_edit.text() or "?"
         context = " (mit Kontext)" if self.time_context_checkbox.isChecked() else ""
-        self.time_range_section.set_summary(f"{start} – {end}{context}")
+        self.time_range_section.set_summary(
+            f"{start} – {end}{context}", color="#2E7D32"
+        )
 
     @pyqtSlot()
     def _on_get_meta(self):
@@ -621,7 +623,8 @@ class MainWindow(QMainWindow):
         )
         self.meta_section.set_summary(
             f"✓ {title_short} · {self.video_info.channel} "
-            f"· {self.video_info.duration_formatted} · {transcript_status}"
+            f"· {self.video_info.duration_formatted} · {transcript_status}",
+            color="#2E7D32",
         )
         self.meta_section.collapse()
 

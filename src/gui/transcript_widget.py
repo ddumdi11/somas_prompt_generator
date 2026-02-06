@@ -169,7 +169,9 @@ class TranscriptInputWidget(QWidget):
         self.source_label.setStyleSheet("color: #2E7D32; font-size: 10px;")
         self.reset_btn.setVisible(True)
         # Quellen-Info einklappen mit Zusammenfassung
-        self.info_section.set_summary("\u2713 YouTube \u00b7 automatisch")
+        self.info_section.set_summary(
+            "\u2713 YouTube \u00b7 automatisch", color="#2E7D32"
+        )
         self.info_section.collapse()
 
     def reset_transcript(self) -> None:
