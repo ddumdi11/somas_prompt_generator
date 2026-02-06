@@ -151,7 +151,7 @@ class MainWindow(QMainWindow):
 
         # Tab 2: Manuelles Transkript
         self.transcript_widget = TranscriptInputWidget()
-        self.input_tabs.addTab(self.transcript_widget, "Manuelles Transkript")
+        self.input_tabs.addTab(self.transcript_widget, "Transkript")
 
         main_layout.addWidget(self.input_tabs)
 
@@ -469,6 +469,11 @@ class MainWindow(QMainWindow):
         # Input-Tabs (YouTube / Transkript)
         self.input_tabs.currentChanged.connect(self._on_input_tab_changed)
         self.transcript_widget.data_changed.connect(self._update_generate_enabled)
+        self.transcript_widget.data_changed.connect(
+            lambda: self._update_transcript_tab_indicator(
+                self.transcript_widget.has_valid_data()
+            )
+        )
         # Zeitbereich
         self.time_range_checkbox.toggled.connect(self._toggle_time_range_fields)
         self.time_start_edit.textChanged.connect(self._update_time_range_summary)
@@ -516,6 +521,14 @@ class MainWindow(QMainWindow):
         # Zeitbereich nur für YouTube-Tab sinnvoll
         self.time_range_section.setVisible(is_youtube)
         self._update_generate_enabled()
+
+    def _update_transcript_tab_indicator(self, has_content: bool) -> None:
+        """Zeigt/versteckt den grünen Punkt am Transkript-Tab."""
+        tab_index = 1  # Transkript-Tab
+        if has_content:
+            self.input_tabs.setTabText(tab_index, "Transkript \u25cf")
+        else:
+            self.input_tabs.setTabText(tab_index, "Transkript")
 
     @pyqtSlot()
     def _update_generate_enabled(self) -> None:
@@ -579,6 +592,9 @@ class MainWindow(QMainWindow):
                     author=self.video_info.channel,
                     url=self.video_info.url,
                 )
+                self._update_transcript_tab_indicator(has_content=True)
+            else:
+                self._update_transcript_tab_indicator(has_content=False)
         except ValueError as e:
             QMessageBox.critical(self, "Fehler", str(e))
             logger.error(f"Fehler beim Abrufen der Metadaten: {e}")
