@@ -156,8 +156,8 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.input_tabs)
 
         # Zeitbereich (optional, nur für YouTube-Tab sichtbar)
-        self.time_range_frame = self._create_time_range_section()
-        main_layout.addWidget(self.time_range_frame)
+        self.time_range_section = self._create_time_range_section()
+        main_layout.addWidget(self.time_range_section)
 
         # Fragen-Sektion
         main_layout.addWidget(self._create_questions_section())
@@ -217,11 +217,14 @@ class MainWindow(QMainWindow):
         self.meta_section.set_content_widget(content)
         return self.meta_section
 
-    def _create_time_range_section(self) -> QFrame:
-        """Erstellt den Zeitbereich-Bereich (optional)."""
-        frame = QFrame()
-        frame.setFrameStyle(QFrame.Shape.StyledPanel)
-        layout = QVBoxLayout(frame)
+    def _create_time_range_section(self) -> CollapsibleSection:
+        """Erstellt den Zeitbereich-Bereich als einklappbare Sektion."""
+        self.time_range_section = CollapsibleSection("Zeitbereich (optional)")
+        self.time_range_section.set_summary("Inaktiv")
+
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(0, 0, 0, 0)
 
         # Haupt-Checkbox
         self.time_range_checkbox = QCheckBox("Nur Ausschnitt analysieren")
@@ -254,7 +257,9 @@ class MainWindow(QMainWindow):
         self.time_end_edit.setEnabled(False)
         self.time_context_checkbox.setEnabled(False)
 
-        return frame
+        self.time_range_section.set_content_widget(content)
+        self.time_range_section.collapse()  # Standard: eingeklappt
+        return self.time_range_section
 
     def _create_questions_section(self) -> QFrame:
         """Erstellt den Fragen-Bereich."""
@@ -466,6 +471,9 @@ class MainWindow(QMainWindow):
         self.transcript_widget.data_changed.connect(self._update_generate_enabled)
         # Zeitbereich
         self.time_range_checkbox.toggled.connect(self._toggle_time_range_fields)
+        self.time_start_edit.textChanged.connect(self._update_time_range_summary)
+        self.time_end_edit.textChanged.connect(self._update_time_range_summary)
+        self.time_context_checkbox.toggled.connect(self._update_time_range_summary)
         # API-Controls
         self.api_checkbox.toggled.connect(self._on_api_toggle)
         self.provider_combo.currentIndexChanged.connect(self._on_provider_changed)
@@ -506,7 +514,7 @@ class MainWindow(QMainWindow):
         """Handler für Tab-Wechsel zwischen YouTube und Transkript."""
         is_youtube = index == 0
         # Zeitbereich nur für YouTube-Tab sinnvoll
-        self.time_range_frame.setVisible(is_youtube)
+        self.time_range_section.setVisible(is_youtube)
         self._update_generate_enabled()
 
     @pyqtSlot()
@@ -536,6 +544,17 @@ class MainWindow(QMainWindow):
             self.time_start_edit.clear()
             self.time_end_edit.clear()
             self.time_context_checkbox.setChecked(False)
+        self._update_time_range_summary()
+
+    def _update_time_range_summary(self) -> None:
+        """Aktualisiert die Zusammenfassung im Zeitbereich-Header."""
+        if not self.time_range_checkbox.isChecked():
+            self.time_range_section.set_summary("Inaktiv")
+            return
+        start = self.time_start_edit.text() or "00:00"
+        end = self.time_end_edit.text() or "?"
+        context = " (mit Kontext)" if self.time_context_checkbox.isChecked() else ""
+        self.time_range_section.set_summary(f"{start} – {end}{context}")
 
     @pyqtSlot()
     def _on_get_meta(self):
