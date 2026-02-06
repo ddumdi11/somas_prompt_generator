@@ -5,10 +5,12 @@ z.B. eigene Transkriptionen, Podcast-Mitschnitte oder Vorträge.
 """
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox,
+    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLabel, QLineEdit, QTextEdit, QPushButton,
 )
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
+
+from src.gui.collapsible_section import CollapsibleSection
 
 
 class TranscriptInputWidget(QWidget):
@@ -29,9 +31,11 @@ class TranscriptInputWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # Quellen-Informationen
-        info_group = QGroupBox("Quellen-Informationen")
-        info_layout = QFormLayout(info_group)
+        # Quellen-Informationen (einklappbar)
+        self.info_section = CollapsibleSection("Quellen-Informationen")
+        info_content = QWidget()
+        info_layout = QFormLayout(info_content)
+        info_layout.setContentsMargins(0, 0, 0, 0)
 
         self.title_edit = QLineEdit()
         self.title_edit.setPlaceholderText("Titel der Quelle")
@@ -45,7 +49,8 @@ class TranscriptInputWidget(QWidget):
         self.url_edit.setPlaceholderText("https://... (optional)")
         info_layout.addRow("URL:", self.url_edit)
 
-        layout.addWidget(info_group)
+        self.info_section.set_content_widget(info_content)
+        layout.addWidget(self.info_section)
 
         # Transkript
         transcript_label = QLabel("Transkript:")
@@ -140,6 +145,8 @@ class TranscriptInputWidget(QWidget):
         self._original_transcript = ""
         self.source_label.setText("")
         self.reset_btn.setVisible(False)
+        self.info_section.set_summary("")
+        self.info_section.expand()
 
     def set_auto_transcript(
         self, transcript: str, title: str, author: str, url: str = ""
@@ -157,6 +164,9 @@ class TranscriptInputWidget(QWidget):
         )
         self.source_label.setStyleSheet("color: #2E7D32; font-size: 10px;")
         self.reset_btn.setVisible(True)
+        # Quellen-Info einklappen mit Zusammenfassung
+        self.info_section.set_summary("\u2713 YouTube \u00b7 automatisch")
+        self.info_section.collapse()
 
     def reset_transcript(self) -> None:
         """Stellt das Original-Transkript wieder her."""
