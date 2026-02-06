@@ -53,6 +53,7 @@ class VideoInfo:
     channel: str
     duration: int  # Sekunden
     url: str
+    transcript: str = ""  # Transkript-Text (optional)
 
     @property
     def duration_formatted(self) -> str:

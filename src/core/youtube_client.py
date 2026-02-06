@@ -61,11 +61,15 @@ def get_video_info(url: str) -> VideoInfo:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
 
+        # Transkript parallel abrufen (optional, Fehler nicht kritisch)
+        transcript = get_transcript(url) or ""
+
         return VideoInfo(
             title=info.get('title', 'Unbekannter Titel'),
             channel=info.get('uploader', 'Unbekannter Kanal'),
             duration=info.get('duration', 0),
             url=url,
+            transcript=transcript,
         )
     except Exception as e:
         logger.error(f"Fehler beim Abruf der Metadaten: {e}")

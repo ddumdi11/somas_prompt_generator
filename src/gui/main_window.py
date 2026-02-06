@@ -570,6 +570,15 @@ class MainWindow(QMainWindow):
             self._display_meta()
             self._clear_stale_sources()
             self.btn_generate.setEnabled(True)
+
+            # Transkript-Brücke: YouTube-Transkript in Transkript-Tab übernehmen
+            if self.video_info.transcript:
+                self.transcript_widget.set_auto_transcript(
+                    transcript=self.video_info.transcript,
+                    title=self.video_info.title,
+                    author=self.video_info.channel,
+                    url=self.video_info.url,
+                )
         except ValueError as e:
             QMessageBox.critical(self, "Fehler", str(e))
             logger.error(f"Fehler beim Abrufen der Metadaten: {e}")
@@ -591,9 +600,12 @@ class MainWindow(QMainWindow):
         title_short = self.video_info.title[:40]
         if len(self.video_info.title) > 40:
             title_short += "…"
+        transcript_status = (
+            "Transkript ✓" if self.video_info.transcript else "Kein Transkript"
+        )
         self.meta_section.set_summary(
             f"✓ {title_short} · {self.video_info.channel} "
-            f"· {self.video_info.duration_formatted}"
+            f"· {self.video_info.duration_formatted} · {transcript_status}"
         )
         self.meta_section.collapse()
 

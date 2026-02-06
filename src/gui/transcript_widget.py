@@ -5,8 +5,8 @@ z.B. eigene Transkriptionen, Podcast-Mitschnitte oder Vorträge.
 """
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QFormLayout, QGroupBox,
-    QLabel, QLineEdit, QTextEdit,
+    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGroupBox,
+    QLabel, QLineEdit, QTextEdit, QPushButton,
 )
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
 
@@ -19,6 +19,8 @@ class TranscriptInputWidget(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._auto_source = False
+        self._original_transcript = ""
         self._setup_ui()
         self._connect_signals()
 
@@ -63,12 +65,24 @@ class TranscriptInputWidget(QWidget):
         self.stats_label.setStyleSheet("color: gray; font-style: italic;")
         layout.addWidget(self.stats_label)
 
+        # Quellen-Hinweis + Zurücksetzen-Button (nur bei auto-fetched sichtbar)
+        source_row = QHBoxLayout()
+        self.source_label = QLabel("")
+        source_row.addWidget(self.source_label)
+        source_row.addStretch()
+        self.reset_btn = QPushButton("Zurücksetzen")
+        self.reset_btn.setMaximumWidth(120)
+        self.reset_btn.setVisible(False)
+        source_row.addWidget(self.reset_btn)
+        layout.addLayout(source_row)
+
     def _connect_signals(self) -> None:
         """Verbindet interne Signals."""
         self.transcript_edit.textChanged.connect(self._on_text_changed)
         self.title_edit.textChanged.connect(self.data_changed.emit)
         self.author_edit.textChanged.connect(self.data_changed.emit)
         self.url_edit.textChanged.connect(self.data_changed.emit)
+        self.reset_btn.clicked.connect(self.reset_transcript)
 
     @pyqtSlot()
     def _on_text_changed(self) -> None:
@@ -122,3 +136,29 @@ class TranscriptInputWidget(QWidget):
         self.author_edit.clear()
         self.url_edit.clear()
         self.transcript_edit.clear()
+        self._auto_source = False
+        self._original_transcript = ""
+        self.source_label.setText("")
+        self.reset_btn.setVisible(False)
+
+    def set_auto_transcript(
+        self, transcript: str, title: str, author: str, url: str = ""
+    ) -> None:
+        """Befüllt das Widget mit einem automatisch geholten Transkript."""
+        self._original_transcript = transcript
+        self._auto_source = True
+        self.title_edit.setText(title)
+        self.author_edit.setText(author)
+        if url:
+            self.url_edit.setText(url)
+        self.transcript_edit.setPlainText(transcript)
+        self.source_label.setText(
+            "\u2713 Automatisch von YouTube geladen \u00b7 editierbar"
+        )
+        self.source_label.setStyleSheet("color: #2E7D32; font-size: 10px;")
+        self.reset_btn.setVisible(True)
+
+    def reset_transcript(self) -> None:
+        """Stellt das Original-Transkript wieder her."""
+        if self._original_transcript:
+            self.transcript_edit.setPlainText(self._original_transcript)
