@@ -4,7 +4,7 @@ Wiederverwendbares Widget für Bereiche, die nach dem Befüllen
 eingeklappt werden können, um Platz zu sparen.
 """
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy
 from PyQt6.QtCore import pyqtSignal, Qt
 
 
@@ -17,6 +17,7 @@ class CollapsibleSection(QWidget):
         super().__init__(parent)
         self._expanded = True
         self._title = title
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -62,6 +63,7 @@ class CollapsibleSection(QWidget):
 
         # Body-Container
         self._body = QWidget()
+        self._body.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
         self._body.setStyleSheet(
             "background-color: white; "
             "border: 1px solid #C0C0C0; border-top: none; "
@@ -115,6 +117,7 @@ class CollapsibleSection(QWidget):
         self._expanded = True
         self._body.setVisible(True)
         self._update_arrow()
+        self._refresh_layout()
         self.toggled.emit(True)
 
     def collapse(self) -> None:
@@ -122,7 +125,15 @@ class CollapsibleSection(QWidget):
         self._expanded = False
         self._body.setVisible(False)
         self._update_arrow()
+        self._refresh_layout()
         self.toggled.emit(False)
+
+    def _refresh_layout(self) -> None:
+        """Erzwingt Neuberechnung der Layout-Größen."""
+        self.adjustSize()
+        parent = self.parentWidget()
+        if parent and parent.layout():
+            parent.layout().activate()
 
     def is_expanded(self) -> bool:
         """Gibt zurück ob die Sektion aufgeklappt ist."""
