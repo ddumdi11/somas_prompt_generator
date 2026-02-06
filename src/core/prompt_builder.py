@@ -251,6 +251,7 @@ def build_prompt_from_transcript(
         depth_description=config.depth_description,
         sentences_per_section=sentences_per_section,
         language=config.language,
+        time_range=config.time_range,
         questions=questions.strip() if questions else "",
     )
 
