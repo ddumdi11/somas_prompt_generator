@@ -17,7 +17,7 @@ class CollapsibleSection(QWidget):
         super().__init__(parent)
         self._expanded = True
         self._title = title
-        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -63,7 +63,7 @@ class CollapsibleSection(QWidget):
 
         # Body-Container
         self._body = QWidget()
-        self._body.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+        self._body.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         self._body.setStyleSheet(
             "background-color: white; "
             "border: 1px solid #C0C0C0; border-top: none; "
@@ -129,11 +129,15 @@ class CollapsibleSection(QWidget):
         self.toggled.emit(False)
 
     def _refresh_layout(self) -> None:
-        """Erzwingt Neuberechnung der Layout-Größen."""
-        self.adjustSize()
-        parent = self.parentWidget()
-        if parent and parent.layout():
-            parent.layout().activate()
+        """Erzwingt Neuberechnung der Layout-Größen durch die gesamte Widget-Hierarchie."""
+        self.updateGeometry()
+        widget = self.parentWidget()
+        while widget:
+            if widget.layout():
+                widget.layout().invalidate()
+                widget.layout().activate()
+            widget.updateGeometry()
+            widget = widget.parentWidget()
 
     def is_expanded(self) -> bool:
         """Gibt zurück ob die Sektion aufgeklappt ist."""
