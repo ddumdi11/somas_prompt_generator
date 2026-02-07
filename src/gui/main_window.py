@@ -1463,7 +1463,7 @@ class MainWindow(QMainWindow):
             channel_name=self.video_info.channel if self.video_info else "",
             video_duration=self.video_info.duration if self.video_info else 0,
             preset_name=self.current_preset.name if self.current_preset else "",
-            preset_max_chars=self.current_preset.max_chars if self.current_preset else 0,
+            preset_max_chars=(self.current_preset.max_chars or 0) if self.current_preset else 0,
             result_chars=len(response.content),
             response_time=response.duration_seconds,
             tokens_used=response.tokens_used,
