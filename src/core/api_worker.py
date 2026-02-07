@@ -79,6 +79,7 @@ class APIWorker(QThread):
 
             response = self.client.send_prompt(self.prompt, self.model)
             duration = time.time() - start_time
+            response.duration_seconds = duration
 
             if self._cancelled:
                 logger.info("API-Worker abgebrochen")
