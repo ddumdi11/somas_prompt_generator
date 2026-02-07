@@ -1,4 +1,4 @@
-\u26A0 ZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter 800 Zeichen bleiben. Z\u00e4hle mit.
+⚠ ZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter 800 Zeichen bleiben. Zähle mit.
 
 Analysiere das folgende YouTube-Video nach dem SOMAS-Schema im Quick-Scan-Modus.
 
@@ -35,4 +35,4 @@ URL: {{ video_url }}
 QUICK INFO (max. 2 Sätze): {{ questions }}
 {% endif %}
 
-\u26A0 ERINNERUNG: Maximale Ausgabel\u00e4nge = 800 Zeichen. K\u00fcrze dich lieber als zu \u00fcberschreiten.
+⚠ ERINNERUNG: Maximale Ausgabelänge = 800 Zeichen. Kürze dich lieber als zu überschreiten.
