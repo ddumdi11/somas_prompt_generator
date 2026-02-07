@@ -614,10 +614,16 @@ class FilterableModelSelector(QWidget):
 
     def get_selected_model_data(self) -> ModelData | None:
         """Gibt das vollständige ModelData-Objekt des ausgewählten Modells zurück."""
-        index = self._popup.list_view.currentIndex()
-        if not index.isValid():
+        if self._selected_model_id is None:
             return None
-        return index.data(ROLE_MODEL_DATA)
+        for row in range(self._source_model.rowCount()):
+            index = self._source_model.index(row, 0)
+            if index.data(ROLE_MODEL_ID) == self._selected_model_id:
+                data = index.data(ROLE_MODEL_DATA)
+                if isinstance(data, ModelData):
+                    return data
+                return None
+        return None
 
     def set_selected_model_id(self, model_id: str) -> None:
         """Setzt die Auswahl auf ein bestimmtes Modell.

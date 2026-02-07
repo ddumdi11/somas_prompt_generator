@@ -141,17 +141,10 @@ class RatingStore:
                     record.had_time_range, record.had_questions,
                 ),
             )
-            return cursor.lastrowid
-
-    def update_quality_score(self, analysis_id: int, score: int) -> None:
-        """Setzt die manuelle Qualitätsbewertung (1-5)."""
-        if not 1 <= score <= 5:
-            raise ValueError(f"Score muss 1-5 sein, war: {score}")
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE analyses SET quality_score = ? WHERE id = ?",
-                (score, analysis_id),
-            )
+            row_id = cursor.lastrowid
+            if row_id is None:
+                raise RuntimeError("INSERT hat keine lastrowid zurückgegeben")
+            return row_id
 
     def update_ratings(
         self, analysis_id: int,
@@ -168,36 +161,33 @@ class RatingStore:
             channel_*: 0 = nicht bewertet, 1 = gut, -1 = schlecht
         """
         with self._connect() as conn:
-            # quality_score: >0 setzen, 0 → NULL (Abwahl)
             db_quality = quality_score if quality_score > 0 else None
+            db_informative = channel_informative if channel_informative != 0 else None
+            db_balanced = channel_balanced if channel_balanced != 0 else None
+            db_sourced = channel_sourced if channel_sourced != 0 else None
+            db_entertaining = channel_entertaining if channel_entertaining != 0 else None
             conn.execute(
-                "UPDATE analyses SET quality_score = ? WHERE id = ?",
-                (db_quality, analysis_id),
+                """UPDATE analyses SET
+                    quality_score = ?,
+                    channel_informative = ?,
+                    channel_balanced = ?,
+                    channel_sourced = ?,
+                    channel_entertaining = ?
+                WHERE id = ?""",
+                (db_quality, db_informative, db_balanced,
+                 db_sourced, db_entertaining, analysis_id),
             )
-            for field, value in [
-                ("channel_informative", channel_informative),
-                ("channel_balanced", channel_balanced),
-                ("channel_sourced", channel_sourced),
-                ("channel_entertaining", channel_entertaining),
-            ]:
-                # value != 0 → setzen, value == 0 → auf NULL zurücksetzen
-                # (damit Abwahl einer vorherigen Bewertung wirkt)
-                db_value = value if value != 0 else None
-                conn.execute(
-                    f"UPDATE analyses SET {field} = ? WHERE id = ?",
-                    (db_value, analysis_id),
-                )
 
     # --- Abfrage-Methoden (für späteres Info-Fenster, Punkt 5) ---
 
     def get_model_rankings(self, min_analyses: int = 3) -> list[dict]:
         """Modell-Rankings nach Durchschnittsqualität."""
-        ...
+        raise NotImplementedError("Wird in Phase 5 implementiert")
 
     def get_channel_rankings(self, min_analyses: int = 2) -> list[dict]:
         """Kanal-Rankings nach Durchschnittsqualität."""
-        ...
+        raise NotImplementedError("Wird in Phase 5 implementiert")
 
     def get_model_stats(self, model_id: str) -> dict:
         """Detailstatistik für ein einzelnes Modell."""
-        ...
+        raise NotImplementedError("Wird in Phase 5 implementiert")

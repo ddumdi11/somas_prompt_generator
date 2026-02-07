@@ -131,6 +131,7 @@ class MainWindow(QMainWindow):
         # Rating-System (SQLite)
         self._rating_store = RatingStore()
         self._current_analysis_id: int | None = None
+        self._is_rework: bool = False
 
         # Debug-Logger (Preference-gesteuert)
         prefs = load_preferences()
@@ -1092,6 +1093,8 @@ class MainWindow(QMainWindow):
         self.btn_rework.setEnabled(False)
         self.btn_rework.setText("\u2702 Wird gekürzt...")
 
+        # Flag setzen NACH Validierung, direkt vor API-Call
+        self._is_rework = True
         # API-Call starten (nutzt bestehende Infrastruktur)
         self._start_api_call(rework_prompt)
 
@@ -1417,9 +1420,12 @@ class MainWindow(QMainWindow):
         )
 
         # Analyse in Datenbank speichern + Bewertungs-Widget aktivieren
-        self._save_analysis_record(response)
-        self.rating_widget.reset()
-        self.rating_widget.set_visible_after_analysis(True)
+        # (nur bei echten Analysen, nicht bei Rework/Kürzung)
+        if not self._is_rework:
+            self._save_analysis_record(response)
+            self.rating_widget.reset()
+            self.rating_widget.set_visible_after_analysis(True)
+        self._is_rework = False
 
         # UI entsperren
         self._update_generate_enabled()
@@ -1470,7 +1476,10 @@ class MainWindow(QMainWindow):
             price_input=price_input,
             price_output=price_output,
             input_mode="transcript" if self.input_tabs.currentIndex() == 1 else "youtube",
-            had_transcript=bool(self.video_info and self.video_info.transcript),
+            had_transcript=bool(
+                (self.video_info and self.video_info.transcript)
+                or self.input_tabs.currentIndex() == 1
+            ),
             had_time_range=self.time_range_checkbox.isChecked(),
             had_questions=bool(self.questions_text.toPlainText().strip()),
         )
