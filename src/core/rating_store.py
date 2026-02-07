@@ -168,22 +168,25 @@ class RatingStore:
             channel_*: 0 = nicht bewertet, 1 = gut, -1 = schlecht
         """
         with self._connect() as conn:
-            if quality_score > 0:
-                conn.execute(
-                    "UPDATE analyses SET quality_score = ? WHERE id = ?",
-                    (quality_score, analysis_id),
-                )
+            # quality_score: >0 setzen, 0 → NULL (Abwahl)
+            db_quality = quality_score if quality_score > 0 else None
+            conn.execute(
+                "UPDATE analyses SET quality_score = ? WHERE id = ?",
+                (db_quality, analysis_id),
+            )
             for field, value in [
                 ("channel_informative", channel_informative),
                 ("channel_balanced", channel_balanced),
                 ("channel_sourced", channel_sourced),
                 ("channel_entertaining", channel_entertaining),
             ]:
-                if value != 0:
-                    conn.execute(
-                        f"UPDATE analyses SET {field} = ? WHERE id = ?",
-                        (value, analysis_id),
-                    )
+                # value != 0 → setzen, value == 0 → auf NULL zurücksetzen
+                # (damit Abwahl einer vorherigen Bewertung wirkt)
+                db_value = value if value != 0 else None
+                conn.execute(
+                    f"UPDATE analyses SET {field} = ? WHERE id = ?",
+                    (db_value, analysis_id),
+                )
 
     # --- Abfrage-Methoden (für späteres Info-Fenster, Punkt 5) ---
 

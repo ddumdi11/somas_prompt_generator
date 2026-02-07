@@ -146,14 +146,10 @@ class RatingWidget(QWidget):
         self._update_channel_display()
 
     def _on_ok(self):
-        """OK geklickt — speichert nur was ausgewählt ist."""
-        has_quality = self._quality_score != 0
-        has_channel = any(v != 0 for v in self._channel_dims.values())
-
-        if has_quality or has_channel:
-            self.rating_submitted.emit(
-                self._quality_score, dict(self._channel_dims)
-            )
+        """OK geklickt — sendet immer den aktuellen Stand (auch Abwahlen)."""
+        self.rating_submitted.emit(
+            self._quality_score, dict(self._channel_dims)
+        )
 
         self._expanded = False
         self.panel.setVisible(False)
