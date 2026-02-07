@@ -22,6 +22,8 @@ from src.core.export import export_to_markdown, get_suggested_filename
 from src.core.api_client import APIResponse, APIStatus
 from src.core.api_worker import APIWorker
 from src.core.debug_logger import DebugLogger, APP_VERSION
+from src.core.rating_store import RatingStore, AnalysisRecord
+from src.gui.rating_widget import RatingWidget
 from src.core.perplexity_client import PerplexityClient
 from src.core.openrouter_client import OpenRouterClient
 from src.gui.collapsible_section import CollapsibleSection
@@ -125,6 +127,10 @@ class MainWindow(QMainWindow):
         self._api_providers = load_providers()
         self._last_api_response: APIResponse | None = None
         self._openrouter_raw_models: list[dict] = []
+
+        # Rating-System (SQLite)
+        self._rating_store = RatingStore()
+        self._current_analysis_id: int | None = None
 
         # Debug-Logger (Preference-gesteuert)
         prefs = load_preferences()
@@ -445,6 +451,11 @@ class MainWindow(QMainWindow):
         header_layout.addWidget(header_label)
         header_layout.addStretch()
 
+        # Bewertungs-Widget (erscheint nach API-Response)
+        self.rating_widget = RatingWidget()
+        self.rating_widget.setVisible(False)
+        header_layout.addWidget(self.rating_widget)
+
         self.btn_paste_result = QPushButton("Paste")
         self.btn_paste_result.setMaximumWidth(80)
         header_layout.addWidget(self.btn_paste_result)
@@ -528,6 +539,8 @@ class MainWindow(QMainWindow):
         self.result_text.textChanged.connect(self._update_result_char_counter)
         # Kürzen-Button
         self.btn_rework.clicked.connect(self._on_rework_result)
+        # Bewertungs-Widget
+        self.rating_widget.rating_submitted.connect(self._on_rating_submitted)
         # Zeitbereich
         self.time_range_checkbox.toggled.connect(self._toggle_time_range_fields)
         self.time_start_edit.textChanged.connect(self._update_time_range_summary)
@@ -760,6 +773,11 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Fehler", "Bitte zuerst Metadaten abrufen.")
             return
 
+        # Bewertungswidget zurücksetzen
+        self.rating_widget.reset()
+        self.rating_widget.setVisible(False)
+        self._current_analysis_id = None
+
         # Zeitbereich validieren und setzen
         if self.time_range_checkbox.isChecked():
             start = parse_time_input(self.time_start_edit.text())
@@ -853,6 +871,11 @@ class MainWindow(QMainWindow):
 
     def _generate_from_transcript(self) -> None:
         """Generiert einen SOMAS-Prompt aus manuellem Transkript."""
+        # Bewertungswidget zurücksetzen
+        self.rating_widget.reset()
+        self.rating_widget.setVisible(False)
+        self._current_analysis_id = None
+
         data = self.transcript_widget.get_data()
         if not data:
             QMessageBox.warning(
@@ -1393,6 +1416,11 @@ class MainWindow(QMainWindow):
             f"{response.tokens_used} Tokens ({response.model_used})"
         )
 
+        # Analyse in Datenbank speichern + Bewertungs-Widget aktivieren
+        self._save_analysis_record(response)
+        self.rating_widget.reset()
+        self.rating_widget.set_visible_after_analysis(True)
+
         # UI entsperren
         self._update_generate_enabled()
         self.btn_generate.setText("Generate Prompt")
@@ -1415,6 +1443,70 @@ class MainWindow(QMainWindow):
         # Rework-Button zurücksetzen
         self.btn_rework.setText("\u2702 Kürzen lassen")
         self.btn_rework.setEnabled(True)
+
+    def _save_analysis_record(self, response: APIResponse) -> None:
+        """Speichert die automatischen Metriken einer Analyse."""
+        price_input = 0.0
+        price_output = 0.0
+        if self.provider_combo.currentData() == "openrouter":
+            model_data = self.model_selector.get_selected_model_data()
+            if model_data:
+                price_input = model_data.price_input
+                price_output = model_data.price_output
+
+        record = AnalysisRecord(
+            provider_id=response.provider_used,
+            model_id=response.model_used,
+            model_name=self._get_model_display_name(response.model_used),
+            video_url=self.video_info.url if self.video_info else "",
+            video_title=self.video_info.title if self.video_info else "",
+            channel_name=self.video_info.channel if self.video_info else "",
+            video_duration=self.video_info.duration if self.video_info else 0,
+            preset_name=self.current_preset.name if self.current_preset else "",
+            preset_max_chars=self.current_preset.max_chars if self.current_preset else 0,
+            result_chars=len(response.content),
+            response_time=response.duration_seconds,
+            tokens_used=response.tokens_used,
+            price_input=price_input,
+            price_output=price_output,
+            input_mode="transcript" if self.input_tabs.currentIndex() == 1 else "youtube",
+            had_transcript=bool(self.video_info and self.video_info.transcript),
+            had_time_range=self.time_range_checkbox.isChecked(),
+            had_questions=bool(self.questions_text.toPlainText().strip()),
+        )
+
+        try:
+            self._current_analysis_id = self._rating_store.save_analysis(record)
+            logger.info(f"Analyse #{self._current_analysis_id} gespeichert")
+        except Exception as e:
+            logger.error(f"Analyse-Speicherung fehlgeschlagen: {e}")
+            self._current_analysis_id = None
+
+    @pyqtSlot(int, int)
+    def _on_rating_submitted(self, quality_score: int, channel_score: int) -> None:
+        """Handler für Bewertungs-Submit (Analyse + Quelle)."""
+        if self._current_analysis_id is None:
+            logger.warning("Keine aktive Analyse-ID für Bewertung")
+            return
+
+        try:
+            self._rating_store.update_ratings(
+                self._current_analysis_id,
+                quality_score=quality_score,
+                channel_score=channel_score,
+            )
+            parts = []
+            if quality_score > 0:
+                parts.append(f"Analyse: {quality_score}/5")
+            if channel_score != 0:
+                thumb = "\U0001f44d" if channel_score == 1 else "\U0001f44e"
+                parts.append(f"Quelle: {thumb}")
+            logger.info(
+                f"Analyse #{self._current_analysis_id} bewertet: "
+                f"{', '.join(parts) or 'keine Bewertung'}"
+            )
+        except Exception as e:
+            logger.error(f"Bewertung fehlgeschlagen: {e}")
 
     def _clear_stale_sources(self) -> None:
         """Setzt den Quellen-Button und -Puffer zurück (verhindert Stale-State)."""
