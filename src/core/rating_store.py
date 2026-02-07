@@ -43,7 +43,12 @@ CREATE TABLE IF NOT EXISTS analyses (
 
     -- Manuelle Bewertung (optional)
     quality_score   INTEGER,
-    channel_score   INTEGER,
+
+    -- Quellen-Dimensionen (1=gut, -1=schlecht, NULL=nicht bewertet)
+    channel_informative   INTEGER,
+    channel_balanced      INTEGER,
+    channel_sourced       INTEGER,
+    channel_entertaining  INTEGER,
 
     -- Kontext
     input_mode      TEXT DEFAULT 'youtube',
@@ -148,26 +153,19 @@ class RatingStore:
                 (score, analysis_id),
             )
 
-    def update_channel_score(self, analysis_id: int, score: int) -> None:
-        """Setzt die Quellen-/Kanal-Bewertung (1=gut, -1=schlecht)."""
-        if score not in (1, -1):
-            raise ValueError(f"Channel score muss 1 oder -1 sein, war: {score}")
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE analyses SET channel_score = ? WHERE id = ?",
-                (score, analysis_id),
-            )
-
     def update_ratings(
         self, analysis_id: int,
         quality_score: int = 0,
-        channel_score: int = 0,
+        channel_informative: int = 0,
+        channel_balanced: int = 0,
+        channel_sourced: int = 0,
+        channel_entertaining: int = 0,
     ) -> None:
-        """Setzt beide Bewertungen in einem Call.
+        """Setzt alle Bewertungen in einem Call.
 
         Args:
             quality_score: 0 = nicht bewertet, 1-5 = Sterne
-            channel_score: 0 = nicht bewertet, 1 = gut, -1 = schlecht
+            channel_*: 0 = nicht bewertet, 1 = gut, -1 = schlecht
         """
         with self._connect() as conn:
             if quality_score > 0:
@@ -175,11 +173,17 @@ class RatingStore:
                     "UPDATE analyses SET quality_score = ? WHERE id = ?",
                     (quality_score, analysis_id),
                 )
-            if channel_score != 0:
-                conn.execute(
-                    "UPDATE analyses SET channel_score = ? WHERE id = ?",
-                    (channel_score, analysis_id),
-                )
+            for field, value in [
+                ("channel_informative", channel_informative),
+                ("channel_balanced", channel_balanced),
+                ("channel_sourced", channel_sourced),
+                ("channel_entertaining", channel_entertaining),
+            ]:
+                if value != 0:
+                    conn.execute(
+                        f"UPDATE analyses SET {field} = ? WHERE id = ?",
+                        (value, analysis_id),
+                    )
 
     # --- Abfrage-Methoden (für späteres Info-Fenster, Punkt 5) ---
 

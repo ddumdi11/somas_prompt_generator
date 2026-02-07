@@ -1482,9 +1482,9 @@ class MainWindow(QMainWindow):
             logger.error(f"Analyse-Speicherung fehlgeschlagen: {e}")
             self._current_analysis_id = None
 
-    @pyqtSlot(int, int)
-    def _on_rating_submitted(self, quality_score: int, channel_score: int) -> None:
-        """Handler für Bewertungs-Submit (Analyse + Quelle)."""
+    @pyqtSlot(int, dict)
+    def _on_rating_submitted(self, quality_score: int, channel_dims: dict) -> None:
+        """Handler für Bewertungs-Submit (Analyse + Quellen-Dimensionen)."""
         if self._current_analysis_id is None:
             logger.warning("Keine aktive Analyse-ID für Bewertung")
             return
@@ -1493,14 +1493,24 @@ class MainWindow(QMainWindow):
             self._rating_store.update_ratings(
                 self._current_analysis_id,
                 quality_score=quality_score,
-                channel_score=channel_score,
+                channel_informative=channel_dims.get("informative", 0),
+                channel_balanced=channel_dims.get("balanced", 0),
+                channel_sourced=channel_dims.get("sourced", 0),
+                channel_entertaining=channel_dims.get("entertaining", 0),
             )
             parts = []
             if quality_score > 0:
                 parts.append(f"Analyse: {quality_score}/5")
-            if channel_score != 0:
-                thumb = "\U0001f44d" if channel_score == 1 else "\U0001f44e"
-                parts.append(f"Quelle: {thumb}")
+            dim_labels = {
+                "informative": "Informativ",
+                "balanced": "Ausgewogen",
+                "sourced": "Quellenbasiert",
+                "entertaining": "Unterhaltung",
+            }
+            for key, value in channel_dims.items():
+                if value != 0:
+                    icon = "\U0001f44d" if value == 1 else "\U0001f44e"
+                    parts.append(f"{dim_labels.get(key, key)}: {icon}")
             logger.info(
                 f"Analyse #{self._current_analysis_id} bewertet: "
                 f"{', '.join(parts) or 'keine Bewertung'}"
