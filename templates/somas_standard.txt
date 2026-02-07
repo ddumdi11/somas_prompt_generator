@@ -1,3 +1,5 @@
+\u26A0 ZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter 2.800 Zeichen bleiben. Z\u00e4hle mit.
+
 Analysiere das folgende YouTube-Video nach dem SOMAS-Schema.
 
 KONFIGURATION:
@@ -11,7 +13,7 @@ STRIKTE FORMATVORGABEN:
 1. KEIN Einleitungstext, KEINE Höflichkeitsfloskeln. Starte direkt mit ### FRAMING.
 2. Genau 5 Absätze mit jeweils maximal 3 KURZEN Sätzen.
 3. Die Antwort auf die Anschlussfrage darf maximal 4 Sätze umfassen.
-4. GESAMTZEICHENLIMIT: Der gesamte Output MUSS unter 2.800 Zeichen bleiben.
+4. GESAMTZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter 2.800 Zeichen bleiben.
 
 MODUL-AUSWAHL: KRITIK, OFFENE_FRAGEN, ZITATE oder VERBINDUNGEN (Inhaltsbasiert).
 
@@ -39,3 +41,5 @@ URL: {{ video_url }}
 ANSCHLUSSFRAGE (nach der Analyse separat beantworten, max. 4 Sätze):
 {{ questions }}
 {% endif %}
+
+\u26A0 ERINNERUNG: Maximale Ausgabel\u00e4nge = 2.800 Zeichen. K\u00fcrze dich lieber als zu \u00fcberschreiten.

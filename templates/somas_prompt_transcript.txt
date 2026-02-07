@@ -1,4 +1,6 @@
-Analysiere das folgende Transkript nach dem SOMAS-Schema (Source Overview Mapping And extraction Schema).
+{% if max_chars and max_chars > 0 %}\u26A0 ZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter {{ max_chars }} Zeichen bleiben. Z\u00e4hle mit.
+
+{% endif %}Analysiere das folgende Transkript nach dem SOMAS-Schema (Source Overview Mapping And extraction Schema).
 
 KONFIGURATION:
 - Tiefe: {{ depth }} ({{ depth_description }})
@@ -45,4 +47,8 @@ TRANSKRIPT:
 ---
 WICHTIG: Analysiere ZUERST das Transkript vollständig. Anschlussfragen werden NACH der Analyse bearbeitet:
 {{ questions }}
+{% endif %}
+{% if max_chars and max_chars > 0 %}
+
+\u26A0 ERINNERUNG: Maximale Ausgabel\u00e4nge = {{ max_chars }} Zeichen. K\u00fcrze dich lieber als zu \u00fcberschreiten.
 {% endif %}

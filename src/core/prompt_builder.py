@@ -191,6 +191,7 @@ def build_prompt(
         sentences_per_section=sentences_per_section,
         language=config.language,
         time_range=config.time_range,
+        max_chars=preset.max_chars if preset else 0,
         questions=questions.strip() if questions else "",
     )
 
@@ -252,6 +253,7 @@ def build_prompt_from_transcript(
         sentences_per_section=sentences_per_section,
         language=config.language,
         time_range=config.time_range,
+        max_chars=preset.max_chars if preset else 0,
         questions=questions.strip() if questions else "",
     )
 
