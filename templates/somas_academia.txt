@@ -1,3 +1,5 @@
+\u26A0 ZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter 3.000 Zeichen bleiben. Z\u00e4hle mit.
+
 Analysiere das folgende YouTube-Video nach dem SOMAS-Schema mit wissenschaftlichem Fokus.
 
 KONFIGURATION:
@@ -14,7 +16,7 @@ STRIKTE FORMATVORGABEN:
 4. Analytische Begriffe verwenden ("signifikant", "korreliert", "kausal").
 5. Fokus auf Reproduzierbarkeit und logische Konsistenz.
 6. Die Antwort auf die Anschlussfrage darf maximal 5 Sätze umfassen.
-7. GESAMTZEICHENLIMIT: Der gesamte Output MUSS unter 3.000 Zeichen bleiben.
+7. GESAMTZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter 3.000 Zeichen bleiben.
 
 MODUL-AUSWAHL: Bevorzugt OFFENE_FRAGEN oder VERBINDUNGEN (Wissenschaft als fortlaufender Prozess).
 
@@ -42,3 +44,5 @@ URL: {{ video_url }}
 ANSCHLUSSFRAGE (technisch/akademisch fokussiert, max. 5 Sätze):
 {{ questions }}
 {% endif %}
+
+\u26A0 ERINNERUNG: Maximale Ausgabel\u00e4nge = 3.000 Zeichen. K\u00fcrze dich lieber als zu \u00fcberschreiten.

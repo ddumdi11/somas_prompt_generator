@@ -1,3 +1,5 @@
+\u26A0 ZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter 2.200 Zeichen bleiben. Z\u00e4hle mit.
+
 Analysiere das folgende YouTube-Video nach dem SOMAS-Schema.
 
 KONFIGURATION:
@@ -13,7 +15,7 @@ STRIKTE FORMATVORGABEN:
 3. KERNTHESE als starker "Hook" formulieren - eingängig und teilbar.
 4. Aktive Sprache verwenden, keine Passivkonstruktionen.
 5. Die Antwort auf die Anschlussfrage darf maximal 3 Sätze umfassen.
-6. GESAMTZEICHENLIMIT: Der gesamte Output MUSS unter 2.200 Zeichen bleiben.
+6. GESAMTZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter 2.200 Zeichen bleiben.
 
 MODUL-AUSWAHL: KRITIK, OFFENE_FRAGEN, ZITATE oder VERBINDUNGEN (Inhaltsbasiert).
 
@@ -41,3 +43,5 @@ URL: {{ video_url }}
 ANSCHLUSSFRAGE (max. 3 Sätze):
 {{ questions }}
 {% endif %}
+
+\u26A0 ERINNERUNG: Maximale Ausgabel\u00e4nge = 2.200 Zeichen. K\u00fcrze dich lieber als zu \u00fcberschreiten.
