@@ -1442,6 +1442,9 @@ class MainWindow(QMainWindow):
         self.api_status_label.setText(f"Fehler: {error_message[:50]}")
         QMessageBox.warning(self, "API-Fehler", error_message)
 
+        # Rework-Flag zurücksetzen (sonst bleibt es nach Fehler hängen)
+        self._is_rework = False
+
         # UI entsperren
         self._update_generate_enabled()
         self.btn_generate.setText("Generate Prompt")
@@ -1488,7 +1491,7 @@ class MainWindow(QMainWindow):
             self._current_analysis_id = self._rating_store.save_analysis(record)
             logger.info(f"Analyse #{self._current_analysis_id} gespeichert")
         except Exception as e:
-            logger.error(f"Analyse-Speicherung fehlgeschlagen: {e}")
+            logger.exception(f"Analyse-Speicherung fehlgeschlagen: {e}")
             self._current_analysis_id = None
 
     @pyqtSlot(int, dict)
@@ -1525,7 +1528,7 @@ class MainWindow(QMainWindow):
                 f"{', '.join(parts) or 'keine Bewertung'}"
             )
         except Exception as e:
-            logger.error(f"Bewertung fehlgeschlagen: {e}")
+            logger.exception(f"Bewertung fehlgeschlagen: {e}")
 
     def _clear_stale_sources(self) -> None:
         """Setzt den Quellen-Button und -Puffer zurück (verhindert Stale-State)."""
