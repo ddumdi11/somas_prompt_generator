@@ -36,6 +36,27 @@ from src.config.api_config import (
 
 logger = logging.getLogger(__name__)
 
+# Kürzungs-Prompt für Ergebnis-Nachbearbeitung (Teil 3: Zeichenlimit-Reihe)
+REWORK_PROMPT_TEMPLATE = """Kürze die folgende SOMAS-Analyse auf EXAKT unter {max_chars} Zeichen.
+
+REGELN:
+1. Behalte ALLE Abschnitte (FRAMING, KERNTHESE, ELABORATION, IMPLIKATION, Modul)
+2. Behalte die ### Überschriften exakt bei
+3. Kürze innerhalb der Absätze: Streiche Füllwörter, vereinfache Sätze, entferne Redundanzen
+4. Opfere lieber Detail-Tiefe als Struktur
+5. Das Ergebnis MUSS unter {max_chars} Zeichen bleiben
+6. Gib NUR die gekürzte Analyse aus — keinen Kommentar, keine Erklärung
+
+AKTUELLE ZEICHENZAHL: {current_chars}
+ZIEL: unter {max_chars} Zeichen ({over_chars} zu viel)
+
+ANALYSE ZUM KÜRZEN:
+
+{result_text}
+
+\u26A0 ERINNERUNG: Maximale Ausgabelänge = {max_chars} Zeichen. Kürze dich lieber als zu überschreiten."""
+
+
 # Status-Farben und Labels für API-Anzeige
 STATUS_DISPLAY = {
     "idle": ("", "#808080", "Bereit"),
@@ -435,8 +456,21 @@ class MainWindow(QMainWindow):
         self.result_text.setPlaceholderText("Analyse-Ergebnis hier einfügen...")
         layout.addWidget(self.result_text)
 
-        # Zeichenzähler-Zeile
+        # Zeichenzähler-Zeile mit Kürzen-Button
         counter_layout = QHBoxLayout()
+
+        # Kürzen-Button (initial versteckt)
+        self.btn_rework = QPushButton("\u2702 Kürzen lassen")
+        self.btn_rework.setVisible(False)
+        self.btn_rework.setToolTip(
+            "Sendet das Ergebnis an das aktive Modell zur Kürzung auf das Preset-Limit"
+        )
+        self.btn_rework.setStyleSheet(
+            "background-color: #FFF3E0; border: 1px solid #FFB74D; "
+            "color: #E65100; padding: 4px 12px; border-radius: 4px; font-size: 11px;"
+        )
+        counter_layout.addWidget(self.btn_rework)
+
         counter_layout.addStretch()
         self.result_char_counter = QLabel("")
         self.result_char_counter.setStyleSheet("font-size: 11px; color: #888;")
@@ -492,6 +526,8 @@ class MainWindow(QMainWindow):
         )
         # Zeichenzähler am Ergebnis-Feld
         self.result_text.textChanged.connect(self._update_result_char_counter)
+        # Kürzen-Button
+        self.btn_rework.clicked.connect(self._on_rework_result)
         # Zeitbereich
         self.time_range_checkbox.toggled.connect(self._toggle_time_range_fields)
         self.time_start_edit.textChanged.connect(self._update_time_range_summary)
@@ -601,6 +637,7 @@ class MainWindow(QMainWindow):
 
         if not text.strip():
             self.result_char_counter.setText("")
+            self.btn_rework.setVisible(False)
             return
 
         # Limit aus aktuellem Preset holen
@@ -614,6 +651,7 @@ class MainWindow(QMainWindow):
             # Unbegrenztes Preset (z.B. Research) — nur Zeichenzahl zeigen
             self.result_char_counter.setText(f"{char_count:,} Zeichen")
             self.result_char_counter.setStyleSheet("font-size: 11px; color: #888;")
+            self.btn_rework.setVisible(False)
             return
 
         # Ampel-Logik
@@ -644,6 +682,14 @@ class MainWindow(QMainWindow):
             f"font-size: 11px; color: {color};"
             f" font-weight: {'bold' if ratio > 1.0 else 'normal'};"
         )
+
+        # Kürzen-Button: nur bei Überschreitung UND aktiver API
+        show_rework = (
+            ratio > 1.0
+            and self.api_checkbox.isChecked()
+            and not (self._api_worker and self._api_worker.isRunning())
+        )
+        self.btn_rework.setVisible(show_rework)
 
     @pyqtSlot()
     def _on_get_meta(self):
@@ -992,6 +1038,40 @@ class MainWindow(QMainWindow):
         # Visuelles Feedback
         self._show_button_feedback(self.btn_sources_detail, "Copied!")
 
+    @pyqtSlot()
+    def _on_rework_result(self) -> None:
+        """Sendet das Ergebnis zur Kürzung an das aktive Modell."""
+        result_text = self.result_text.toPlainText()
+        if not result_text:
+            return
+
+        max_chars = self.current_preset.max_chars if self.current_preset else 0
+        if max_chars == 0:
+            return
+
+        current_chars = len(result_text)
+        over_chars = current_chars - max_chars
+
+        # Kürzungs-Prompt bauen
+        rework_prompt = REWORK_PROMPT_TEMPLATE.format(
+            max_chars=max_chars,
+            current_chars=current_chars,
+            over_chars=over_chars,
+            result_text=result_text,
+        )
+
+        logger.info(
+            f"Rework gestartet: {current_chars} → Ziel {max_chars} "
+            f"({over_chars} über Limit)"
+        )
+
+        # Button deaktivieren während der Verarbeitung
+        self.btn_rework.setEnabled(False)
+        self.btn_rework.setText("\u2702 Wird gekürzt...")
+
+        # API-Call starten (nutzt bestehende Infrastruktur)
+        self._start_api_call(rework_prompt)
+
     # --- API-Methoden ---
 
     def _get_model_display_name(self, model_id: str) -> str:
@@ -1317,6 +1397,10 @@ class MainWindow(QMainWindow):
         self._update_generate_enabled()
         self.btn_generate.setText("Generate Prompt")
 
+        # Rework-Button zurücksetzen
+        self.btn_rework.setText("\u2702 Kürzen lassen")
+        self.btn_rework.setEnabled(True)
+
     @pyqtSlot(str)
     def _on_api_error(self, error_message: str) -> None:
         """Handler für API-Fehler."""
@@ -1327,6 +1411,10 @@ class MainWindow(QMainWindow):
         # UI entsperren
         self._update_generate_enabled()
         self.btn_generate.setText("Generate Prompt")
+
+        # Rework-Button zurücksetzen
+        self.btn_rework.setText("\u2702 Kürzen lassen")
+        self.btn_rework.setEnabled(True)
 
     def _clear_stale_sources(self) -> None:
         """Setzt den Quellen-Button und -Puffer zurück (verhindert Stale-State)."""
