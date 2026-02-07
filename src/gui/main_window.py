@@ -705,7 +705,30 @@ class MainWindow(QMainWindow):
 
         # Verwende das ausgewählte Preset
         preset_name = self.current_preset.name if self.current_preset else None
-        prompt = build_prompt(self.video_info, self.config, questions, preset_name)
+
+        # Wenn Transkript vorhanden → transkript-aware Prompt bauen
+        if self.video_info.transcript:
+            # Transkript aus dem Transcript-Widget holen (könnte editiert worden sein)
+            transcript_data = self.transcript_widget.get_data()
+            transcript_text = (
+                transcript_data["transcript"]
+                if transcript_data and transcript_data.get("transcript")
+                else self.video_info.transcript
+            )
+
+            prompt = build_prompt_from_transcript(
+                title=self.video_info.title,
+                author=self.video_info.channel,
+                transcript=transcript_text,
+                config=self.config,
+                url=self.video_info.url,
+                questions=questions,
+                preset_name=preset_name,
+            )
+        else:
+            # Kein Transkript → nur URL/Metadaten (bisheriges Verhalten)
+            prompt = build_prompt(self.video_info, self.config, questions, preset_name)
+
         self.prompt_text.setText(prompt)
 
         # Zeige Zeichenzahl im Prompt-Header
