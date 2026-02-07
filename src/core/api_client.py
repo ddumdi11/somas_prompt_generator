@@ -28,6 +28,7 @@ class APIResponse:
     provider_used: str = ""
     tokens_used: int = 0
     citations: list[str] = field(default_factory=list)
+    duration_seconds: float = 0.0
 
 
 class LLMClient(ABC):
