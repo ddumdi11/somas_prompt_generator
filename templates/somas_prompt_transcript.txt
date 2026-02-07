@@ -1,4 +1,4 @@
-{% if max_chars and max_chars > 0 %}\u26A0 ZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter {{ max_chars }} Zeichen bleiben. Z\u00e4hle mit.
+{% if max_chars and max_chars > 0 %}⚠ ZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter {{ max_chars }} Zeichen bleiben. Zähle mit.
 
 {% endif %}Analysiere das folgende Transkript nach dem SOMAS-Schema (Source Overview Mapping And extraction Schema).
 
@@ -50,5 +50,5 @@ WICHTIG: Analysiere ZUERST das Transkript vollständig. Anschlussfragen werden N
 {% endif %}
 {% if max_chars and max_chars > 0 %}
 
-\u26A0 ERINNERUNG: Maximale Ausgabel\u00e4nge = {{ max_chars }} Zeichen. K\u00fcrze dich lieber als zu \u00fcberschreiten.
+⚠ ERINNERUNG: Maximale Ausgabelänge = {{ max_chars }} Zeichen. Kürze dich lieber als zu überschreiten.
 {% endif %}
