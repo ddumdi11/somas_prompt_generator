@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="SOMAS Prompt Generator v0.4.0 – Strukturierte YouTube-Analysen mit KI-Power. Zeitbereich-Analyse, Manuelles Transkript, 200+ Modelle, 5 Presets.">
+    <meta name="description" content="SOMAS Prompt Generator – Strukturierte YouTube-Analysen mit KI-Power. Transkript-Einbettung, 200+ Modelle, LinkedIn-ready.">
     <title>SOMAS Prompt Generator – KI-gestützte Video-Analysen</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -13,7 +13,7 @@
         <div class="container">
             <h1>🎯 SOMAS Prompt Generator</h1>
             <p class="tagline">Strukturierte YouTube-Analysen mit KI-Power.<br>200+ Modelle · Ein Klick · LinkedIn-ready.</p>
-            <p class="version-badge">✨ v0.4.0: Zeitbereich-Analyse · Manuelles Transkript · 5 Presets</p>
+            <p class="version-badge">✨ v0.4.1: Kompaktes UI · Transkript-Brücke · Smarte Prompt-Einbettung</p>
             <div class="cta-buttons">
                 <a href="https://github.com/ddumdi11/somas_prompt_generator" class="btn btn-primary">GitHub Repo</a>
                 <a href="https://github.com/ddumdi11/somas_prompt_generator/releases" class="btn btn-secondary">Download</a>
@@ -29,18 +29,45 @@
         </div>
     </section>
 
-    <!-- NEU in v0.4.0: Präzise Analyse -->
+    <!-- NEU in v0.4.1 -->
+    <section class="whats-new">
+        <div class="container">
+            <h2>🆕 Neu in v0.4.1</h2>
+            <p class="section-intro">Drei Verbesserungen, die den Analyse-Workflow grundlegend verbessern.</p>
+            <div class="new-features-grid">
+                <div class="new-feature-card">
+                    <span class="new-feature-icon">📐</span>
+                    <h3>Kompaktes UI</h3>
+                    <p>Metadaten und Zeitbereich sind jetzt einklappbare Sektionen. Nach dem Laden zeigt ein kompakter Header die wichtigsten Infos – bei Bedarf aufklappbar für volle Details.</p>
+                    <span class="new-feature-detail">Mehr Platz für das Wesentliche</span>
+                </div>
+                <div class="new-feature-card">
+                    <span class="new-feature-icon">🔗</span>
+                    <h3>Transkript-Brücke</h3>
+                    <p>YouTube-Transkripte werden automatisch in den Transkript-Tab übernommen – editierbar, mit Wort- und Zeichenzähler. Ein grüner Punkt signalisiert verfügbare Transkripte.</p>
+                    <span class="new-feature-detail">Automatisch geladen, manuell anpassbar</span>
+                </div>
+                <div class="new-feature-card new-feature-card-highlight">
+                    <span class="new-feature-icon">🧠</span>
+                    <h3>Smarte Prompt-Einbettung</h3>
+                    <p>Verfügbare Transkripte werden direkt in den Prompt eingebettet. Modelle ohne Web-Zugriff analysieren jetzt den tatsächlichen Inhalt – keine Halluzination mehr.</p>
+                    <span class="new-feature-detail">Transkript im Prompt = bessere Analysen</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Zeitbereich + Transkript -->
     <section class="precision-section">
         <div class="container">
-            <h2>🎯 NEU: Präzise Analyse</h2>
+            <h2>🎯 Präzise Analyse</h2>
             <p class="section-intro">Analysiere genau das, was dich interessiert – nicht mehr, nicht weniger.</p>
-            
             <div class="precision-grid">
                 <div class="precision-card">
                     <span class="precision-icon">⏱️</span>
                     <h3>Zeitbereich-Analyse</h3>
                     <p>Nur den relevanten Ausschnitt analysieren</p>
-                    <ul class="precision-features">
+                    <ul>
                         <li>Start- und Endzeit frei wählbar (MM:SS oder HH:MM:SS)</li>
                         <li>Optional: Gesamtkontext des Videos einbeziehen</li>
                         <li>Perfekt für lange Videos mit mehreren Themen</li>
@@ -50,7 +77,7 @@
                     <span class="precision-icon">📝</span>
                     <h3>Manuelles Transkript</h3>
                     <p>Nicht nur YouTube – analysiere jede Textquelle</p>
-                    <ul class="precision-features">
+                    <ul>
                         <li>Podcasts, Vorträge, Interviews</li>
                         <li>Korrigierte oder übersetzte Transkripte</li>
                         <li>Eigene Notizen und Mitschriften</li>
@@ -60,12 +87,12 @@
         </div>
     </section>
 
-    <!-- API-Integration Section -->
+    <!-- API-Integration -->
     <section class="api-section">
         <div class="container">
             <h2>🚀 Integrierte KI-Analyse</h2>
             <p class="section-intro">Keine Copy-Paste-Workflows mehr. Wähle ein Modell und lass die App die Analyse automatisch erstellen.</p>
-            
+
             <div class="provider-grid">
                 <div class="provider-card">
                     <span class="provider-icon">🔮</span>
@@ -83,7 +110,7 @@
                     <h3>OpenRouter</h3>
                     <p>200+ Modelle von allen großen Anbietern – oft kostenlos testbar</p>
                     <ul class="provider-features">
-                        <li>Claude, Gemini, GPT, Llama, DeepSeek...</li>
+                        <li>Claude, Gemini, GPT, Llama, DeepSeek, Grok...</li>
                         <li>Dynamische Preisanzeige</li>
                         <li>Suchbare Modell-Liste mit Filtern</li>
                         <li>Kostenlose Testmodelle bei neuen Releases</li>
@@ -91,27 +118,27 @@
                 </div>
             </div>
 
-            <div class="api-features">
-                <div class="api-feature">
-                    <span class="feature-icon">⚡</span>
+            <div class="api-highlights">
+                <div class="api-highlight">
+                    <span>⚡</span>
                     <strong>Ein-Klick-Analyse</strong>
-                    <span>API-Automatik aktivieren → Generate Prompt → Fertig</span>
+                    <p>API-Automatik aktivieren → Generate → Fertig</p>
                 </div>
-                <div class="api-feature">
-                    <span class="feature-icon">💰</span>
+                <div class="api-highlight">
+                    <span>💰</span>
                     <strong>Preistransparenz</strong>
-                    <span>Context-Länge und Token-Preise direkt im Dropdown</span>
+                    <p>Context-Länge und Token-Preise im Dropdown</p>
                 </div>
-                <div class="api-feature">
-                    <span class="feature-icon">🔄</span>
+                <div class="api-highlight">
+                    <span>🔄</span>
                     <strong>Flexibel</strong>
-                    <span>Manueller Workflow bleibt verfügbar – du entscheidest</span>
+                    <p>Manueller Workflow bleibt verfügbar</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Features: Die 5 Presets -->
+    <!-- 5 Presets -->
     <section class="features">
         <div class="container">
             <h2>Fünf Analyse-Presets</h2>
@@ -142,9 +169,9 @@
                 </div>
                 <div class="preset-card">
                     <span class="preset-icon">🔬</span>
-                    <h3>Research (Extended)</h3>
-                    <p>Umfassende Tiefenrecherche ohne Zeichenlimit</p>
-                    <span class="preset-meta">Lesezeit: variabel · Max: unbegrenzt</span>
+                    <h3>Research</h3>
+                    <p>Umfassende Tiefenrecherche ohne Limit</p>
+                    <span class="preset-meta">Lesezeit: variabel · unbegrenzt</span>
                 </div>
             </div>
         </div>
@@ -182,7 +209,7 @@
         </div>
     </section>
 
-    <!-- SOMAS Schema Erklärung -->
+    <!-- SOMAS Schema -->
     <section class="schema-section">
         <div class="container">
             <h2>Was ist SOMAS?</h2>
@@ -218,19 +245,15 @@
         <div class="container">
             <h2>Installation</h2>
             <div class="code-block">
-                <code>
-git clone https://github.com/ddumdi11/somas_prompt_generator.git
+                <code>git clone https://github.com/ddumdi11/somas_prompt_generator.git
 cd somas_prompt_generator
 pip install -r requirements.txt
-python main.py
-                </code>
+python main.py</code>
             </div>
             <p class="tech-stack">
                 <strong>Tech Stack:</strong> Python 3.11+ · PyQt6 · yt-dlp · requests · keyring
             </p>
-            <p class="api-note">
-                💡 API-Keys werden sicher im System-Keyring gespeichert (Windows Credential Manager / macOS Keychain)
-            </p>
+            <p class="tech-note">💡 API-Keys werden sicher im System-Keyring gespeichert (Windows Credential Manager / macOS Keychain)</p>
         </div>
     </section>
 
@@ -238,13 +261,13 @@ python main.py
     <footer class="footer">
         <div class="container">
             <p>
-                MIT License · Made with 🤖 by 
-                <a href="https://github.com/ddumdi11">Thorsten Diederichs</a> 
+                MIT License · Made with 🤖 by
+                <a href="https://github.com/ddumdi11">Thorsten Diederichs</a>
                 + Claude + Gemini
             </p>
             <p class="footer-links">
-                <a href="https://github.com/ddumdi11/somas_prompt_generator">GitHub</a> · 
-                <a href="https://github.com/ddumdi11/somas_prompt_generator/issues">Issues</a> · 
+                <a href="https://github.com/ddumdi11/somas_prompt_generator">GitHub</a> ·
+                <a href="https://github.com/ddumdi11/somas_prompt_generator/issues">Issues</a> ·
                 <a href="https://github.com/ddumdi11/somas_prompt_generator/releases">Releases</a>
             </p>
         </div>

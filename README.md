@@ -14,8 +14,11 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuelle Version (v0.4.0)
+### Aktuelle Version (v0.4.1)
 
+- **Kompaktes UI** – Einklappbare Sektionen (Metadaten, Zeitbereich) mit kompakter Zusammenfassung
+- **Transkript-Brücke** – YouTube-Transkripte automatisch im Transkript-Tab verfügbar, editierbar
+- **Smarte Prompt-Einbettung** – Verfügbare Transkripte werden direkt in den Prompt eingebettet (Modelle ohne Web-Zugriff analysieren tatsächlichen Inhalt)
 - **Dual-Input-Modus** – YouTube-URL oder manuelles Transkript (Tab-basiert)
 - **YouTube-Integration** – URL einfügen, Metadaten automatisch abrufen
 - **Zeitbereich-Analyse** – Nur einen bestimmten Abschnitt des Videos analysieren (MM:SS oder HH:MM:SS)
@@ -37,7 +40,6 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ### Nächste Schritte
 
-- **v0.4.1** – UI-Redesign: Einklappbare Sektionen, Transkript-Brücke (YouTube → Transkript-Tab)
 - **v0.5** – Modell-Bewertungssystem
 - PDF-Export
 - Batch-Verarbeitung
@@ -115,7 +117,7 @@ somas_prompt_generator/
 
 ```txt
 PyQt6>=6.4.0
-youtube-transcript-api>=0.6.0
+youtube-transcript-api>=1.0.0
 yt-dlp>=2024.1.0
 Jinja2>=3.1.0
 requests>=2.31.0
@@ -203,6 +205,7 @@ Plus automatisch gewähltes Modul: `[KRITIK]`, `[ZITATE]`, `[OFFENE_FRAGEN]`, `[
 
 | Version | Datum | Änderungen |
 | --------- | ------- | ------------ |
+| 0.4.1 | 2026-02-07 | UI-Redesign (Collapsible Sections), Transkript-Brücke, Transkript-Einbettung in Prompts |
 | 0.4.0 | 2026-02-03 | Zeitbereich-Analyse, Manuelles Transkript, Tab-basierte Eingabe, Landing Page v0.4.0 |
 | 0.3.1 | 2026-01-31 | FilterableModelSelector, OpenRouter-Suchfeld mit Filtern |
 | 0.3.0 | 2026-01-29 | API-Integration (Perplexity + OpenRouter), Debug-Logger, Research-Preset |
