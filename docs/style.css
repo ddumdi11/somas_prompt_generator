@@ -1,5 +1,4 @@
-/* SOMAS Prompt Generator - Landing Page Styles */
-/* Updated for v0.4.0 with Zeitbereich & Manual Transcript */
+/* SOMAS Prompt Generator - Landing Page Styles v0.4.1 */
 
 /* ========== Reset & Base ========== */
 * {
@@ -128,89 +127,17 @@ a:hover {
     font-style: italic;
 }
 
-/* ========== Precision Section (NEW in v0.4.0) ========== */
-.precision-section {
+/* ========== What's New Section ========== */
+.whats-new {
     padding: 80px 20px;
-    background: linear-gradient(180deg, #fef3c7 0%, #fde68a 100%);
+    background: #f0fdf4;
 }
 
-.precision-section h2 {
+.whats-new h2 {
     text-align: center;
     font-size: 2rem;
-    margin-bottom: 16px;
-    color: #92400e;
-}
-
-.precision-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 24px;
-    margin-bottom: 0;
-}
-
-.precision-card {
-    background: white;
-    padding: 32px;
-    border-radius: 16px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    transition: transform 0.2s, box-shadow 0.2s;
-    border-top: 4px solid #f59e0b;
-}
-
-.precision-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 32px rgba(0,0,0,0.12);
-}
-
-.precision-icon {
-    font-size: 2.5rem;
-    display: block;
-    margin-bottom: 16px;
-}
-
-.precision-card h3 {
-    font-size: 1.4rem;
-    margin-bottom: 8px;
-    color: #92400e;
-}
-
-.precision-card > p {
-    color: #666;
-    margin-bottom: 16px;
-}
-
-.precision-features {
-    list-style: none;
-    padding: 0;
-}
-
-.precision-features li {
-    padding: 6px 0;
-    padding-left: 24px;
-    position: relative;
-    color: #555;
-    font-size: 0.95rem;
-}
-
-.precision-features li::before {
-    content: "✓";
-    position: absolute;
-    left: 0;
-    color: #f59e0b;
-    font-weight: bold;
-}
-
-/* ========== API Section ========== */
-.api-section {
-    padding: 80px 20px;
-    background: linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 100%);
-}
-
-.api-section h2 {
-    text-align: center;
-    font-size: 2rem;
-    margin-bottom: 16px;
-    color: #1e3a5f;
+    margin-bottom: 12px;
+    color: #166534;
 }
 
 .section-intro {
@@ -221,52 +148,168 @@ a:hover {
     font-size: 1.1rem;
 }
 
+.new-features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+}
+
+.new-feature-card {
+    background: white;
+    padding: 32px 24px;
+    border-radius: 12px;
+    border-top: 4px solid #22c55e;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.new-feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+}
+
+.new-feature-card-highlight {
+    border-top-color: #2563eb;
+    background: #f8faff;
+}
+
+.new-feature-icon {
+    font-size: 2.2rem;
+    display: block;
+    margin-bottom: 12px;
+}
+
+.new-feature-card h3 {
+    font-size: 1.2rem;
+    margin-bottom: 8px;
+    color: #1e3a5f;
+}
+
+.new-feature-card p {
+    color: #555;
+    margin-bottom: 12px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.new-feature-detail {
+    font-size: 0.85rem;
+    color: #15803d;
+    font-weight: 600;
+    display: block;
+}
+
+.new-feature-card-highlight .new-feature-detail {
+    color: #2563eb;
+}
+
+/* ========== Precision Section ========== */
+.precision-section {
+    padding: 80px 20px;
+    background: #fff;
+}
+
+.precision-section h2 {
+    text-align: center;
+    font-size: 2rem;
+    margin-bottom: 12px;
+    color: #1e3a5f;
+}
+
+.precision-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 32px;
+}
+
+.precision-card {
+    background: #f8fafc;
+    padding: 32px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+}
+
+.precision-icon {
+    font-size: 2.2rem;
+    display: block;
+    margin-bottom: 12px;
+}
+
+.precision-card h3 {
+    font-size: 1.2rem;
+    margin-bottom: 8px;
+    color: #1e3a5f;
+}
+
+.precision-card > p {
+    color: #666;
+    margin-bottom: 16px;
+}
+
+.precision-card ul {
+    list-style: none;
+    padding: 0;
+}
+
+.precision-card li {
+    padding: 4px 0 4px 20px;
+    position: relative;
+    color: #555;
+    font-size: 0.95rem;
+}
+
+.precision-card li::before {
+    content: "·";
+    position: absolute;
+    left: 6px;
+    color: #2563eb;
+    font-weight: bold;
+}
+
+/* ========== API Section ========== */
+.api-section {
+    padding: 80px 20px;
+    background: #f5f7fa;
+}
+
+.api-section h2 {
+    text-align: center;
+    font-size: 2rem;
+    margin-bottom: 12px;
+    color: #1e3a5f;
+}
+
 .provider-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: 24px;
     margin-bottom: 48px;
 }
 
 .provider-card {
     background: white;
-    padding: 32px;
-    border-radius: 16px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    transition: transform 0.2s, box-shadow 0.2s;
+    padding: 32px 24px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    transition: transform 0.2s;
 }
 
 .provider-card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 12px 32px rgba(0,0,0,0.12);
 }
 
 .provider-card-highlight {
-    border: 2px solid #10b981;
-    position: relative;
-}
-
-.provider-card-highlight::before {
-    content: "200+ Modelle";
-    position: absolute;
-    top: -12px;
-    right: 20px;
-    background: #10b981;
-    color: white;
-    padding: 4px 12px;
-    border-radius: 12px;
-    font-size: 0.8rem;
-    font-weight: 600;
+    border: 2px solid #2563eb;
 }
 
 .provider-icon {
-    font-size: 2.5rem;
+    font-size: 2.2rem;
     display: block;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
 .provider-card h3 {
-    font-size: 1.4rem;
+    font-size: 1.2rem;
     margin-bottom: 8px;
     color: #1e3a5f;
 }
@@ -282,8 +325,7 @@ a:hover {
 }
 
 .provider-features li {
-    padding: 6px 0;
-    padding-left: 24px;
+    padding: 4px 0 4px 20px;
     position: relative;
     color: #555;
     font-size: 0.95rem;
@@ -293,46 +335,44 @@ a:hover {
     content: "✓";
     position: absolute;
     left: 0;
-    color: #10b981;
-    font-weight: bold;
+    color: #22c55e;
 }
 
-.api-features {
+.api-highlights {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 24px;
 }
 
-.api-feature {
-    background: white;
-    padding: 24px;
-    border-radius: 12px;
+.api-highlight {
     text-align: center;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    padding: 24px 16px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
 
-.api-feature .feature-icon {
-    font-size: 2rem;
+.api-highlight span {
+    font-size: 1.5rem;
     display: block;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
 }
 
-.api-feature strong {
+.api-highlight strong {
     display: block;
     color: #1e3a5f;
-    margin-bottom: 8px;
-    font-size: 1.1rem;
+    margin-bottom: 4px;
 }
 
-.api-feature span {
-    color: #666;
+.api-highlight p {
     font-size: 0.9rem;
+    color: #666;
 }
 
-/* ========== Features Section ========== */
+/* ========== Features / Presets Section ========== */
 .features {
     padding: 80px 20px;
-    background: #f5f7fa;
+    background: #fff;
 }
 
 .features h2 {
@@ -344,32 +384,32 @@ a:hover {
 
 .preset-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 24px;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 20px;
 }
 
 .preset-card {
-    background: white;
-    padding: 32px 24px;
+    background: #f8fafc;
+    padding: 28px 20px;
     border-radius: 12px;
     text-align: center;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border: 1px solid #e2e8f0;
     transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .preset-card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
 }
 
 .preset-icon {
-    font-size: 2.5rem;
+    font-size: 2.2rem;
     display: block;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
 .preset-card h3 {
-    font-size: 1.3rem;
+    font-size: 1.15rem;
     margin-bottom: 8px;
     color: #1e3a5f;
 }
@@ -377,18 +417,19 @@ a:hover {
 .preset-card p {
     color: #666;
     margin-bottom: 12px;
+    font-size: 0.9rem;
 }
 
 .preset-meta {
-    font-size: 0.85rem;
-    color: #999;
+    font-size: 0.8rem;
+    color: #737373;
     display: block;
 }
 
 /* ========== How It Works ========== */
 .how-it-works {
     padding: 80px 20px;
-    background: white;
+    background: #f5f7fa;
 }
 
 .how-it-works h2 {
@@ -426,18 +467,14 @@ a:hover {
 }
 
 .step h3 {
-    font-size: 1.1rem;
+    font-size: 1.05rem;
     margin-bottom: 8px;
     color: #1e3a5f;
 }
 
 .step p {
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     color: #666;
-}
-
-.step p strong {
-    color: #2563eb;
 }
 
 .step-arrow {
@@ -445,22 +482,19 @@ a:hover {
     color: #ccc;
 }
 
-@media (max-width: 800px) {
+@media (max-width: 700px) {
     .step-arrow {
         display: none;
     }
     .steps {
         flex-direction: column;
     }
-    .step {
-        max-width: 280px;
-    }
 }
 
 /* ========== Schema Section ========== */
 .schema-section {
     padding: 80px 20px;
-    background: #f5f7fa;
+    background: #fff;
 }
 
 .schema-section h2 {
@@ -492,7 +526,7 @@ a:hover {
 }
 
 .schema-block {
-    background: white;
+    background: #f8fafc;
     padding: 20px 24px;
     border-radius: 8px;
     border-left: 4px solid #2563eb;
@@ -549,15 +583,13 @@ a:hover {
     text-align: center;
     opacity: 0.8;
     font-size: 0.95rem;
-    margin-bottom: 16px;
 }
 
-.api-note {
+.tech-note {
     text-align: center;
-    font-size: 0.9rem;
     opacity: 0.7;
-    max-width: 500px;
-    margin: 0 auto;
+    font-size: 0.85rem;
+    margin-top: 12px;
 }
 
 /* ========== Footer ========== */
@@ -581,36 +613,27 @@ a:hover {
     .hero h1 {
         font-size: 2rem;
     }
-    
+
     .hero .tagline {
         font-size: 1.1rem;
     }
-    
-    .version-badge {
-        font-size: 0.85rem;
-        padding: 6px 16px;
-    }
-    
+
     .features h2,
     .how-it-works h2,
     .schema-section h2,
     .installation h2,
-    .api-section h2,
-    .precision-section h2 {
+    .whats-new h2,
+    .precision-section h2,
+    .api-section h2 {
         font-size: 1.6rem;
     }
-    
-    .provider-grid,
-    .precision-grid {
+
+    .new-features-grid,
+    .precision-grid,
+    .provider-grid {
         grid-template-columns: 1fr;
     }
-    
-    .provider-card-highlight::before {
-        top: -10px;
-        right: 12px;
-        font-size: 0.75rem;
-    }
-    
+
     .preset-grid {
         grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     }
