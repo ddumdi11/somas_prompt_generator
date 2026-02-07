@@ -435,6 +435,14 @@ class MainWindow(QMainWindow):
         self.result_text.setPlaceholderText("Analyse-Ergebnis hier einfügen...")
         layout.addWidget(self.result_text)
 
+        # Zeichenzähler-Zeile
+        counter_layout = QHBoxLayout()
+        counter_layout.addStretch()
+        self.result_char_counter = QLabel("")
+        self.result_char_counter.setStyleSheet("font-size: 11px; color: #888;")
+        counter_layout.addWidget(self.result_char_counter)
+        layout.addLayout(counter_layout)
+
         return frame
 
     def _create_export_section(self) -> QHBoxLayout:
@@ -482,6 +490,8 @@ class MainWindow(QMainWindow):
                 self.transcript_widget.has_valid_data()
             )
         )
+        # Zeichenzähler am Ergebnis-Feld
+        self.result_text.textChanged.connect(self._update_result_char_counter)
         # Zeitbereich
         self.time_range_checkbox.toggled.connect(self._toggle_time_range_fields)
         self.time_start_edit.textChanged.connect(self._update_time_range_summary)
@@ -521,6 +531,9 @@ class MainWindow(QMainWindow):
             self.preset_description.setText("Keine Presets verfügbar")
             self.reading_time_label.setText("")
             self.max_chars_label.setText("")
+
+        # Zeichenzähler aktualisieren (Limit könnte sich geändert haben)
+        self._update_result_char_counter()
 
     @pyqtSlot(int)
     def _on_input_tab_changed(self, index: int) -> None:
@@ -578,6 +591,58 @@ class MainWindow(QMainWindow):
         context = " (mit Kontext)" if self.time_context_checkbox.isChecked() else ""
         self.time_range_section.set_summary(
             f"{start} – {end}{context}", color="#2E7D32"
+        )
+
+    @pyqtSlot()
+    def _update_result_char_counter(self) -> None:
+        """Aktualisiert den Zeichenzähler unter dem Ergebnis-Feld."""
+        text = self.result_text.toPlainText()
+        char_count = len(text)
+
+        if not text.strip():
+            self.result_char_counter.setText("")
+            return
+
+        # Limit aus aktuellem Preset holen
+        max_chars = 0
+        preset_name = ""
+        if self.current_preset:
+            max_chars = self.current_preset.max_chars or 0
+            preset_name = self.current_preset.name
+
+        if max_chars == 0:
+            # Unbegrenztes Preset (z.B. Research) — nur Zeichenzahl zeigen
+            self.result_char_counter.setText(f"{char_count:,} Zeichen")
+            self.result_char_counter.setStyleSheet("font-size: 11px; color: #888;")
+            return
+
+        # Ampel-Logik
+        ratio = char_count / max_chars
+
+        if ratio <= 0.9:
+            color = "#2E7D32"
+            icon = "\u2713"
+        elif ratio <= 1.0:
+            color = "#F57F17"
+            icon = "\u26A0"
+        else:
+            color = "#C62828"
+            icon = "\u2717"
+
+        # Anzeige-Text
+        if ratio > 1.0:
+            over = char_count - max_chars
+            display = (
+                f"{icon} {char_count:,} / {max_chars:,} Zeichen ({preset_name})"
+                f" \u2014 {over:,} \u00fcber Limit"
+            )
+        else:
+            display = f"{icon} {char_count:,} / {max_chars:,} Zeichen ({preset_name})"
+
+        self.result_char_counter.setText(display)
+        self.result_char_counter.setStyleSheet(
+            f"font-size: 11px; color: {color};"
+            f" font-weight: {'bold' if ratio > 1.0 else 'normal'};"
         )
 
     @pyqtSlot()
