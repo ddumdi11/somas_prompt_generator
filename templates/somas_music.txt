@@ -1,8 +1,10 @@
 {% if max_chars and max_chars > 0 %}⚠ ZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter {{ max_chars }} Zeichen bleiben. Zähle mit.
 
-{% endif %}Analysiere den folgenden Songtext nach dem SOMAS-Musik-Schema.
+{% endif %}Analysiere den folgenden Songtext.
+WICHTIG: "SOMAS" ist nur der Name dieses Analyse-Frameworks. Verwende den Begriff NICHT in deiner Analyse.
+Triff keine Annahmen über das Geschlecht singender oder sprechender Personen, sofern es nicht eindeutig aus dem Text oder den Metadaten hervorgeht.
 
-WICHTIG: Dies ist eine rein textbasierte Analyse des Songtexts.
+Dies ist eine rein textbasierte Analyse des Songtexts.
 Beurteile NICHT die musikalische Qualität (Melodie, Produktion, Sound),
 da dir nur der Text vorliegt, nicht das Audio.
 
@@ -36,7 +38,20 @@ QUELLE:
 Titel: "{{ video_title }}" von {{ channel_name }}
 {% if video_url %}URL: {{ video_url }}
 {% endif %}
-{% if transcript %}SONGTEXT:
+{% if transcript %}
+{% if is_auto_transcript %}
+HINWEIS ZUM SONGTEXT:
+Der folgende Text wurde automatisch per Spracherkennung erstellt (Speech-to-Text).
+Automatische Spracherkennung ist für Gesang besonders unzuverlässig.
+Rechne mit stark verfälschten Liedtexten:
+- Falsch erkannte Wörter und Eigennamen
+- Fehlende oder falsche Satzzeichen
+- Homophone Verwechslungen
+- Völlig falsch erkannte Passagen (besonders bei schnellem Rap, Ad-libs, Background-Vocals)
+Nutze dein Wissen über den Künstler und Song, um offensichtliche Transkriptionsfehler
+zu korrigieren, statt sie als kreative Schreibweise zu interpretieren.
+
+{% endif %}SONGTEXT:
 """
 {{ transcript }}
 """

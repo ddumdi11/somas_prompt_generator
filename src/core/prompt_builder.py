@@ -207,6 +207,7 @@ def build_prompt_from_transcript(
     url: Optional[str] = None,
     questions: str = "",
     preset_name: Optional[str] = None,
+    is_auto_transcript: bool = False,
 ) -> str:
     """Generiert einen SOMAS-Prompt aus manuellem Transkript.
 
@@ -221,6 +222,8 @@ def build_prompt_from_transcript(
         url: Optionale Quellen-URL.
         questions: Optionale Anschlussfragen.
         preset_name: Name des Presets (für sentences_per_section).
+        is_auto_transcript: True wenn automatisch transkribiert (YouTube STT).
+            Fügt einen Disclaimer über typische Erkennungsfehler ein.
 
     Returns:
         Fertig gerenderte Prompt-Zeichenkette.
@@ -252,6 +255,7 @@ def build_prompt_from_transcript(
         author=author,
         url=url,
         transcript=transcript,
+        is_auto_transcript=is_auto_transcript,
         # Aliase für Kompatibilität mit Video-Templates
         video_title=title,
         channel_name=author,
