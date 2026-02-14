@@ -730,7 +730,16 @@ class MainWindow(QMainWindow):
                 )
                 self._update_transcript_tab_indicator(has_content=True)
             else:
+                # Altes Transkript entfernen (verhindert Stale-State)
+                self.transcript_widget.clear()
                 self._update_transcript_tab_indicator(has_content=False)
+
+            # Stale Analyse-Ergebnis entfernen (vom vorherigen Video)
+            self.result_text.clear()
+            self._last_api_response = None
+            self.rating_widget.reset()
+            self.rating_widget.setVisible(False)
+            self._current_analysis_id = None
         except ValueError as e:
             QMessageBox.critical(self, "Fehler", str(e))
             logger.error(f"Fehler beim Abrufen der Metadaten: {e}")
