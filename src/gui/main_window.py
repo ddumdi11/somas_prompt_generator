@@ -863,6 +863,7 @@ class MainWindow(QMainWindow):
                 url=self.video_info.url,
                 questions=questions,
                 preset_name=preset_name,
+                is_auto_transcript=True,
             )
         else:
             # Kein Transkript → nur URL/Metadaten (bisheriges Verhalten)
@@ -917,6 +918,7 @@ class MainWindow(QMainWindow):
             url=data["url"],
             questions=questions,
             preset_name=preset_name,
+            is_auto_transcript=self.transcript_widget.is_auto_source(),
         )
         self.prompt_text.setText(prompt)
 

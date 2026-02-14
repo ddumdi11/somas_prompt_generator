@@ -1,6 +1,8 @@
 {% if max_chars and max_chars > 0 %}⚠ ZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter {{ max_chars }} Zeichen bleiben. Zähle mit.
 
 {% endif %}Analysiere das folgende Transkript nach dem SOMAS-Schema (Source Overview Mapping And extraction Schema).
+WICHTIG: "SOMAS" ist nur der Name dieses Analyse-Frameworks. Verwende den Begriff NICHT in deiner Analyse.
+Triff keine Annahmen über das Geschlecht sprechender Personen, sofern es nicht eindeutig aus dem Text oder den Metadaten hervorgeht.
 
 KONFIGURATION:
 - Tiefe: {{ depth }} ({{ depth_description }})
@@ -39,7 +41,16 @@ QUELLE:
 Titel: "{{ title }}" von {{ author }}
 {% if url %}URL: {{ url }}
 {% endif %}
-TRANSKRIPT:
+{% if is_auto_transcript %}
+HINWEIS ZUM TRANSKRIPT:
+Der folgende Text wurde automatisch per Spracherkennung erstellt (Speech-to-Text).
+Rechne mit typischen Erkennungsfehlern:
+- Falsch geschriebene Eigennamen und Fachbegriffe
+- Fehlende oder falsche Satzzeichen
+- Homophone Verwechslungen (z.B. "Seite"/"Saite", "mehr"/"Meer")
+Interpretiere offensichtliche Verschreibungen NICHT als bewusste sprachliche Stilmittel.
+
+{% endif %}TRANSKRIPT:
 """
 {{ transcript }}
 """

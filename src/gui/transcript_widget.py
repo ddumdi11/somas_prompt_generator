@@ -139,6 +139,10 @@ class TranscriptInputWidget(QWidget):
             and self.transcript_edit.toPlainText().strip()
         )
 
+    def is_auto_source(self) -> bool:
+        """Prüft ob das Transkript automatisch von YouTube geladen wurde."""
+        return self._auto_source
+
     def clear(self) -> None:
         """Setzt alle Felder zurück."""
         self.title_edit.clear()
