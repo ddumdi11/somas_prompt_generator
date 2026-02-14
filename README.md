@@ -14,7 +14,15 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuelle Version (v0.4.1)
+### Aktuelle Version (v0.5.0) — "Musik-Preset & Transkript-Qualität"
+
+- **Musik-Preset** – Eigenes 4-Teil-Schema für Songtext-Analysen (KONTEXT → SONGTEXT-ANALYSE → EINORDNUNG → BEWERTUNG)
+- **Bewertungssystem** – Modell-Sterne (1-5) und Quellen-Daumen (up/down) nach jeder API-Analyse, SQLite-Speicherung
+- **Zeichenlimit-Kontrolle** – Traffic-Light-Counter, Sandwich-Technik im Prompt, Rework-Button zum Kürzen
+- **Transkript-Disclaimer** – Automatischer STT-Hinweis für maschinelle Transkripte, geschlechtsneutrale Sprache, SOMAS-Selbstreferenz-Unterdrückung
+- **Stale-State-Fix** – Transkript und Ergebnis werden beim Laden neuer Videos korrekt zurückgesetzt
+
+### Seit v0.4.1
 
 - **Kompaktes UI** – Einklappbare Sektionen (Metadaten, Zeitbereich) mit kompakter Zusammenfassung
 - **Transkript-Brücke** – YouTube-Transkripte automatisch im Transkript-Tab verfügbar, editierbar
@@ -27,12 +35,13 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
   - **Perplexity AI** – Sonar, Sonar Pro, Deep Research
   - **OpenRouter** – 200+ Modelle (Claude, Gemini, GPT, Llama, DeepSeek...)
   - Suchbare Modell-Liste mit dynamischer Preisanzeige
-- **5 Prompt-Presets:**
+- **6 Prompt-Presets:**
   - **Standard** – Ausgewogene Analyse (2.800 Zeichen, ~2 Min Lesezeit)
   - **LinkedIn** – Social-Media-optimiert (2.200 Zeichen, ~90 Sek)
   - **Minimal** – Blitz-Überblick (800 Zeichen, ~30 Sek)
   - **Academia** – Wissenschaftlich (3.000 Zeichen, ~2,5 Min)
   - **Research** – Umfassende Tiefenrecherche (unbegrenzt)
+  - **Musik** – Songtext-Analyse (2.400 Zeichen, ~75 Sek)
 - **Export-Formate:**
   - LinkedIn-optimiert (Unicode-Bold, Post-Header, Aufzählungen)
   - Markdown (.md)
@@ -40,7 +49,7 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ### Nächste Schritte
 
-- **v0.5** – Modell-Bewertungssystem
+- **v0.6.0** – SOMAS Schema-Erweiterung (modulares Framework mit Content-Type-Varianten)
 - PDF-Export
 - Batch-Verarbeitung
 
@@ -58,7 +67,9 @@ somas_prompt_generator/
 ├── src/
 │   ├── gui/
 │   │   ├── main_window.py      # Hauptfenster mit Tabs, Presets, API-Controls
+│   │   ├── collapsible_section.py # Einklappbare UI-Sektionen
 │   │   ├── model_selector.py   # FilterableModelSelector (OpenRouter)
+│   │   ├── rating_widget.py    # Bewertungs-Widget (Sterne + Daumen)
 │   │   ├── settings_dialog.py  # Einstellungsdialog (API-Keys)
 │   │   └── transcript_widget.py # Transkript-Eingabewidget
 │   │
@@ -71,23 +82,25 @@ somas_prompt_generator/
 │   │   ├── api_worker.py       # QThread-Worker für async API-Calls
 │   │   ├── perplexity_client.py # Perplexity Sonar/Deep Research
 │   │   ├── openrouter_client.py # OpenRouter (200+ Modelle)
+│   │   ├── rating_store.py     # SQLite-Bewertungsspeicher
 │   │   └── debug_logger.py     # Debug-Logging
 │   │
 │   └── config/
 │       ├── defaults.py         # VideoInfo, SomasConfig, TimeRange
 │       ├── api_config.py       # API-Provider-Konfiguration
-│       ├── prompt_presets.json  # 5 Preset-Konfigurationen
+│       ├── prompt_presets.json  # 6 Preset-Konfigurationen
 │       ├── api_providers.json   # Provider-Definitionen
 │       └── user_preferences.json # Benutzereinstellungen
 │
 ├── templates/
 │   ├── somas_prompt.txt        # Basis-Prompt-Template (Jinja2)
-│   ├── somas_prompt_transcript.txt # Transkript-Template
+│   ├── somas_prompt_transcript.txt # Transkript-Template (mit STT-Disclaimer)
 │   ├── somas_standard.txt      # Standard-Preset
 │   ├── somas_linkedin.txt      # LinkedIn-Preset
 │   ├── somas_minimal.txt       # Minimal-Preset
 │   ├── somas_academia.txt      # Academia-Preset
-│   └── somas_research.txt      # Research-Preset
+│   ├── somas_research.txt      # Research-Preset
+│   └── somas_music.txt         # Musik-Preset (Songtext-Analyse)
 │
 ├── docs/                   # GitHub Pages Landing Page
 │   ├── index.html
@@ -190,14 +203,22 @@ LinkedIn unterstützt nur eingeschränkte Formatierung:
 
 ## 📊 SOMAS-Schema
 
-Die App implementiert das SOMAS-Schema mit 4 Basis-Abschnitten:
+Die App implementiert das SOMAS-Framework mit Content-Type-spezifischen Analyse-Schemata:
+
+### Standard-Schema (Vorträge, Interviews, Nachrichten)
 
 1. **FRAMING** – Wer spricht, Format, Kontext
 2. **KERNTHESE** – Zentrale Aussage/Position
 3. **ELABORATION** – Vertiefung, Belege, Details
 4. **IMPLIKATION** – Fazit, Empfehlung, Bedeutung
+5. **[MODUL]** – Automatisch gewählt: Kritik · Zitate · Offene Fragen · Verbindungen
 
-Plus automatisch gewähltes Modul: `[KRITIK]`, `[ZITATE]`, `[OFFENE_FRAGEN]`, `[VERBINDUNGEN]`
+### Musik-Schema (Songtexte, Musikvideos)
+
+1. **KONTEXT** – Künstler, Genre, Einordnung
+2. **SONGTEXT-ANALYSE** – Thema, Erzählperspektive, sprachliche Mittel
+3. **EINORDNUNG** – Genre-Vergleich, kulturelle Bezüge
+4. **BEWERTUNG** – Stärken, Schwächen, Gesamteindruck
 
 ---
 
@@ -205,6 +226,7 @@ Plus automatisch gewähltes Modul: `[KRITIK]`, `[ZITATE]`, `[OFFENE_FRAGEN]`, `[
 
 | Version | Datum | Änderungen |
 | --------- | ------- | ------------ |
+| 0.5.0 | 2026-02-14 | Musik-Preset, Bewertungssystem (Sterne+Daumen), Zeichenlimit-Kontrolle (Counter, Sandwich, Rework), Transkript-Disclaimer, Stale-State-Fix |
 | 0.4.1 | 2026-02-07 | UI-Redesign (Collapsible Sections), Transkript-Brücke, Transkript-Einbettung in Prompts |
 | 0.4.0 | 2026-02-03 | Zeitbereich-Analyse, Manuelles Transkript, Tab-basierte Eingabe, Landing Page v0.4.0 |
 | 0.3.1 | 2026-01-31 | FilterableModelSelector, OpenRouter-Suchfeld mit Filtern |

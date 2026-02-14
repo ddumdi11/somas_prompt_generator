@@ -13,7 +13,7 @@
         <div class="container">
             <h1>🎯 SOMAS Prompt Generator</h1>
             <p class="tagline">Strukturierte YouTube-Analysen mit KI-Power.<br>200+ Modelle · Ein Klick · LinkedIn-ready.</p>
-            <p class="version-badge">✨ v0.4.1: Kompaktes UI · Transkript-Brücke · Smarte Prompt-Einbettung</p>
+            <p class="version-badge">✨ v0.5.0: Musik-Preset · Bewertungssystem · Zeichenlimit-Kontrolle · Transkript-Disclaimer</p>
             <div class="cta-buttons">
                 <a href="https://github.com/ddumdi11/somas_prompt_generator" class="btn btn-primary">GitHub Repo</a>
                 <a href="https://github.com/ddumdi11/somas_prompt_generator/releases" class="btn btn-secondary">Download</a>
@@ -29,29 +29,29 @@
         </div>
     </section>
 
-    <!-- NEU in v0.4.1 -->
+    <!-- NEU in v0.5.0 -->
     <section class="whats-new">
         <div class="container">
-            <h2>🆕 Neu in v0.4.1</h2>
-            <p class="section-intro">Drei Verbesserungen, die den Analyse-Workflow grundlegend verbessern.</p>
+            <h2>🆕 Neu in v0.5.0</h2>
+            <p class="section-intro">Musik-Analysen, Qualitätskontrolle und ein Bewertungssystem für KI-Modelle.</p>
             <div class="new-features-grid">
-                <div class="new-feature-card">
-                    <span class="new-feature-icon">📐</span>
-                    <h3>Kompaktes UI</h3>
-                    <p>Metadaten und Zeitbereich sind jetzt einklappbare Sektionen. Nach dem Laden zeigt ein kompakter Header die wichtigsten Infos – bei Bedarf aufklappbar für volle Details.</p>
-                    <span class="new-feature-detail">Mehr Platz für das Wesentliche</span>
-                </div>
-                <div class="new-feature-card">
-                    <span class="new-feature-icon">🔗</span>
-                    <h3>Transkript-Brücke</h3>
-                    <p>YouTube-Transkripte werden automatisch in den Transkript-Tab übernommen – editierbar, mit Wort- und Zeichenzähler. Ein grüner Punkt signalisiert verfügbare Transkripte.</p>
-                    <span class="new-feature-detail">Automatisch geladen, manuell anpassbar</span>
-                </div>
                 <div class="new-feature-card new-feature-card-highlight">
-                    <span class="new-feature-icon">🧠</span>
-                    <h3>Smarte Prompt-Einbettung</h3>
-                    <p>Verfügbare Transkripte werden direkt in den Prompt eingebettet. Modelle ohne Web-Zugriff analysieren jetzt den tatsächlichen Inhalt – keine Halluzination mehr.</p>
-                    <span class="new-feature-detail">Transkript im Prompt = bessere Analysen</span>
+                    <span class="new-feature-icon">🎵</span>
+                    <h3>Musik-Preset</h3>
+                    <p>Eigenes 4-Teil-Schema für Songtext-Analysen: Kontext, Songtext-Analyse, Einordnung, Bewertung. Optimiert für Lyrics statt Sprache – mit speziellem STT-Disclaimer für Gesang.</p>
+                    <span class="new-feature-detail">SOMAS wird zum modularen Framework</span>
+                </div>
+                <div class="new-feature-card">
+                    <span class="new-feature-icon">⭐</span>
+                    <h3>Bewertungssystem</h3>
+                    <p>Nach jeder API-Analyse: Modell-Qualität mit Sternen (1-5) und Quellen-Relevanz mit Daumen (up/down) bewerten. Alles in SQLite gespeichert.</p>
+                    <span class="new-feature-detail">Modelle vergleichen, Favoriten finden</span>
+                </div>
+                <div class="new-feature-card">
+                    <span class="new-feature-icon">📏</span>
+                    <h3>Zeichenlimit-Kontrolle</h3>
+                    <p>Traffic-Light-Counter zeigt Zeichenverbrauch live an. Sandwich-Technik im Prompt erzwingt Limits. Rework-Button kürzt zu lange Ergebnisse automatisch.</p>
+                    <span class="new-feature-detail">Grün · Gelb · Rot – immer im Limit</span>
                 </div>
             </div>
         </div>
@@ -141,7 +141,7 @@
     <!-- 5 Presets -->
     <section class="features">
         <div class="container">
-            <h2>Fünf Analyse-Presets</h2>
+            <h2>Sechs Analyse-Presets</h2>
             <div class="preset-grid">
                 <div class="preset-card">
                     <span class="preset-icon">📊</span>
@@ -172,6 +172,12 @@
                     <h3>Research</h3>
                     <p>Umfassende Tiefenrecherche ohne Limit</p>
                     <span class="preset-meta">Lesezeit: variabel · unbegrenzt</span>
+                </div>
+                <div class="preset-card">
+                    <span class="preset-icon">🎵</span>
+                    <h3>Musik</h3>
+                    <p>Songtext-Analyse mit eigenem Schema</p>
+                    <span class="preset-meta">3 Sätze · max. 2.400 Zeichen</span>
                 </div>
             </div>
         </div>
@@ -214,7 +220,10 @@
         <div class="container">
             <h2>Was ist SOMAS?</h2>
             <p class="schema-intro"><strong>S</strong>ource <strong>O</strong>verview <strong>M</strong>apping <strong>A</strong>nd extraction <strong>S</strong>chema</p>
-            <p>Ein strukturiertes Analyse-Framework für Video-Inhalte, basierend auf reverse-engineerten NotebookLM-Patterns.</p>
+            <p>Ein modulares Analyse-Framework mit Content-Type-spezifischen Schemata, basierend auf reverse-engineerten NotebookLM-Patterns.</p>
+
+            <h3 style="margin-top: 1.5em; margin-bottom: 0.5em;">Standard-Schema</h3>
+            <p style="color: #666; margin-bottom: 0.8em;">Vorträge, Interviews, Nachrichten, Podcasts</p>
             <div class="schema-blocks">
                 <div class="schema-block">
                     <strong>FRAMING</strong>
@@ -235,6 +244,27 @@
                 <div class="schema-block schema-block-module">
                     <strong>[MODUL]</strong>
                     <span>Kritik · Zitate · Offene Fragen · Verbindungen</span>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 1.5em; margin-bottom: 0.5em;">Musik-Schema</h3>
+            <p style="color: #666; margin-bottom: 0.8em;">Songtexte, Musikvideos, Lyrics-Analysen</p>
+            <div class="schema-blocks">
+                <div class="schema-block">
+                    <strong>KONTEXT</strong>
+                    <span>Künstler, Genre, Einordnung</span>
+                </div>
+                <div class="schema-block">
+                    <strong>SONGTEXT-ANALYSE</strong>
+                    <span>Thema, Perspektive, Stilmittel</span>
+                </div>
+                <div class="schema-block">
+                    <strong>EINORDNUNG</strong>
+                    <span>Genre-Vergleich, kulturelle Bezüge</span>
+                </div>
+                <div class="schema-block">
+                    <strong>BEWERTUNG</strong>
+                    <span>Stärken, Schwächen, Gesamteindruck</span>
                 </div>
             </div>
         </div>

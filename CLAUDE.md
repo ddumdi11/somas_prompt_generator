@@ -7,7 +7,7 @@
 ## 🎯 Projektkontext
 
 **Name:** SOMAS Prompt Generator
-**Version:** 0.4.0
+**Version:** 0.5.0
 **Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
 **Sprache:** Python 3.11+
 **GUI-Framework:** PyQt6
@@ -26,10 +26,12 @@ somas_prompt_generator/
 │
 ├── src/
 │   ├── gui/                # PyQt6-Komponenten
-│   │   ├── main_window.py      # QMainWindow mit Tabs, Preset-Dropdown, API-Controls
+│   │   ├── main_window.py      # QMainWindow mit Tabs, Presets, API-Controls
+│   │   ├── collapsible_section.py # Einklappbare UI-Sektionen
 │   │   ├── model_selector.py   # FilterableModelSelector (OpenRouter-Modellauswahl)
+│   │   ├── rating_widget.py    # Bewertungs-Widget (Sterne + Daumen)
 │   │   ├── settings_dialog.py  # Einstellungsdialog (API-Keys)
-│   │   └── transcript_widget.py # Manuelles Transkript-Eingabewidget
+│   │   └── transcript_widget.py # Transkript-Eingabewidget
 │   │
 │   ├── core/               # Business-Logik
 │   │   ├── youtube_client.py   # Metadaten via yt-dlp
@@ -40,29 +42,31 @@ somas_prompt_generator/
 │   │   ├── api_worker.py       # QThread-Worker für async API-Calls
 │   │   ├── perplexity_client.py # Perplexity Sonar/Deep Research
 │   │   ├── openrouter_client.py # OpenRouter (200+ Modelle)
+│   │   ├── rating_store.py     # SQLite-Bewertungsspeicher
 │   │   └── debug_logger.py     # Debug-Logging mit Version/Session-Info
 │   │
 │   └── config/             # Konfiguration
 │       ├── defaults.py         # SOMAS-Defaults (VideoInfo, SomasConfig, TimeRange)
 │       ├── api_config.py       # API-Provider-Konfiguration
-│       ├── prompt_presets.json  # 5 Preset-Varianten
+│       ├── prompt_presets.json  # 6 Preset-Varianten
 │       ├── api_providers.json   # Provider-Definitionen (Perplexity, OpenRouter)
 │       └── user_preferences.json # Benutzereinstellungen
 │
 ├── templates/
 │   ├── somas_prompt.txt        # Basis-Prompt-Template (Jinja2)
-│   ├── somas_prompt_transcript.txt # Transkript-spezifisches Template
+│   ├── somas_prompt_transcript.txt # Transkript-Template (mit STT-Disclaimer)
 │   ├── somas_standard.txt      # Standard-Preset (2.800 Zeichen)
 │   ├── somas_linkedin.txt      # LinkedIn-Preset (2.200 Zeichen)
 │   ├── somas_minimal.txt       # Minimal-Preset (800 Zeichen)
 │   ├── somas_academia.txt      # Academia-Preset (3.000 Zeichen)
-│   └── somas_research.txt      # Research-Preset (unbegrenzt)
+│   ├── somas_research.txt      # Research-Preset (unbegrenzt)
+│   └── somas_music.txt         # Musik-Preset (2.400 Zeichen, Songtext-Analyse)
 │
 ├── specs/                  # Entwicklungs-Spezifikationen
 │   ├── API_INTEGRATION_SPEC.md
 │   ├── OPENROUTER_MODEL_FILTER_SPEC.md
-│   ├── MODEL_RATING_SPEC_DRAFT.md
-│   └── UI_REDESIGN_SPEC.md     # NEU: v0.4.1 Collapsible Sections
+│   ├── KURT_FEATURE_rating_system.md
+│   └── UI_REDESIGN_SPEC.md
 │
 ├── docs/                   # GitHub Pages Landing Page
 │   ├── index.html
@@ -152,7 +156,7 @@ Für manuelles Transkript wird `templates/somas_prompt_transcript.txt` verwendet
 1. **YouTube Shorts** – Sehr kurze Videos (< 60s) haben oft kein ausreichendes Transkript
 2. **Neue Videos** – Transkripte sind erst nach einigen Stunden verfügbar
 3. **LinkedIn** – Keine echte Markdown-Unterstützung, nur Unicode-Workarounds
-4. **Window-Sizing** – Metadaten/Zeitbereich nehmen zu viel Platz ein → Lösung in v0.4.1 (CollapsibleSection, siehe `specs/UI_REDESIGN_SPEC.md`)
+4. **Auto-Transkripte** – YouTube-STT ist bei Gesang/schnellem Sprechen unzuverlässig → Disclaimer im Prompt warnt KI-Modelle
 
 ---
 
@@ -216,18 +220,32 @@ TEST_URLS = [
 - [x] video_info_source Tracking
 - [x] Landing Page aktualisiert
 
-### Phase 6: UI-Optimierung (v0.4.1) — Nächster Schritt
+### Phase 6: UI-Optimierung ✅ (v0.4.1)
 
-- [ ] Einklappbare Metadaten- und Zeitbereich-Sektionen (`CollapsibleSection`)
-- [ ] Transkript-Brücke: YouTube-Transkript automatisch in Transkript-Tab übernehmen
-- [ ] Tab-Umbenennung: "Manuelles Transkript" → "Transkript"
-- [ ] Siehe: `specs/UI_REDESIGN_SPEC.md`
+- [x] Einklappbare Metadaten- und Zeitbereich-Sektionen (`CollapsibleSection`)
+- [x] Transkript-Brücke: YouTube-Transkript automatisch in Transkript-Tab übernehmen
+- [x] Tab-Umbenennung: "Manuelles Transkript" → "Transkript"
 
-### Phase 7+: Backlog
+### Phase 7: Musik-Preset & Transkript-Qualität ✅ (v0.5.0)
 
-- [ ] Modell-Bewertungssystem (non-intrusiv) — Entwurf in `specs/MODEL_RATING_SPEC_DRAFT.md`
+- [x] Zeichenlimit-Kontrolle (Traffic-Light-Counter, Sandwich-Technik, Rework-Button)
+- [x] Bewertungssystem (Modell-Sterne, Quellen-Daumen, SQLite-Speicherung)
+- [x] Musik-Preset mit eigenem 4-Teil-Schema (Songtext-Analyse)
+- [x] Transkript-Disclaimer (STT-Hinweis, geschlechtsneutrale Sprache, SOMAS-Unterdrückung)
+- [x] Stale-State-Bugfix (Transkript/Ergebnis bei neuem Video zurücksetzen)
+
+### Phase 8: SOMAS Schema-Erweiterung (v0.6.0) — Nächster Schritt
+
+- [ ] Standard-Schema formell als Variante dokumentieren
+- [ ] Musik-Schema formell beschreiben
+- [ ] Weitere Schema-Varianten evaluieren (Interview, Tutorial)
+- [ ] README, CLAUDE.md, Landing Page als modulares Framework darstellen
+- [ ] Changelog pflegen
+
+### Backlog
+
 - [ ] Englisch-Support
-- [ ] Weitere Quellentypen
+- [ ] PDF-Export
 - [ ] Batch-Modus
 
 ---
@@ -248,4 +266,4 @@ Bei Unklarheiten: Frag nach! Lieber einmal zu viel als eine falsche Annahme tref
 
 ---
 
-Letzte Aktualisierung: 2026-02-06
+Letzte Aktualisierung: 2026-02-14
