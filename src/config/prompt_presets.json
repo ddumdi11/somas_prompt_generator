@@ -55,6 +55,20 @@
       "recommended_models": null,
       "show_model_hint": false
     },
+    "music": {
+      "id": "mus_06",
+      "name": "Musik",
+      "description": "Songtext-Analyse für Musikvideos (Lyrics, Themen, Einordnung).",
+      "max_chars": 2400,
+      "sentences_per_section": 3,
+      "reading_time_seconds": 75,
+      "system_prompt": "Role: Music & Lyrics Analyst. Output: SOMAS-Musik-Schema in German. Sections: KONTEXT, SONGTEXT-ANALYSE, EINORDNUNG, BEWERTUNG. Constraints: Exactly 3 sentences per section. Focus on lyrics/text analysis only, NOT audio/music quality. No intro/outro. Direct start with '### KONTEXT'.",
+      "template_file": "somas_music.txt",
+      "transcript_aware": true,
+      "recommended_models": null,
+      "show_model_hint": true,
+      "model_hint_message": "Musik-Preset: Modelle mit Web-Search (z.B. Perplexity Sonar) liefern bessere Ergebnisse, da sie den Künstler und Song recherchieren können."
+    },
     "research": {
       "id": "res_05",
       "name": "Research (Extended)",
