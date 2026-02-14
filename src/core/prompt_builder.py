@@ -30,6 +30,8 @@ class PromptPreset:
     recommended_models: Optional[List[str]] = None
     show_model_hint: bool = False
     model_hint_message: Optional[str] = None
+    # Neu in v0.4.2: Preset-Template enthält eigene {{ transcript }}-Einbettung
+    transcript_aware: bool = False
 
     @property
     def reading_time_display(self) -> str:
@@ -89,6 +91,7 @@ def load_presets() -> Dict[str, PromptPreset]:
             recommended_models=preset_data.get("recommended_models"),
             show_model_hint=preset_data.get("show_model_hint", False),
             model_hint_message=preset_data.get("model_hint_message"),
+            transcript_aware=preset_data.get("transcript_aware", False),
         )
     return presets
 
@@ -237,7 +240,12 @@ def build_prompt_from_transcript(
         if preset and preset.sentences_per_section > 0:
             sentences_per_section = preset.sentences_per_section
 
-    template = env.get_template("somas_prompt_transcript.txt")
+    # Preset mit eigenem Transkript-Template (z.B. Musik) nutzt sein Template,
+    # andere Presets nutzen das generische Transkript-Template
+    if preset and preset.transcript_aware:
+        template = env.get_template(preset.template_file)
+    else:
+        template = env.get_template("somas_prompt_transcript.txt")
 
     return template.render(
         title=title,
