@@ -585,6 +585,10 @@ class MainWindow(QMainWindow):
         # Zeichenzähler aktualisieren (Limit könnte sich geändert haben)
         self._update_result_char_counter()
 
+        # Web-Search-Kompatibilität prüfen
+        if self.api_checkbox.isChecked():
+            self._check_web_search_compatibility()
+
     @pyqtSlot(int)
     def _on_input_tab_changed(self, index: int) -> None:
         """Handler für Tab-Wechsel zwischen YouTube und Transkript."""
@@ -1298,6 +1302,9 @@ class MainWindow(QMainWindow):
                 self._update_api_status("error")
                 self.api_status_label.setText("Kein API-Key")
 
+            # Web-Search-Kompatibilität prüfen
+            self._check_web_search_compatibility()
+
     @pyqtSlot(str)
     def _on_openrouter_model_selected(self, model_id: str) -> None:
         """Handler für FilterableModelSelector-Auswahl."""
@@ -1313,6 +1320,37 @@ class MainWindow(QMainWindow):
         model_id = self.model_combo.currentData()
         if provider_id and model_id:
             save_last_selection(provider_id, model_id)
+
+    def _check_web_search_compatibility(self) -> None:
+        """Prüft ob das aktuelle Preset Web-Search braucht und der Provider es bietet."""
+        if not self.current_preset or not self.current_preset.requires_web_search:
+            return
+
+        provider_id = self.provider_combo.currentData()
+        if not provider_id or provider_id not in self._api_providers:
+            return
+
+        provider = self._api_providers[provider_id]
+        if provider.supports_web_search:
+            return  # Alles gut
+
+        reply = QMessageBox.warning(
+            self,
+            "Web-Search erforderlich",
+            f'Das Preset "{self.current_preset.name}" erfordert ein Modell mit '
+            f"Web-Search-Fähigkeit.\n\n"
+            f"Der aktuelle Provider ({provider.name}) unterstützt kein Web-Search. "
+            f"Die Analyse wird ohne Recherche-Zugriff wahrscheinlich unzuverlässig.\n\n"
+            f"Möchtest du zu Perplexity wechseln?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            for i in range(self.provider_combo.count()):
+                if self.provider_combo.itemData(i) == "perplexity":
+                    self.provider_combo.setCurrentIndex(i)
+                    break
 
     @pyqtSlot()
     def _on_settings(self) -> None:
