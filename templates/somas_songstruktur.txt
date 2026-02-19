@@ -56,6 +56,11 @@ Welche strukturellen Mittel erzeugen die emotionale/dramatische Wirkung?
 Verbindung zwischen Form und Textinhalt (z.B. zyklische Rückkehr des Anfangstextes spiegelt den "start again"-Gedanken).
 Subjektive Wahrnehmung erklären: Warum fühlt sich ein Song nach "mehr Teilen" an, als er formal hat?
 
+ZEITPOSITIONEN:
+- Falls du keinen direkten Zugriff auf das Audio/Video hast: Schätze die ungefähren Zeitpositionen anhand der Gesamtlänge des Songs und der Anzahl der identifizierten Teile. Markiere geschätzte Zeiten mit "ca." (z.B. "ca. 0:45–1:10").
+- Falls Zeitangaben aus Quellen (Blogs, Analysen, Tab-Seiten) verfügbar sind, verwende diese und kennzeichne die Quelle.
+- Zeitpositionen sind ein Orientierungswert – lieber eine plausible Schätzung als gar keine Angabe.
+
 WICHTIG:
 - Kein Einleitungstext, keine Höflichkeitsfloskeln. Starte direkt mit ## 1. KONTEXT.
 - Harmonien und Akkordfolgen NUR angeben, wenn aus verlässlichen Quellen belegt.

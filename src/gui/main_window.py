@@ -376,7 +376,7 @@ class MainWindow(QMainWindow):
         self.model_label = QLabel("Modell:")
         controls_layout.addWidget(self.model_label)
         self.model_combo = QComboBox()
-        self.model_combo.setMinimumWidth(200)
+        self.model_combo.setMinimumWidth(380)
         controls_layout.addWidget(self.model_combo)
 
         # OpenRouter: FilterableModelSelector (Popup-Dropdown, initial versteckt)
