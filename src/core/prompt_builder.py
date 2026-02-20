@@ -3,6 +3,9 @@
 Changelog v0.3.1:
 - Neues Research-Preset mit recommended_models und model_hint
 - Unterstützung für Presets ohne Zeichenbegrenzung (max_chars=0)
+
+Changelog v0.5.1:
+- Neues Feld requires_web_search im PromptPreset für Web-Search-abhängige Presets
 """
 
 import json
@@ -32,6 +35,8 @@ class PromptPreset:
     model_hint_message: Optional[str] = None
     # Neu in v0.4.2: Preset-Template enthält eigene {{ transcript }}-Einbettung
     transcript_aware: bool = False
+    # Neu in v0.5.1: Preset erfordert Web-Search-fähiges Modell
+    requires_web_search: bool = False
 
     @property
     def reading_time_display(self) -> str:
@@ -92,6 +97,7 @@ def load_presets() -> Dict[str, PromptPreset]:
             show_model_hint=preset_data.get("show_model_hint", False),
             model_hint_message=preset_data.get("model_hint_message"),
             transcript_aware=preset_data.get("transcript_aware", False),
+            requires_web_search=preset_data.get("requires_web_search", False),
         )
     return presets
 

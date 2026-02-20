@@ -3,6 +3,7 @@
     {
       "id": "perplexity",
       "name": "Perplexity AI",
+      "supports_web_search": true,
       "base_url": "https://api.perplexity.ai",
       "chat_endpoint": "/chat/completions",
       "models_endpoint": null,
@@ -30,6 +31,7 @@
     {
       "id": "openrouter",
       "name": "OpenRouter",
+      "supports_web_search": false,
       "base_url": "https://openrouter.ai/api/v1",
       "chat_endpoint": "/chat/completions",
       "models_endpoint": "/models",

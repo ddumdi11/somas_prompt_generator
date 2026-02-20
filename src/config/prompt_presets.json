@@ -69,6 +69,24 @@
       "show_model_hint": true,
       "model_hint_message": "Musik-Preset: Modelle mit Web-Search (z.B. Perplexity Sonar) liefern bessere Ergebnisse, da sie den Künstler und Song recherchieren können."
     },
+    "songstruktur": {
+      "id": "sst_07",
+      "name": "Songstruktur",
+      "description": "Formanalyse eines Musikstücks – Struktur, Teile, Wirkung. Erfordert Web-Search.",
+      "max_chars": 0,
+      "sentences_per_section": 0,
+      "reading_time_seconds": 0,
+      "system_prompt": "Role: Music Theory Analyst & Song Structure Expert. Task: Analyze the formal structure of a song in detail. Output in German. Sections: KONTEXT (metadata), FORMÜBERSICHT (formula notation), STRUKTURKARTE (chronological part-by-part analysis), WIRKUNGSANALYSE (why does the structure feel like it does). Use established music theory terminology. Only state chord progressions if verifiable from reliable sources. No length constraints - be as thorough as needed, especially in the Strukturkarte. Cite sources.",
+      "template_file": "somas_songstruktur.txt",
+      "transcript_aware": true,
+      "requires_web_search": true,
+      "recommended_models": [
+        "perplexity/sonar-pro",
+        "perplexity/sonar"
+      ],
+      "show_model_hint": true,
+      "model_hint_message": "⚠️ Songstruktur-Preset: Dieses Preset erfordert ein Modell mit Web-Search-Fähigkeit (z.B. Perplexity Sonar). Modelle ohne Web-Zugriff können keine verlässliche Songstruktur-Analyse liefern."
+    },
     "research": {
       "id": "res_05",
       "name": "Research (Extended)",

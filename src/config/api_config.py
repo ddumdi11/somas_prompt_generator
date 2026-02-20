@@ -41,6 +41,7 @@ class ProviderDefinition:
     supports_dynamic_models: bool
     default_model: str
     models: list[ProviderModel]
+    supports_web_search: bool = False
 
 
 # --- API-Key-Verwaltung (keyring) ---
@@ -128,6 +129,7 @@ def load_providers() -> dict[str, ProviderDefinition]:
                 supports_dynamic_models=p.get("supports_dynamic_models", False),
                 default_model=p.get("default_model", ""),
                 models=models,
+                supports_web_search=p.get("supports_web_search", False),
             )
 
         logger.info(f"{len(providers)} Provider geladen: {list(providers.keys())}")
