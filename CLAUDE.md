@@ -7,7 +7,7 @@
 ## 🎯 Projektkontext
 
 **Name:** SOMAS Prompt Generator
-**Version:** 0.5.0
+**Version:** 0.5.2
 **Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
 **Sprache:** Python 3.11+
 **GUI-Framework:** PyQt6
@@ -29,8 +29,9 @@ somas_prompt_generator/
 │   │   ├── main_window.py      # QMainWindow mit Tabs, Presets, API-Controls
 │   │   ├── collapsible_section.py # Einklappbare UI-Sektionen
 │   │   ├── model_selector.py   # FilterableModelSelector (OpenRouter-Modellauswahl)
-│   │   ├── rating_widget.py    # Bewertungs-Widget (Sterne + Daumen)
-│   │   ├── settings_dialog.py  # Einstellungsdialog (API-Keys)
+│   │   ├── rating_widget.py    # Z-Skala Modell-Bewertung (-2 bis +2)
+│   │   ├── channel_dialog.py   # Kanal-Bewertungsdialog (Fakten, Bias, Tags)
+│   │   ├── settings_dialog.py  # Einstellungsdialog (API-Keys, CSV-Export)
 │   │   └── transcript_widget.py # Transkript-Eingabewidget
 │   │
 │   ├── core/               # Business-Logik
@@ -42,13 +43,13 @@ somas_prompt_generator/
 │   │   ├── api_worker.py       # QThread-Worker für async API-Calls
 │   │   ├── perplexity_client.py # Perplexity Sonar/Deep Research
 │   │   ├── openrouter_client.py # OpenRouter (200+ Modelle)
-│   │   ├── rating_store.py     # SQLite-Bewertungsspeicher
+│   │   ├── rating_store.py     # SQLite-Bewertungsspeicher (Schema-Versionierung, Kanal-DB)
 │   │   └── debug_logger.py     # Debug-Logging mit Version/Session-Info
 │   │
 │   └── config/             # Konfiguration
 │       ├── defaults.py         # SOMAS-Defaults (VideoInfo, SomasConfig, TimeRange)
 │       ├── api_config.py       # API-Provider-Konfiguration
-│       ├── prompt_presets.json  # 6 Preset-Varianten
+│       ├── prompt_presets.json  # 7 Preset-Varianten
 │       ├── api_providers.json   # Provider-Definitionen (Perplexity, OpenRouter)
 │       └── user_preferences.json # Benutzereinstellungen
 │
@@ -60,7 +61,8 @@ somas_prompt_generator/
 │   ├── somas_minimal.txt       # Minimal-Preset (800 Zeichen)
 │   ├── somas_academia.txt      # Academia-Preset (3.000 Zeichen)
 │   ├── somas_research.txt      # Research-Preset (unbegrenzt)
-│   └── somas_music.txt         # Musik-Preset (2.400 Zeichen, Songtext-Analyse)
+│   ├── somas_music.txt         # Musik-Preset (2.400 Zeichen, Songtext-Analyse)
+│   └── somas_songstruktur.txt  # Songstruktur-Preset (Formanalyse)
 │
 ├── specs/                  # Entwicklungs-Spezifikationen
 │   ├── API_INTEGRATION_SPEC.md
@@ -234,6 +236,15 @@ TEST_URLS = [
 - [x] Transkript-Disclaimer (STT-Hinweis, geschlechtsneutrale Sprache, SOMAS-Unterdrückung)
 - [x] Stale-State-Bugfix (Transkript/Ergebnis bei neuem Video zurücksetzen)
 
+### Phase 7b: Bewertungs-Redesign & Songstruktur ✅ (v0.5.2)
+
+- [x] Z-Skala (-2 bis +2) statt 1-5 Sterne (gegen Rating-Inflation)
+- [x] Kanal-Bewertungsdialog (Faktenqualität, Argumentationsqualität, Bias-Spektrum, Modus-Tags, Notizen)
+- [x] Separate `channels`-Tabelle mit Schema-Versionierung (automatische Migration v1→v2)
+- [x] CSV Export/Import für Kanal-Bewertungen (UTF-8-sig BOM, Semikolon-Delimiter)
+- [x] Kanal-Meta-Anzeige Toggle in Einstellungen
+- [x] Songstruktur-Preset für musikalische Formanalyse (Web-Search erforderlich)
+
 ### Phase 8: SOMAS Schema-Erweiterung (v0.6.0) — Nächster Schritt
 
 - [ ] Standard-Schema formell als Variante dokumentieren
@@ -266,4 +277,4 @@ Bei Unklarheiten: Frag nach! Lieber einmal zu viel als eine falsche Annahme tref
 
 ---
 
-Letzte Aktualisierung: 2026-02-14
+Letzte Aktualisierung: 2026-02-20

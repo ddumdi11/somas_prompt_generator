@@ -14,13 +14,19 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuelle Version (v0.5.0) — "Musik-Preset & Transkript-Qualität"
+### Aktuelle Version (v0.5.2) — "Bewertungs-Redesign & Songstruktur"
+
+- **Bewertungs-Redesign** – Z-Skala (-2 bis +2) statt 1-5 Sterne, separater Kanal-Bewertungsdialog mit Fakten-/Argumentationsqualität, Bias-Spektrum (10 Richtungen), Modus-Tags (11 Kategorien), Freitext-Notizen
+- **Kanal-Datenbank** – Eigene `channels`-Tabelle mit Schema-Versionierung und automatischer Migration
+- **CSV Export/Import** – Kanal-Bewertungen als CSV exportieren/importieren (UTF-8-sig für Excel)
+- **Kanal-Meta-Anzeige** – Bekannte Kanäle zeigen ihr Profil in den Metadaten (Toggle in Einstellungen)
+- **Songstruktur-Preset** – Neues Preset für musikalische Formanalyse (Songform, Arrangements, Dynamik)
+
+### Seit v0.5.0
 
 - **Musik-Preset** – Eigenes 4-Teil-Schema für Songtext-Analysen (KONTEXT → SONGTEXT-ANALYSE → EINORDNUNG → BEWERTUNG)
-- **Bewertungssystem** – Modell-Sterne (1-5) und Quellen-Daumen (up/down) nach jeder API-Analyse, SQLite-Speicherung
 - **Zeichenlimit-Kontrolle** – Traffic-Light-Counter, Sandwich-Technik im Prompt, Rework-Button zum Kürzen
 - **Transkript-Disclaimer** – Automatischer STT-Hinweis für maschinelle Transkripte, geschlechtsneutrale Sprache, SOMAS-Selbstreferenz-Unterdrückung
-- **Stale-State-Fix** – Transkript und Ergebnis werden beim Laden neuer Videos korrekt zurückgesetzt
 
 ### Seit v0.4.1
 
@@ -35,13 +41,14 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
   - **Perplexity AI** – Sonar, Sonar Pro, Deep Research
   - **OpenRouter** – 200+ Modelle (Claude, Gemini, GPT, Llama, DeepSeek...)
   - Suchbare Modell-Liste mit dynamischer Preisanzeige
-- **6 Prompt-Presets:**
+- **7 Prompt-Presets:**
   - **Standard** – Ausgewogene Analyse (2.800 Zeichen, ~2 Min Lesezeit)
   - **LinkedIn** – Social-Media-optimiert (2.200 Zeichen, ~90 Sek)
   - **Minimal** – Blitz-Überblick (800 Zeichen, ~30 Sek)
   - **Academia** – Wissenschaftlich (3.000 Zeichen, ~2,5 Min)
   - **Research** – Umfassende Tiefenrecherche (unbegrenzt)
   - **Musik** – Songtext-Analyse (2.400 Zeichen, ~75 Sek)
+  - **Songstruktur** – Musikalische Formanalyse (Web-Search erforderlich)
 - **Export-Formate:**
   - LinkedIn-optimiert (Unicode-Bold, Post-Header, Aufzählungen)
   - Markdown (.md)
@@ -69,8 +76,9 @@ somas_prompt_generator/
 │   │   ├── main_window.py      # Hauptfenster mit Tabs, Presets, API-Controls
 │   │   ├── collapsible_section.py # Einklappbare UI-Sektionen
 │   │   ├── model_selector.py   # FilterableModelSelector (OpenRouter)
-│   │   ├── rating_widget.py    # Bewertungs-Widget (Sterne + Daumen)
-│   │   ├── settings_dialog.py  # Einstellungsdialog (API-Keys)
+│   │   ├── rating_widget.py    # Z-Skala Modell-Bewertung (-2 bis +2)
+│   │   ├── channel_dialog.py   # Kanal-Bewertungsdialog (Fakten, Bias, Tags)
+│   │   ├── settings_dialog.py  # Einstellungsdialog (API-Keys, CSV-Export)
 │   │   └── transcript_widget.py # Transkript-Eingabewidget
 │   │
 │   ├── core/
@@ -82,13 +90,13 @@ somas_prompt_generator/
 │   │   ├── api_worker.py       # QThread-Worker für async API-Calls
 │   │   ├── perplexity_client.py # Perplexity Sonar/Deep Research
 │   │   ├── openrouter_client.py # OpenRouter (200+ Modelle)
-│   │   ├── rating_store.py     # SQLite-Bewertungsspeicher
+│   │   ├── rating_store.py     # SQLite-Bewertungsspeicher (Schema-Versionierung, Kanal-DB)
 │   │   └── debug_logger.py     # Debug-Logging
 │   │
 │   └── config/
 │       ├── defaults.py         # VideoInfo, SomasConfig, TimeRange
 │       ├── api_config.py       # API-Provider-Konfiguration
-│       ├── prompt_presets.json  # 6 Preset-Konfigurationen
+│       ├── prompt_presets.json  # 7 Preset-Konfigurationen
 │       ├── api_providers.json   # Provider-Definitionen
 │       └── user_preferences.json # Benutzereinstellungen
 │
@@ -100,7 +108,8 @@ somas_prompt_generator/
 │   ├── somas_minimal.txt       # Minimal-Preset
 │   ├── somas_academia.txt      # Academia-Preset
 │   ├── somas_research.txt      # Research-Preset
-│   └── somas_music.txt         # Musik-Preset (Songtext-Analyse)
+│   ├── somas_music.txt         # Musik-Preset (Songtext-Analyse)
+│   └── somas_songstruktur.txt  # Songstruktur-Preset (Formanalyse)
 │
 ├── docs/                   # GitHub Pages Landing Page
 │   ├── index.html
@@ -226,6 +235,7 @@ Die App implementiert das SOMAS-Framework mit Content-Type-spezifischen Analyse-
 
 | Version | Datum | Änderungen |
 | --------- | ------- | ------------ |
+| 0.5.2 | 2026-02-20 | Bewertungs-Redesign (Z-Skala, Kanal-Dialog, CSV Export/Import, Meta-Toggle), Songstruktur-Preset |
 | 0.5.0 | 2026-02-14 | Musik-Preset, Bewertungssystem (Sterne+Daumen), Zeichenlimit-Kontrolle (Counter, Sandwich, Rework), Transkript-Disclaimer, Stale-State-Fix |
 | 0.4.1 | 2026-02-07 | UI-Redesign (Collapsible Sections), Transkript-Brücke, Transkript-Einbettung in Prompts |
 | 0.4.0 | 2026-02-03 | Zeitbereich-Analyse, Manuelles Transkript, Tab-basierte Eingabe, Landing Page v0.4.0 |
