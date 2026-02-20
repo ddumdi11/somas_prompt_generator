@@ -348,6 +348,93 @@ class RatingStore:
             ).fetchall()
             return [dict(row) for row in rows]
 
+    # --- CSV Export/Import ---
+
+    def export_channels_csv(self, path: Path) -> int:
+        """Exportiert alle Kanal-Bewertungen als CSV (UTF-8-sig BOM).
+
+        Verwendet Semikolon als Delimiter (für deutsches Excel).
+
+        Args:
+            path: Zielpfad für die CSV-Datei.
+
+        Returns:
+            Anzahl exportierter Zeilen.
+        """
+        import csv
+
+        channels = self.get_all_channels()
+        if not channels:
+            return 0
+
+        fieldnames = [
+            "channel_name", "factual_score", "argument_score",
+            "bias_direction", "bias_strength", "mode_tags",
+            "notes", "updated_at",
+        ]
+
+        with open(path, "w", newline="", encoding="utf-8-sig") as f:
+            writer = csv.DictWriter(
+                f, fieldnames=fieldnames, delimiter=";",
+                extrasaction="ignore",
+            )
+            writer.writeheader()
+            for ch in channels:
+                writer.writerow(ch)
+
+        return len(channels)
+
+    def import_channels_csv(self, path: Path) -> tuple[int, int]:
+        """Importiert Kanal-Bewertungen aus CSV.
+
+        Verwendet INSERT OR REPLACE (UPSERT) — bestehende Kanäle
+        werden aktualisiert.
+
+        Args:
+            path: Pfad zur CSV-Datei.
+
+        Returns:
+            Tuple (importiert, übersprungen).
+        """
+        import csv
+
+        imported = 0
+        skipped = 0
+
+        with open(path, "r", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f, delimiter=";")
+            for row in reader:
+                channel_name = row.get("channel_name", "").strip()
+                if not channel_name:
+                    skipped += 1
+                    continue
+
+                try:
+                    factual = int(row.get("factual_score", 0))
+                    argument = int(row.get("argument_score", 0))
+                    bias_strength = int(row.get("bias_strength", 0))
+                except (ValueError, TypeError):
+                    skipped += 1
+                    continue
+
+                # Wertebereiche prüfen
+                factual = max(-2, min(2, factual))
+                argument = max(-2, min(2, argument))
+                bias_strength = max(0, min(3, bias_strength))
+
+                self.save_channel_rating(
+                    channel_name=channel_name,
+                    factual_score=factual,
+                    argument_score=argument,
+                    bias_direction=row.get("bias_direction", ""),
+                    bias_strength=bias_strength,
+                    mode_tags=row.get("mode_tags", ""),
+                    notes=row.get("notes", "")[:500],
+                )
+                imported += 1
+
+        return imported, skipped
+
     # --- Abfrage-Methoden (für späteres Info-Fenster, Punkt 5) ---
 
     def get_model_rankings(self, min_analyses: int = 3) -> list[dict]:
