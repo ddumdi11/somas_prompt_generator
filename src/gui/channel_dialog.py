@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QRadioButton,
     QSpinBox,
     QTextEdit,
@@ -176,10 +177,14 @@ class ChannelRatingDialog(QDialog):
         """Begrenzt Notizen auf 500 Zeichen."""
         text = self._notes_edit.toPlainText()
         if len(text) > 500:
-            self._notes_edit.setPlainText(text[:500])
-            cursor = self._notes_edit.textCursor()
-            cursor.movePosition(cursor.MoveOperation.End)
-            self._notes_edit.setTextCursor(cursor)
+            self._notes_edit.blockSignals(True)
+            try:
+                self._notes_edit.setPlainText(text[:500])
+                cursor = self._notes_edit.textCursor()
+                cursor.movePosition(cursor.MoveOperation.End)
+                self._notes_edit.setTextCursor(cursor)
+            finally:
+                self._notes_edit.blockSignals(False)
 
     def _load_existing(self):
         """Füllt den Dialog mit bestehender Kanal-Bewertung vor."""
@@ -266,3 +271,8 @@ class ChannelRatingDialog(QDialog):
             self.accept()
         except Exception as e:
             logger.exception(f"Kanal-Bewertung fehlgeschlagen: {e}")
+            QMessageBox.critical(
+                self,
+                "Fehler",
+                f"Kanal-Bewertung konnte nicht gespeichert werden:\n{e}",
+            )
