@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="SOMAS Prompt Generator – Strukturierte YouTube-Analysen mit KI-Power. Transkript-Einbettung, 200+ Modelle, LinkedIn-ready.">
+    <meta name="description" content="SOMAS Prompt Generator v0.5.2 – Strukturierte YouTube-Analysen mit KI-Power. Z-Skala Bewertung, Kanal-Datenbank, 200+ Modelle, LinkedIn-ready.">
     <title>SOMAS Prompt Generator – KI-gestützte Video-Analysen</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -13,7 +13,7 @@
         <div class="container">
             <h1>🎯 SOMAS Prompt Generator</h1>
             <p class="tagline">Strukturierte YouTube-Analysen mit KI-Power.<br>200+ Modelle · Ein Klick · LinkedIn-ready.</p>
-            <p class="version-badge">✨ v0.5.0: Musik-Preset · Bewertungssystem · Zeichenlimit-Kontrolle · Transkript-Disclaimer</p>
+            <p class="version-badge">✨ v0.5.2: Bewertungs-Redesign · Kanal-Datenbank · Songstruktur-Preset · CSV Export/Import</p>
             <div class="cta-buttons">
                 <a href="https://github.com/ddumdi11/somas_prompt_generator" class="btn btn-primary">GitHub Repo</a>
                 <a href="https://github.com/ddumdi11/somas_prompt_generator/releases" class="btn btn-secondary">Download</a>
@@ -29,29 +29,67 @@
         </div>
     </section>
 
-    <!-- NEU in v0.5.0 -->
+    <!-- NEU in v0.5.2: Bewertungs-Redesign -->
     <section class="whats-new">
         <div class="container">
-            <h2>🆕 Neu in v0.5.0</h2>
-            <p class="section-intro">Musik-Analysen, Qualitätskontrolle und ein Bewertungssystem für KI-Modelle.</p>
+            <h2>🆕 Neu in v0.5.2</h2>
+            <p class="section-intro">Ein komplett überarbeitetes Bewertungssystem – für Modelle und Quellen getrennt, mit Kanal-Datenbank und Export.</p>
             <div class="new-features-grid">
                 <div class="new-feature-card new-feature-card-highlight">
-                    <span class="new-feature-icon">🎵</span>
-                    <h3>Musik-Preset</h3>
-                    <p>Eigenes 4-Teil-Schema für Songtext-Analysen: Kontext, Songtext-Analyse, Einordnung, Bewertung. Optimiert für Lyrics statt Sprache – mit speziellem STT-Disclaimer für Gesang.</p>
-                    <span class="new-feature-detail">SOMAS wird zum modularen Framework</span>
+                    <span class="new-feature-icon">📊</span>
+                    <h3>Z-Skala Modellbewertung</h3>
+                    <p>Symmetrische Bewertung von −2 bis +2 statt inflationärer 1–5 Sterne. Drei Sterne = „hat den Job gemacht". Harte Kriterien für Bestnoten: Gegenpositionen, Bias-Reflexion, strukturelle Tiefe.</p>
+                    <span class="new-feature-detail">Modelle empirisch vergleichen</span>
+                </div>
+                <div class="new-feature-card new-feature-card-highlight">
+                    <span class="new-feature-icon">📺</span>
+                    <h3>Kanal-Bewertungsdialog</h3>
+                    <p>Eigener Dialog für Kanalprofile: Faktenqualität (−2 bis +2), Argumentationsstruktur, Bias-Richtung (10 Kategorien), Bias-Stärke und 11 Modus-Tags – von News bis Musik/Art.</p>
+                    <span class="new-feature-detail">170+ Kanäle differenziert bewerten</span>
                 </div>
                 <div class="new-feature-card">
-                    <span class="new-feature-icon">⭐</span>
-                    <h3>Bewertungssystem</h3>
-                    <p>Nach jeder API-Analyse: Modell-Qualität mit Sternen (1-5) und Quellen-Relevanz mit Daumen (up/down) bewerten. Alles in SQLite gespeichert.</p>
-                    <span class="new-feature-detail">Modelle vergleichen, Favoriten finden</span>
+                    <span class="new-feature-icon">💾</span>
+                    <h3>Kanal-Datenbank + CSV</h3>
+                    <p>Separate <code>channels</code>-Tabelle mit Schema-Versionierung. Export/Import als CSV (UTF-8-sig für Excel). Historische Analyse-Daten bleiben unangetastet.</p>
+                    <span class="new-feature-detail">Exportieren · Bearbeiten · Reimportieren</span>
                 </div>
                 <div class="new-feature-card">
-                    <span class="new-feature-icon">📏</span>
-                    <h3>Zeichenlimit-Kontrolle</h3>
-                    <p>Traffic-Light-Counter zeigt Zeichenverbrauch live an. Sandwich-Technik im Prompt erzwingt Limits. Rework-Button kürzt zu lange Ergebnisse automatisch.</p>
-                    <span class="new-feature-detail">Grün · Gelb · Rot – immer im Limit</span>
+                    <span class="new-feature-icon">🎼</span>
+                    <h3>Songstruktur-Preset</h3>
+                    <p>Musikalische Formanalyse: Songform, Arrangements, Dynamik, Harmonik. Mit eingebettetem Musiktheorie-Glossar und Web-Search-Pflicht für Akkordquellen.</p>
+                    <span class="new-feature-detail">Web-Search erforderlich (Perplexity)</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Kanal-Bewertungssystem Detail -->
+    <section class="rating-section">
+        <div class="container">
+            <h2>⚖️ Medienkompetenz-Toolkit</h2>
+            <p class="section-intro">Nicht nur KI-Modelle vergleichen – auch Quellen systematisch einordnen.</p>
+            <div class="rating-grid">
+                <div class="rating-card">
+                    <h3>Modell-Dimension</h3>
+                    <p class="rating-label">„Wie gut hat das Modell analysiert?"</p>
+                    <div class="rating-scale">
+                        <span class="scale-item scale-neg">−2</span>
+                        <span class="scale-item scale-neg-light">−1</span>
+                        <span class="scale-item scale-neutral">0</span>
+                        <span class="scale-item scale-pos-light">+1</span>
+                        <span class="scale-item scale-pos">+2</span>
+                    </div>
+                    <p class="rating-explain">Z-Skala mit symmetrischer Mitte: 0 = durchschnittlich gut</p>
+                </div>
+                <div class="rating-card">
+                    <h3>Kanal-Dimension</h3>
+                    <p class="rating-label">„Was für eine Quelle ist das?"</p>
+                    <ul class="rating-dimensions">
+                        <li><strong>Faktenqualität</strong> – Quellen, Belege, Überprüfbarkeit</li>
+                        <li><strong>Argumentation</strong> – Struktur, Fairness, Differenzierung</li>
+                        <li><strong>Bias-Profil</strong> – Richtung + Stärke (nicht wertend)</li>
+                        <li><strong>Modus-Tags</strong> – News, Analyse, Kommentar, Musik/Art…</li>
+                    </ul>
                 </div>
             </div>
         </div>
@@ -102,7 +140,7 @@
                         <li>Sonar, Sonar Pro, Sonar Reasoning</li>
                         <li>Deep Research für unbegrenzte Analysen</li>
                         <li>Web-Suche inklusive</li>
-                        <li>$5/Monat API-Credit für Pro-User</li>
+                        <li>Pflicht-Provider für Songstruktur-Preset</li>
                     </ul>
                 </div>
                 <div class="provider-card provider-card-highlight">
@@ -131,17 +169,17 @@
                 </div>
                 <div class="api-highlight">
                     <span>🔄</span>
-                    <strong>Flexibel</strong>
-                    <p>Manueller Workflow bleibt verfügbar</p>
+                    <strong>Web-Search-Erkennung</strong>
+                    <p>Automatischer Provider-Wechsel bei Bedarf</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- 5 Presets -->
+    <!-- 7 Presets -->
     <section class="features">
         <div class="container">
-            <h2>Sechs Analyse-Presets</h2>
+            <h2>Sieben Analyse-Presets</h2>
             <div class="preset-grid">
                 <div class="preset-card">
                     <span class="preset-icon">📊</span>
@@ -179,6 +217,12 @@
                     <p>Songtext-Analyse mit eigenem Schema</p>
                     <span class="preset-meta">3 Sätze · max. 2.400 Zeichen</span>
                 </div>
+                <div class="preset-card preset-card-new">
+                    <span class="preset-icon">🎼</span>
+                    <h3>Songstruktur</h3>
+                    <p>Musikalische Formanalyse mit Glossar</p>
+                    <span class="preset-meta">Web-Search · unbegrenzt</span>
+                </div>
             </div>
         </div>
     </section>
@@ -202,14 +246,14 @@
                 <div class="step-arrow">→</div>
                 <div class="step">
                     <span class="step-number">3</span>
-                    <h3>Generieren</h3>
+                    <h3>Analysieren</h3>
                     <p>Ein Klick – die KI analysiert automatisch</p>
                 </div>
                 <div class="step-arrow">→</div>
                 <div class="step">
                     <span class="step-number">4</span>
-                    <h3>Exportieren</h3>
-                    <p>LinkedIn-ready oder als Markdown</p>
+                    <h3>Bewerten & Exportieren</h3>
+                    <p>Modell + Kanal bewerten, LinkedIn oder Markdown</p>
                 </div>
             </div>
         </div>
@@ -267,6 +311,27 @@
                     <span>Stärken, Schwächen, Gesamteindruck</span>
                 </div>
             </div>
+
+            <h3 style="margin-top: 1.5em; margin-bottom: 0.5em;">Songstruktur-Schema <span style="background: #dbeafe; color: #1e40af; font-size: 0.7em; padding: 2px 8px; border-radius: 4px; font-weight: 600; vertical-align: middle;">NEU</span></h3>
+            <p style="color: #666; margin-bottom: 0.8em;">Formanalyse, Arrangements, Harmonik (Web-Search erforderlich)</p>
+            <div class="schema-blocks">
+                <div class="schema-block">
+                    <strong>KONTEXT</strong>
+                    <span>Song, Künstler, Recherche-Quellen</span>
+                </div>
+                <div class="schema-block">
+                    <strong>FORMÜBERSICHT</strong>
+                    <span>Gesamtstruktur, Tempo, Tonart</span>
+                </div>
+                <div class="schema-block">
+                    <strong>STRUKTURKARTE</strong>
+                    <span>Chronologische Sektionsanalyse</span>
+                </div>
+                <div class="schema-block schema-block-module">
+                    <strong>WIRKUNGSANALYSE</strong>
+                    <span>Form-Inhalt-Beziehung, Arrangement</span>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -281,7 +346,7 @@ pip install -r requirements.txt
 python main.py</code>
             </div>
             <p class="tech-stack">
-                <strong>Tech Stack:</strong> Python 3.11+ · PyQt6 · yt-dlp · requests · keyring
+                <strong>Tech Stack:</strong> Python 3.11+ · PyQt6 · yt-dlp · SQLite · requests · keyring
             </p>
             <p class="tech-note">💡 API-Keys werden sicher im System-Keyring gespeichert (Windows Credential Manager / macOS Keychain)</p>
         </div>

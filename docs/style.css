@@ -1,4 +1,4 @@
-/* SOMAS Prompt Generator - Landing Page Styles v0.4.1 */
+/* SOMAS Prompt Generator - Landing Page Styles v0.5.2 */
 
 /* ========== Reset & Base ========== */
 * {
@@ -150,7 +150,7 @@ a:hover {
 
 .new-features-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 24px;
 }
 
@@ -192,6 +192,14 @@ a:hover {
     line-height: 1.5;
 }
 
+.new-feature-card code {
+    background: #e2e8f0;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.85rem;
+    color: #1e3a5f;
+}
+
 .new-feature-detail {
     font-size: 0.85rem;
     color: #15803d;
@@ -201,6 +209,116 @@ a:hover {
 
 .new-feature-card-highlight .new-feature-detail {
     color: #2563eb;
+}
+
+/* ========== Rating System Section ========== */
+.rating-section {
+    padding: 80px 20px;
+    background: #fefce8;
+}
+
+.rating-section h2 {
+    text-align: center;
+    font-size: 2rem;
+    margin-bottom: 12px;
+    color: #854d0e;
+}
+
+.rating-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 32px;
+}
+
+.rating-card {
+    background: white;
+    padding: 32px;
+    border-radius: 12px;
+    border: 1px solid #fde68a;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.rating-card h3 {
+    font-size: 1.2rem;
+    color: #1e3a5f;
+    margin-bottom: 8px;
+}
+
+.rating-label {
+    color: #666;
+    font-style: italic;
+    margin-bottom: 20px;
+    font-size: 0.95rem;
+}
+
+.rating-scale {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 16px;
+}
+
+.scale-item {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.scale-neg {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.scale-neg-light {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.scale-neutral {
+    background: #e0e7ff;
+    color: #3730a3;
+    border: 2px solid #6366f1;
+}
+
+.scale-pos-light {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.scale-pos {
+    background: #bbf7d0;
+    color: #14532d;
+}
+
+.rating-explain {
+    text-align: center;
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.rating-dimensions {
+    list-style: none;
+    padding: 0;
+}
+
+.rating-dimensions li {
+    padding: 8px 0;
+    border-bottom: 1px solid #f3f4f6;
+    color: #555;
+    font-size: 0.95rem;
+}
+
+.rating-dimensions li:last-child {
+    border-bottom: none;
+}
+
+.rating-dimensions li strong {
+    color: #1e3a5f;
 }
 
 /* ========== Precision Section ========== */
@@ -400,6 +518,26 @@ a:hover {
 .preset-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+}
+
+.preset-card-new {
+    border: 2px solid #2563eb;
+    background: #eff6ff;
+    position: relative;
+}
+
+.preset-card-new::after {
+    content: "NEU";
+    position: absolute;
+    top: -10px;
+    right: 12px;
+    background: #2563eb;
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
 }
 
 .preset-icon {
@@ -624,17 +762,29 @@ a:hover {
     .installation h2,
     .whats-new h2,
     .precision-section h2,
-    .api-section h2 {
+    .api-section h2,
+    .rating-section h2 {
         font-size: 1.6rem;
     }
 
     .new-features-grid,
     .precision-grid,
-    .provider-grid {
+    .provider-grid,
+    .rating-grid {
         grid-template-columns: 1fr;
     }
 
     .preset-grid {
         grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    }
+
+    .rating-scale {
+        gap: 4px;
+    }
+
+    .scale-item {
+        width: 40px;
+        height: 40px;
+        font-size: 0.9rem;
     }
 }
