@@ -85,7 +85,7 @@
         "perplexity/sonar"
       ],
       "show_model_hint": true,
-      "model_hint_message": "Songstruktur-Preset: Dieses Preset erfordert ein Modell mit Web-Search-Fähigkeit (z.B. Perplexity Sonar). Modelle ohne Web-Zugriff können keine verlässliche Songstruktur-Analyse liefern."
+      "model_hint_message": "⚠️ Songstruktur-Preset: Dieses Preset erfordert ein Modell mit Web-Search-Fähigkeit (z.B. Perplexity Sonar). Modelle ohne Web-Zugriff können keine verlässliche Songstruktur-Analyse liefern."
     },
     "research": {
       "id": "res_05",

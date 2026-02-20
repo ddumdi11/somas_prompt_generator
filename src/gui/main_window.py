@@ -1334,6 +1334,21 @@ class MainWindow(QMainWindow):
         if provider.supports_web_search:
             return  # Alles gut
 
+        # Ersten Web-Search-fähigen Provider dynamisch ermitteln
+        web_search_provider_name = None
+        web_search_index = None
+        for i in range(self.provider_combo.count()):
+            pid = self.provider_combo.itemData(i)
+            if pid in self._api_providers and self._api_providers[pid].supports_web_search:
+                web_search_provider_name = self._api_providers[pid].name
+                web_search_index = i
+                break
+
+        if web_search_provider_name:
+            hint = f"Möchtest du zu {web_search_provider_name} wechseln?"
+        else:
+            hint = "Es ist kein Web-Search-fähiger Provider konfiguriert."
+
         reply = QMessageBox.warning(
             self,
             "Web-Search erforderlich",
@@ -1341,16 +1356,13 @@ class MainWindow(QMainWindow):
             f"Web-Search-Fähigkeit.\n\n"
             f"Der aktuelle Provider ({provider.name}) unterstützt kein Web-Search. "
             f"Die Analyse wird ohne Recherche-Zugriff wahrscheinlich unzuverlässig.\n\n"
-            f"Möchtest du zu Perplexity wechseln?",
+            f"{hint}",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.Yes,
         )
 
-        if reply == QMessageBox.StandardButton.Yes:
-            for i in range(self.provider_combo.count()):
-                if self.provider_combo.itemData(i) == "perplexity":
-                    self.provider_combo.setCurrentIndex(i)
-                    break
+        if reply == QMessageBox.StandardButton.Yes and web_search_index is not None:
+            self.provider_combo.setCurrentIndex(web_search_index)
 
     @pyqtSlot()
     def _on_settings(self) -> None:

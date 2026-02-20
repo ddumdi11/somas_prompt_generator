@@ -3,6 +3,9 @@
 Changelog v0.3.1:
 - Neues Research-Preset mit recommended_models und model_hint
 - Unterstützung für Presets ohne Zeichenbegrenzung (max_chars=0)
+
+Changelog v0.5.1:
+- Neues Feld requires_web_search im PromptPreset für Web-Search-abhängige Presets
 """
 
 import json
