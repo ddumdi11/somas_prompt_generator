@@ -10,7 +10,7 @@ from typing import Optional
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QGroupBox, QFormLayout, QMessageBox, QComboBox, QWidget,
-    QCheckBox,
+    QCheckBox, QFileDialog,
 )
 from PyQt6.QtCore import pyqtSlot
 from PyQt6.QtGui import QFont
@@ -23,6 +23,7 @@ from src.config.api_config import (
 from src.core.perplexity_client import PerplexityClient
 from src.core.openrouter_client import OpenRouterClient
 from src.core.debug_logger import DebugLogger
+from src.core.rating_store import RatingStore
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ class SettingsDialog(QDialog):
         self._visibility_buttons: dict[str, QPushButton] = {}
         self._status_labels: dict[str, QLabel] = {}
         self._debug_logger = DebugLogger()
+        self._rating_store = RatingStore()
 
         self._setup_ui()
         self._load_current_keys()
@@ -63,6 +65,9 @@ class SettingsDialog(QDialog):
 
         # Debug-Einstellungen
         layout.addWidget(self._create_debug_group())
+
+        # Bewertungsdaten
+        layout.addWidget(self._create_ratings_group())
 
         # Buttons
         btn_layout = QHBoxLayout()
@@ -147,6 +152,16 @@ class SettingsDialog(QDialog):
 
         group_layout.addRow("Default-Provider:", self.default_provider_combo)
 
+        # Kanal-Meta-Anzeige
+        self.channel_meta_checkbox = QCheckBox(
+            "Kanal-Bewertung bei bekannten Kanälen anzeigen"
+        )
+        prefs = load_preferences()
+        self.channel_meta_checkbox.setChecked(
+            prefs.get("show_channel_meta", False)
+        )
+        group_layout.addRow(self.channel_meta_checkbox)
+
         return group
 
     def _create_debug_group(self) -> QGroupBox:
@@ -189,6 +204,103 @@ class SettingsDialog(QDialog):
         group_layout.addRow(btn_layout)
 
         return group
+
+    def _create_ratings_group(self) -> QGroupBox:
+        """Erstellt die Bewertungsdaten-Gruppe mit CSV Export/Import."""
+        group = QGroupBox("Bewertungsdaten")
+        group_layout = QFormLayout(group)
+
+        # Info
+        channel_count = len(self._rating_store.get_all_channels())
+        self._channel_count_label = QLabel(
+            f"{channel_count} Kanal-Bewertungen"
+            if channel_count > 0 else "Keine Kanal-Bewertungen vorhanden"
+        )
+        self._channel_count_label.setStyleSheet("color: gray; font-style: italic;")
+        group_layout.addRow(self._channel_count_label)
+
+        # Export/Import Buttons
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        btn_export = QPushButton("Kanal-Bewertungen exportieren (CSV)")
+        btn_export.setMaximumWidth(280)
+        btn_export.clicked.connect(self._on_export_channels)
+        btn_layout.addWidget(btn_export)
+
+        btn_import = QPushButton("Kanal-Bewertungen importieren (CSV)")
+        btn_import.setMaximumWidth(280)
+        btn_import.clicked.connect(self._on_import_channels)
+        btn_layout.addWidget(btn_import)
+
+        group_layout.addRow(btn_layout)
+
+        return group
+
+    @pyqtSlot()
+    def _on_export_channels(self) -> None:
+        """Exportiert Kanal-Bewertungen als CSV."""
+        from pathlib import Path
+
+        channels = self._rating_store.get_all_channels()
+        if not channels:
+            QMessageBox.information(
+                self, "Export",
+                "Keine Kanal-Bewertungen zum Exportieren vorhanden."
+            )
+            return
+
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Kanal-Bewertungen exportieren",
+            "somas_channels.csv",
+            "CSV-Dateien (*.csv)"
+        )
+        if not path:
+            return
+
+        try:
+            count = self._rating_store.export_channels_csv(Path(path))
+            QMessageBox.information(
+                self, "Export erfolgreich",
+                f"{count} Kanal-Bewertungen exportiert nach:\n{path}"
+            )
+            logger.info(f"{count} Kanal-Bewertungen nach {path} exportiert")
+        except Exception as e:
+            logger.exception(f"Export fehlgeschlagen: {e}")
+            QMessageBox.critical(
+                self, "Export fehlgeschlagen",
+                f"Fehler beim Export:\n{e}"
+            )
+
+    @pyqtSlot()
+    def _on_import_channels(self) -> None:
+        """Importiert Kanal-Bewertungen aus CSV."""
+        from pathlib import Path
+
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Kanal-Bewertungen importieren",
+            "",
+            "CSV-Dateien (*.csv)"
+        )
+        if not path:
+            return
+
+        try:
+            imported, skipped = self._rating_store.import_channels_csv(Path(path))
+            msg = f"{imported} Kanal-Bewertungen importiert."
+            if skipped > 0:
+                msg += f"\n{skipped} Einträge übersprungen (ungültige Daten)."
+            QMessageBox.information(self, "Import erfolgreich", msg)
+            logger.info(f"Import: {imported} importiert, {skipped} übersprungen")
+            # Count aktualisieren
+            channel_count = len(self._rating_store.get_all_channels())
+            self._channel_count_label.setText(f"{channel_count} Kanal-Bewertungen")
+        except Exception as e:
+            logger.exception(f"Import fehlgeschlagen: {e}")
+            QMessageBox.critical(
+                self, "Import fehlgeschlagen",
+                f"Fehler beim Import:\n{e}"
+            )
 
     def _update_debug_log_count(self) -> None:
         """Aktualisiert die Anzeige der Debug-Log-Anzahl."""
@@ -335,6 +447,7 @@ class SettingsDialog(QDialog):
         if default_provider:
             prefs["last_provider"] = default_provider
         prefs["debug_logging"] = self.debug_checkbox.isChecked()
+        prefs["show_channel_meta"] = self.channel_meta_checkbox.isChecked()
         save_preferences(prefs)
 
         logger.info(f"{saved_count} API-Key(s) gespeichert")

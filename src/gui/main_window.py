@@ -24,6 +24,7 @@ from src.core.api_worker import APIWorker
 from src.core.debug_logger import DebugLogger, APP_VERSION
 from src.core.rating_store import RatingStore, AnalysisRecord
 from src.gui.rating_widget import RatingWidget
+from src.gui.channel_dialog import ChannelRatingDialog
 from src.core.perplexity_client import PerplexityClient
 from src.core.openrouter_client import OpenRouterClient
 from src.gui.collapsible_section import CollapsibleSection
@@ -457,6 +458,17 @@ class MainWindow(QMainWindow):
         self.rating_widget.setVisible(False)
         header_layout.addWidget(self.rating_widget)
 
+        # Kanal-Bewertung (erscheint nach API-Response wenn channel_name vorhanden)
+        self.btn_channel_rating = QPushButton("Kanal bewerten")
+        self.btn_channel_rating.setStyleSheet(
+            "padding: 2px 8px; border: 1px solid #90CAF9; "
+            "border-radius: 3px; background: #E3F2FD; "
+            "color: #1565C0; font-size: 11px;"
+        )
+        self.btn_channel_rating.setVisible(False)
+        self.btn_channel_rating.clicked.connect(self._on_channel_rating_clicked)
+        header_layout.addWidget(self.btn_channel_rating)
+
         self.btn_paste_result = QPushButton("Paste")
         self.btn_paste_result.setMaximumWidth(80)
         header_layout.addWidget(self.btn_paste_result)
@@ -743,6 +755,7 @@ class MainWindow(QMainWindow):
             self._last_api_response = None
             self.rating_widget.reset()
             self.rating_widget.setVisible(False)
+            self.btn_channel_rating.setVisible(False)
             self._current_analysis_id = None
         except ValueError as e:
             QMessageBox.critical(self, "Fehler", str(e))
@@ -759,6 +772,12 @@ class MainWindow(QMainWindow):
             f"Dauer: {self.video_info.duration_formatted}\n"
             f"URL: {self.video_info.url}"
         )
+
+        # Kanal-Meta anzeigen wenn Preference aktiv
+        channel_meta = self._get_channel_meta_display(self.video_info.channel)
+        if channel_meta:
+            meta_text += f"\n{channel_meta}"
+
         self.meta_text.setText(meta_text)
 
         # Zusammenfassung setzen und einklappen
@@ -787,9 +806,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Fehler", "Bitte zuerst Metadaten abrufen.")
             return
 
-        # Bewertungswidget zurücksetzen
+        # Bewertungswidgets zurücksetzen
         self.rating_widget.reset()
         self.rating_widget.setVisible(False)
+        self.btn_channel_rating.setVisible(False)
         self._current_analysis_id = None
 
         # Zeitbereich validieren und setzen
@@ -886,9 +906,10 @@ class MainWindow(QMainWindow):
 
     def _generate_from_transcript(self) -> None:
         """Generiert einen SOMAS-Prompt aus manuellem Transkript."""
-        # Bewertungswidget zurücksetzen
+        # Bewertungswidgets zurücksetzen
         self.rating_widget.reset()
         self.rating_widget.setVisible(False)
+        self.btn_channel_rating.setVisible(False)
         self._current_analysis_id = None
 
         data = self.transcript_widget.get_data()
@@ -1486,6 +1507,9 @@ class MainWindow(QMainWindow):
             self._save_analysis_record(response)
             self.rating_widget.reset()
             self.rating_widget.set_visible_after_analysis(True)
+            # Kanal-Button zeigen wenn channel_name vorhanden
+            channel_name = self._get_current_channel_name()
+            self.btn_channel_rating.setVisible(bool(channel_name))
         self._is_rework = False
 
         # UI entsperren
@@ -1555,41 +1579,86 @@ class MainWindow(QMainWindow):
             logger.exception(f"Analyse-Speicherung fehlgeschlagen: {e}")
             self._current_analysis_id = None
 
-    @pyqtSlot(int, dict)
-    def _on_rating_submitted(self, quality_score: int, channel_dims: dict) -> None:
-        """Handler für Bewertungs-Submit (Analyse + Quellen-Dimensionen)."""
+    @pyqtSlot(int)
+    def _on_rating_submitted(self, z_score: int) -> None:
+        """Handler für Modell-Bewertung auf Z-Skala (-2 bis +2)."""
         if self._current_analysis_id is None:
             logger.warning("Keine aktive Analyse-ID für Bewertung")
             return
 
         try:
-            self._rating_store.update_ratings(
-                self._current_analysis_id,
-                quality_score=quality_score,
-                channel_informative=channel_dims.get("informative", 0),
-                channel_balanced=channel_dims.get("balanced", 0),
-                channel_sourced=channel_dims.get("sourced", 0),
-                channel_entertaining=channel_dims.get("entertaining", 0),
+            self._rating_store.update_model_rating_z(
+                self._current_analysis_id, z_score
             )
-            parts = []
-            if quality_score > 0:
-                parts.append(f"Analyse: {quality_score}/5")
-            dim_labels = {
-                "informative": "Informativ",
-                "balanced": "Ausgewogen",
-                "sourced": "Quellenbasiert",
-                "entertaining": "Unterhaltung",
-            }
-            for key, value in channel_dims.items():
-                if value != 0:
-                    icon = "\U0001f44d" if value == 1 else "\U0001f44e"
-                    parts.append(f"{dim_labels.get(key, key)}: {icon}")
+            sign = "+" if z_score > 0 else ""
             logger.info(
                 f"Analyse #{self._current_analysis_id} bewertet: "
-                f"{', '.join(parts) or 'keine Bewertung'}"
+                f"Z-Score {sign}{z_score}"
             )
         except Exception as e:
             logger.exception(f"Bewertung fehlgeschlagen: {e}")
+
+    def _get_current_channel_name(self) -> str:
+        """Gibt den aktuellen Kanalnamen zurück (YouTube oder Transkript)."""
+        if self.video_info and self.video_info.channel:
+            return self.video_info.channel
+        # Transkript-Tab: Autor als Kanal verwenden
+        if self.input_tabs.currentIndex() == 1:
+            data = self.transcript_widget.get_data()
+            if data and data.get("author"):
+                return data["author"]
+        return ""
+
+    def _get_channel_meta_display(self, channel_name: str) -> str:
+        """Gibt eine kompakte Kanal-Meta-Anzeige zurück (oder leer).
+
+        Nur wenn show_channel_meta Preference aktiv und Kanal bewertet ist.
+        """
+        prefs = load_preferences()
+        if not prefs.get("show_channel_meta", False):
+            return ""
+        if not channel_name:
+            return ""
+
+        try:
+            rating = self._rating_store.get_channel_rating(channel_name)
+        except Exception:
+            return ""
+
+        if rating is None:
+            return ""
+
+        parts = []
+        factual = rating.get("factual_score", 0)
+        argument = rating.get("argument_score", 0)
+        if factual != 0:
+            sign = "+" if factual > 0 else ""
+            parts.append(f"Fakten {sign}{factual}")
+        if argument != 0:
+            sign = "+" if argument > 0 else ""
+            parts.append(f"Argument {sign}{argument}")
+
+        bias_dir = rating.get("bias_direction", "")
+        bias_str = rating.get("bias_strength", 0)
+        if bias_dir:
+            parts.append(f"Bias: {bias_dir} ({bias_str})")
+
+        tags = rating.get("mode_tags", "")
+        if tags:
+            parts.append(f"Tags: {tags}")
+
+        if not parts:
+            return ""
+
+        return "Kanal-Profil: " + " | ".join(parts)
+
+    def _on_channel_rating_clicked(self) -> None:
+        """Öffnet den Kanal-Bewertungsdialog."""
+        channel_name = self._get_current_channel_name()
+        if not channel_name:
+            return
+        dialog = ChannelRatingDialog(channel_name, self._rating_store, self)
+        dialog.exec()
 
     def _clear_stale_sources(self) -> None:
         """Setzt den Quellen-Button und -Puffer zurück (verhindert Stale-State)."""
