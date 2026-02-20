@@ -772,6 +772,12 @@ class MainWindow(QMainWindow):
             f"Dauer: {self.video_info.duration_formatted}\n"
             f"URL: {self.video_info.url}"
         )
+
+        # Kanal-Meta anzeigen wenn Preference aktiv
+        channel_meta = self._get_channel_meta_display(self.video_info.channel)
+        if channel_meta:
+            meta_text += f"\n{channel_meta}"
+
         self.meta_text.setText(meta_text)
 
         # Zusammenfassung setzen und einklappen
@@ -1602,6 +1608,49 @@ class MainWindow(QMainWindow):
             if data and data.get("author"):
                 return data["author"]
         return ""
+
+    def _get_channel_meta_display(self, channel_name: str) -> str:
+        """Gibt eine kompakte Kanal-Meta-Anzeige zurück (oder leer).
+
+        Nur wenn show_channel_meta Preference aktiv und Kanal bewertet ist.
+        """
+        prefs = load_preferences()
+        if not prefs.get("show_channel_meta", False):
+            return ""
+        if not channel_name:
+            return ""
+
+        try:
+            rating = self._rating_store.get_channel_rating(channel_name)
+        except Exception:
+            return ""
+
+        if rating is None:
+            return ""
+
+        parts = []
+        factual = rating.get("factual_score", 0)
+        argument = rating.get("argument_score", 0)
+        if factual != 0:
+            sign = "+" if factual > 0 else ""
+            parts.append(f"Fakten {sign}{factual}")
+        if argument != 0:
+            sign = "+" if argument > 0 else ""
+            parts.append(f"Argument {sign}{argument}")
+
+        bias_dir = rating.get("bias_direction", "")
+        bias_str = rating.get("bias_strength", 0)
+        if bias_dir:
+            parts.append(f"Bias: {bias_dir} ({bias_str})")
+
+        tags = rating.get("mode_tags", "")
+        if tags:
+            parts.append(f"Tags: {tags}")
+
+        if not parts:
+            return ""
+
+        return "Kanal-Profil: " + " | ".join(parts)
 
     def _on_channel_rating_clicked(self) -> None:
         """Öffnet den Kanal-Bewertungsdialog."""

@@ -152,6 +152,16 @@ class SettingsDialog(QDialog):
 
         group_layout.addRow("Default-Provider:", self.default_provider_combo)
 
+        # Kanal-Meta-Anzeige
+        self.channel_meta_checkbox = QCheckBox(
+            "Kanal-Bewertung bei bekannten Kanälen anzeigen"
+        )
+        prefs = load_preferences()
+        self.channel_meta_checkbox.setChecked(
+            prefs.get("show_channel_meta", False)
+        )
+        group_layout.addRow(self.channel_meta_checkbox)
+
         return group
 
     def _create_debug_group(self) -> QGroupBox:
@@ -437,6 +447,7 @@ class SettingsDialog(QDialog):
         if default_provider:
             prefs["last_provider"] = default_provider
         prefs["debug_logging"] = self.debug_checkbox.isChecked()
+        prefs["show_channel_meta"] = self.channel_meta_checkbox.isChecked()
         save_preferences(prefs)
 
         logger.info(f"{saved_count} API-Key(s) gespeichert")
