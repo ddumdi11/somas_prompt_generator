@@ -13,7 +13,9 @@ STRIKTE FORMATVORGABEN:
 {% endif %}{% endif %}
 {% if perspective_text %}{{ perspective_text }}
 
-{% endif %}STRUKTUR:
+{% endif %}MODUL: KRITIK, ZITATE, OFFENE_FRAGEN, VERBINDUNGEN, SUBTEXT oder FAKTENCHECK.
+
+STRUKTUR:
 ### FRAMING
 [1 präziser Satz zu Sprecher & Kontext]
 

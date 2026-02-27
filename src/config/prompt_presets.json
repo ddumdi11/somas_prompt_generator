@@ -1,7 +1,7 @@
 {
   "version": "1.1",
   "author": "SOMAS Team (Claude.ai + Gemini + Thorsten)",
-  "module_logic": "Select one module based on content: KRITIK (bias/ads), OFFENE_FRAGEN (complexity), ZITATE (interviews), or VERBINDUNGEN (history/context).",
+  "module_logic": "Select one module based on content: KRITIK (bias/ads), ZITATE (interviews), OFFENE_FRAGEN (complexity), VERBINDUNGEN (history/context), SUBTEXT (implicit messages), or FAKTENCHECK (claims to verify).",
   "api_settings": {
     "temperature": 0.4,
     "stop_sequences": ["###"]

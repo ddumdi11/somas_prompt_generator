@@ -17,7 +17,7 @@ KONFIGURATION:
 3. Die Antwort auf die Anschlussfrage darf maximal 4 Sätze umfassen.
 4. GESAMTZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter 2.800 Zeichen bleiben.
 
-MODUL-AUSWAHL: KRITIK, OFFENE_FRAGEN, ZITATE oder VERBINDUNGEN (Inhaltsbasiert).
+MODUL-AUSWAHL: KRITIK, ZITATE, OFFENE_FRAGEN, VERBINDUNGEN, SUBTEXT oder FAKTENCHECK (Inhaltsbasiert).
 
 STRUKTUR:
 ### FRAMING

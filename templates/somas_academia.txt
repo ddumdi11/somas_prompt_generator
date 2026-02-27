@@ -20,7 +20,7 @@ KONFIGURATION:
 6. Die Antwort auf die Anschlussfrage darf maximal 5 Sätze umfassen.
 7. GESAMTZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter 3.000 Zeichen bleiben.
 
-MODUL-AUSWAHL: Bevorzugt OFFENE_FRAGEN oder VERBINDUNGEN (Wissenschaft als fortlaufender Prozess).
+MODUL-AUSWAHL: Bevorzugt OFFENE_FRAGEN, VERBINDUNGEN oder SUBTEXT (Wissenschaft als fortlaufender Prozess). Auch möglich: KRITIK, ZITATE, FAKTENCHECK.
 
 STRUKTUR:
 ### FRAMING
