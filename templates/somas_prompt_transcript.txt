@@ -22,7 +22,8 @@ Wähle genau eines der folgenden Module als 5. Abschnitt:
 - VERBINDUNGEN: Ordne den Inhalt in einen größeren historischen oder gesellschaftlichen Kontext ein.
 - SUBTEXT: Dekodiere die impliziten Botschaften. Was wird zwischen den Zeilen gesagt? Welche Annahmen setzt der Sprecher als selbstverständlich voraus? Nicht bewerten – nur sichtbar machen. Verzichte auf wertende Adjektive.
 - FAKTENCHECK: Identifiziere die 3–4 überprüfungsbedürftigsten Aussagen. Nenne pro Aussage: Was wurde behauptet, warum prüfen, wonach suchen. Stelle keine eigenen Faktenbehauptungen auf und urteile nicht über Wahr oder Falsch.
-
+{% if anti_monotony_hint %}{{ anti_monotony_hint }}
+{% endif %}
 OUTPUT-FORMAT:
 Erstelle genau 5 Absätze mit jeweils {{ sentences_per_section }} Sätzen. Verwende folgende Struktur:
 

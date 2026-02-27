@@ -20,7 +20,8 @@ KONFIGURATION:
 6. GESAMTZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter 2.200 Zeichen bleiben.
 
 MODUL-AUSWAHL: KRITIK, ZITATE, OFFENE_FRAGEN, VERBINDUNGEN, SUBTEXT oder FAKTENCHECK (Inhaltsbasiert).
-
+{% if anti_monotony_hint %}{{ anti_monotony_hint }}
+{% endif %}
 STRUKTUR:
 ### FRAMING
 [3 kurze Sätze]

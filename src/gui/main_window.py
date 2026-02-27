@@ -16,6 +16,7 @@ from src.core.youtube_client import get_video_info
 from src.core.prompt_builder import (
     build_prompt, build_prompt_from_transcript,
     load_presets, get_preset_by_name, PromptPreset,
+    get_anti_monotony_hint,
 )
 from src.core.linkedin_formatter import format_for_linkedin
 from src.core.export import export_to_markdown, get_suggested_filename
@@ -886,6 +887,10 @@ class MainWindow(QMainWindow):
         preset_name = self.current_preset.name if self.current_preset else None
         perspective = self.perspective_combo.currentData()
 
+        # Anti-Monotonie: Hint berechnen falls letzte Module identisch waren
+        recent_modules = self._rating_store.get_recent_modules(3)
+        anti_monotony_hint = get_anti_monotony_hint(recent_modules)
+
         # Wenn Transkript vorhanden → transkript-aware Prompt bauen
         if self.video_info.transcript:
             # Transkript aus dem Transcript-Widget holen (könnte editiert worden sein)
@@ -906,12 +911,14 @@ class MainWindow(QMainWindow):
                 preset_name=preset_name,
                 is_auto_transcript=True,
                 perspective=perspective,
+                anti_monotony_hint=anti_monotony_hint,
             )
         else:
             # Kein Transkript → nur URL/Metadaten (bisheriges Verhalten)
             prompt = build_prompt(
                 self.video_info, self.config, questions, preset_name,
                 perspective=perspective,
+                anti_monotony_hint=anti_monotony_hint,
             )
 
         self.prompt_text.setText(prompt)
@@ -957,6 +964,10 @@ class MainWindow(QMainWindow):
         preset_name = self.current_preset.name if self.current_preset else None
         perspective = self.perspective_combo.currentData()
 
+        # Anti-Monotonie: Hint berechnen falls letzte Module identisch waren
+        recent_modules = self._rating_store.get_recent_modules(3)
+        anti_monotony_hint = get_anti_monotony_hint(recent_modules)
+
         prompt = build_prompt_from_transcript(
             title=data["title"],
             author=data["author"],
@@ -967,6 +978,7 @@ class MainWindow(QMainWindow):
             preset_name=preset_name,
             is_auto_transcript=self.transcript_widget.is_auto_source(),
             perspective=perspective,
+            anti_monotony_hint=anti_monotony_hint,
         )
         self.prompt_text.setText(prompt)
 

@@ -162,6 +162,46 @@ def get_perspective_text(perspective: str) -> str:
     return PERSPECTIVE_TEXTS.get(perspective, PERSPECTIVE_TEXTS["neutral"])
 
 
+# Alle Standard-Schema-Module (für Anti-Monotonie)
+ALL_MODULES = [
+    "KRITIK", "ZITATE", "OFFENE_FRAGEN", "VERBINDUNGEN",
+    "SUBTEXT", "FAKTENCHECK",
+]
+
+
+def get_anti_monotony_hint(
+    recent_modules: List[str], threshold: int = 3
+) -> str:
+    """Generiert einen Anti-Monotonie-Hinweis wenn nötig.
+
+    Prüft ob die letzten `threshold` Module identisch sind.
+    Wenn ja, wird ein Hinweis generiert, der andere Module bevorzugt.
+
+    Args:
+        recent_modules: Liste der letzten N Module (neueste zuerst).
+        threshold: Ab wie vielen Wiederholungen der Hinweis greift.
+
+    Returns:
+        Hinweis-Text oder leere Zeichenkette.
+    """
+    if len(recent_modules) < threshold:
+        return ""
+
+    # Prüfe ob die letzten threshold Module alle identisch sind
+    last_n = recent_modules[:threshold]
+    if len(set(last_n)) != 1:
+        return ""
+
+    repeated_module = last_n[0]
+    alternatives = [m for m in ALL_MODULES if m != repeated_module]
+    alternatives_str = ", ".join(alternatives)
+
+    return (
+        f"Wähle für diese Analyse bevorzugt eines der folgenden Module: "
+        f"{alternatives_str}."
+    )
+
+
 def get_template_dir() -> Path:
     """Gibt den Pfad zum Templates-Verzeichnis zurück."""
     # Vom src/core/ aus zwei Ebenen hoch, dann in templates/
@@ -189,6 +229,7 @@ def build_prompt(
     questions: str = "",
     preset_name: Optional[str] = None,
     perspective: Optional[str] = None,
+    anti_monotony_hint: str = "",
 ) -> str:
     """Generiert einen SOMAS-Prompt aus Template und Konfiguration.
 
@@ -198,6 +239,7 @@ def build_prompt(
         questions: Optionale Anschlussfragen
         preset_name: Name des zu verwendenden Presets (None für Legacy-Template)
         perspective: Perspektive-Override (None = Preset-Default verwenden)
+        anti_monotony_hint: Optionaler Hinweis zur Modul-Variation.
 
     Returns:
         Fertig gerenderte Prompt-Zeichenkette
@@ -245,6 +287,7 @@ def build_prompt(
         max_chars=preset.max_chars if preset else 0,
         questions=questions.strip() if questions else "",
         perspective_text=perspective_text,
+        anti_monotony_hint=anti_monotony_hint,
     )
 
 
@@ -258,6 +301,7 @@ def build_prompt_from_transcript(
     preset_name: Optional[str] = None,
     is_auto_transcript: bool = False,
     perspective: Optional[str] = None,
+    anti_monotony_hint: str = "",
 ) -> str:
     """Generiert einen SOMAS-Prompt aus manuellem Transkript.
 
@@ -275,6 +319,7 @@ def build_prompt_from_transcript(
         is_auto_transcript: True wenn automatisch transkribiert (YouTube STT).
             Fügt einen Disclaimer über typische Erkennungsfehler ein.
         perspective: Perspektive-Override (None = Preset-Default verwenden).
+        anti_monotony_hint: Optionaler Hinweis zur Modul-Variation.
 
     Returns:
         Fertig gerenderte Prompt-Zeichenkette.
@@ -323,6 +368,7 @@ def build_prompt_from_transcript(
         max_chars=preset.max_chars if preset else 0,
         questions=questions.strip() if questions else "",
         perspective_text=perspective_text,
+        anti_monotony_hint=anti_monotony_hint,
     )
 
 

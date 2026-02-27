@@ -21,7 +21,8 @@ KONFIGURATION:
 7. GESAMTZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter 3.000 Zeichen bleiben.
 
 MODUL-AUSWAHL: Bevorzugt OFFENE_FRAGEN, VERBINDUNGEN oder SUBTEXT (Wissenschaft als fortlaufender Prozess). Auch möglich: KRITIK, ZITATE, FAKTENCHECK.
-
+{% if anti_monotony_hint %}{{ anti_monotony_hint }}
+{% endif %}
 STRUKTUR:
 ### FRAMING
 [4 Sätze zu Quelle und Kontext]

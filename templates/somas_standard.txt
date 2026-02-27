@@ -18,7 +18,8 @@ KONFIGURATION:
 4. GESAMTZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter 2.800 Zeichen bleiben.
 
 MODUL-AUSWAHL: KRITIK, ZITATE, OFFENE_FRAGEN, VERBINDUNGEN, SUBTEXT oder FAKTENCHECK (Inhaltsbasiert).
-
+{% if anti_monotony_hint %}{{ anti_monotony_hint }}
+{% endif %}
 STRUKTUR:
 ### FRAMING
 [3 kurze Sätze zu Sprecher & Kontext]
