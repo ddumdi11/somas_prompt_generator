@@ -1625,13 +1625,15 @@ class MainWindow(QMainWindow):
         """Extrahiert das gewählte Modul aus dem API-Ergebnis per Regex."""
         import re
 
-        pattern = (
-            r"###\s*(KRITIK|ZITATE|OFFENE_FRAGEN|VERBINDUNGEN"
-            r"|SUBTEXT|FAKTENCHECK)"
+        from src.core.rating_store import VALID_MODULES
+        modules_pattern = "|".join(re.escape(m) for m in sorted(VALID_MODULES))
+        pattern = rf"^###\s*({modules_pattern})\b"
+        match = re.search(
+            pattern, result_text,
+            flags=re.IGNORECASE | re.MULTILINE,
         )
-        match = re.search(pattern, result_text)
         if match:
-            module_name = match.group(1)
+            module_name = match.group(1).upper()
             try:
                 self._rating_store.update_chosen_module(
                     analysis_id, module_name

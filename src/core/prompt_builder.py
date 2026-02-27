@@ -158,7 +158,14 @@ PERSPECTIVE_TEXTS = {
 
 
 def get_perspective_text(perspective: str) -> str:
-    """Gibt den Perspektive-Textblock für ein Prompt-Template zurück."""
+    """Gibt den Perspektive-Textblock für ein Prompt-Template zurück.
+
+    Args:
+        perspective: Perspektiv-Schlüssel ("neutral", "critical", "empathic").
+
+    Returns:
+        Perspektiv-Text; bei unbekanntem Schlüssel der neutrale Standardtext.
+    """
     return PERSPECTIVE_TEXTS.get(perspective, PERSPECTIVE_TEXTS["neutral"])
 
 

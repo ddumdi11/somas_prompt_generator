@@ -305,14 +305,20 @@ class RatingStore:
         Returns:
             Liste der Modulnamen (leer wenn keine Daten).
         """
+        if limit <= 0:
+            return []
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT chosen_module FROM analyses "
-                "WHERE chosen_module IS NOT NULL "
                 "ORDER BY id DESC LIMIT ?",
                 (limit,),
             ).fetchall()
-        return [row[0] for row in rows]
+        modules = [row[0] for row in rows]
+        # Wenn eine der letzten N Analysen kein Modul hat,
+        # kein Anti-Monotonie-Trigger (unvollständige Datenlage)
+        if any(m is None for m in modules):
+            return []
+        return modules
 
     def update_ratings(
         self, analysis_id: int,
