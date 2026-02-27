@@ -331,6 +331,16 @@ class MainWindow(QMainWindow):
             self.preset_combo.addItem(preset.name)
         layout.addWidget(self.preset_combo)
 
+        # Perspektive-Dropdown
+        perspective_label = QLabel("Perspektive:")
+        layout.addWidget(perspective_label)
+        self.perspective_combo = QComboBox()
+        self.perspective_combo.addItem("Neutral-Deskriptiv", "neutral")
+        self.perspective_combo.addItem("Kritisch-Analytisch", "critical")
+        self.perspective_combo.addItem("Empathisch-Rekonstruktiv", "empathic")
+        self.perspective_combo.setMinimumWidth(180)
+        layout.addWidget(self.perspective_combo)
+
         # Preset-Beschreibung
         self.preset_description = QLabel("")
         self.preset_description.setStyleSheet("color: gray; font-style: italic;")
@@ -583,6 +593,12 @@ class MainWindow(QMainWindow):
             self.max_chars_label.setText(
                 f"Max: {self.current_preset.max_chars_display} Zeichen"
             )
+            # Perspektive auf Preset-Default setzen
+            perspective_index = self.perspective_combo.findData(
+                self.current_preset.perspective
+            )
+            if perspective_index >= 0:
+                self.perspective_combo.setCurrentIndex(perspective_index)
             # Model-Hint anzeigen (z.B. bei Research-Preset)
             if self.current_preset.show_model_hint and self.current_preset.model_hint_message:
                 QMessageBox.information(
@@ -866,8 +882,9 @@ class MainWindow(QMainWindow):
 
         questions = self.questions_text.toPlainText()
 
-        # Verwende das ausgewählte Preset
+        # Verwende das ausgewählte Preset und Perspektive
         preset_name = self.current_preset.name if self.current_preset else None
+        perspective = self.perspective_combo.currentData()
 
         # Wenn Transkript vorhanden → transkript-aware Prompt bauen
         if self.video_info.transcript:
@@ -888,10 +905,14 @@ class MainWindow(QMainWindow):
                 questions=questions,
                 preset_name=preset_name,
                 is_auto_transcript=True,
+                perspective=perspective,
             )
         else:
             # Kein Transkript → nur URL/Metadaten (bisheriges Verhalten)
-            prompt = build_prompt(self.video_info, self.config, questions, preset_name)
+            prompt = build_prompt(
+                self.video_info, self.config, questions, preset_name,
+                perspective=perspective,
+            )
 
         self.prompt_text.setText(prompt)
 
@@ -934,6 +955,7 @@ class MainWindow(QMainWindow):
 
         questions = self.questions_text.toPlainText()
         preset_name = self.current_preset.name if self.current_preset else None
+        perspective = self.perspective_combo.currentData()
 
         prompt = build_prompt_from_transcript(
             title=data["title"],
@@ -944,6 +966,7 @@ class MainWindow(QMainWindow):
             questions=questions,
             preset_name=preset_name,
             is_auto_transcript=self.transcript_widget.is_auto_source(),
+            perspective=perspective,
         )
         self.prompt_text.setText(prompt)
 

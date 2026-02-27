@@ -11,7 +11,9 @@ KONFIGURATION:
 {% if time_range %}{% if time_range.include_context %}- Zeitbereich: Analysiere den Ausschnitt {{ time_range.start }} bis {{ time_range.end }} im Kontext des Gesamtvideos (Dauer: {{ time_range.video_duration_formatted }})
 {% else %}- Zeitbereich: Analysiere AUSSCHLIESSLICH {{ time_range.start }} bis {{ time_range.end }}
 {% endif %}{% endif %}
-
+{% if perspective_text %}
+{{ perspective_text }}
+{% endif %}
 MODUL-AUSWAHL:
 Wähle das Erweiterungsmodul basierend auf dem Inhalt:
 - KRITIK (bei werblichen/einseitigen Inhalten)
