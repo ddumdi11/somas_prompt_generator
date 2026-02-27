@@ -1598,9 +1598,41 @@ class MainWindow(QMainWindow):
         try:
             self._current_analysis_id = self._rating_store.save_analysis(record)
             logger.info(f"Analyse #{self._current_analysis_id} gespeichert")
+
+            # Gewähltes Modul aus Ergebnis extrahieren und speichern
+            self._extract_and_store_module(
+                self._current_analysis_id, response.content
+            )
         except Exception as e:
             logger.exception(f"Analyse-Speicherung fehlgeschlagen: {e}")
             self._current_analysis_id = None
+
+    def _extract_and_store_module(
+        self, analysis_id: int, result_text: str
+    ) -> None:
+        """Extrahiert das gewählte Modul aus dem API-Ergebnis per Regex."""
+        import re
+
+        pattern = (
+            r"###\s*(KRITIK|ZITATE|OFFENE_FRAGEN|VERBINDUNGEN"
+            r"|SUBTEXT|FAKTENCHECK)"
+        )
+        match = re.search(pattern, result_text)
+        if match:
+            module_name = match.group(1)
+            try:
+                self._rating_store.update_chosen_module(
+                    analysis_id, module_name
+                )
+                logger.info(
+                    f"Analyse #{analysis_id}: Modul '{module_name}' erkannt"
+                )
+            except Exception as e:
+                logger.warning(f"Modul-Speicherung fehlgeschlagen: {e}")
+        else:
+            logger.debug(
+                f"Analyse #{analysis_id}: Kein Modulname im Ergebnis erkannt"
+            )
 
     @pyqtSlot(int)
     def _on_rating_submitted(self, z_score: int) -> None:
