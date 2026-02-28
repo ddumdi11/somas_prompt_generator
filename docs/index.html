@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="SOMAS Prompt Generator v0.5.2 – Strukturierte YouTube-Analysen mit KI-Power. Z-Skala Bewertung, Kanal-Datenbank, 200+ Modelle, LinkedIn-ready.">
+    <meta name="description" content="SOMAS Prompt Generator v0.6.0 – Strukturierte YouTube-Analysen mit KI-Power. Perspektive-Steuerung, 6 Analyse-Module, Anti-Monotonie, 200+ Modelle.">
     <title>SOMAS Prompt Generator – KI-gestützte Video-Analysen</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -13,7 +13,7 @@
         <div class="container">
             <h1>🎯 SOMAS Prompt Generator</h1>
             <p class="tagline">Strukturierte YouTube-Analysen mit KI-Power.<br>200+ Modelle · Ein Klick · LinkedIn-ready.</p>
-            <p class="version-badge">✨ v0.5.2: Bewertungs-Redesign · Kanal-Datenbank · Songstruktur-Preset · CSV Export/Import</p>
+            <p class="version-badge">✨ v0.6.0: Perspektive-Steuerung · 6 Module · Anti-Monotonie · Modul-Statistik</p>
             <div class="cta-buttons">
                 <a href="https://github.com/ddumdi11/somas_prompt_generator" class="btn btn-primary">GitHub Repo</a>
                 <a href="https://github.com/ddumdi11/somas_prompt_generator/releases" class="btn btn-secondary">Download</a>
@@ -29,41 +29,69 @@
         </div>
     </section>
 
-    <!-- NEU in v0.5.2: Bewertungs-Redesign -->
+    <!-- NEU in v0.6.0 -->
     <section class="whats-new">
         <div class="container">
-            <h2>🆕 Neu in v0.5.2</h2>
-            <p class="section-intro">Ein komplett überarbeitetes Bewertungssystem – für Modelle und Quellen getrennt, mit Kanal-Datenbank und Export.</p>
+            <h2>🆕 Neu in v0.6.0</h2>
+            <p class="section-intro">Drei orthogonale Steuerungsachsen – Preset, Perspektive, Modul – für maximale Kontrolle über jede Analyse.</p>
             <div class="new-features-grid">
                 <div class="new-feature-card new-feature-card-highlight">
-                    <span class="new-feature-icon">📊</span>
-                    <h3>Z-Skala Modellbewertung</h3>
-                    <p>Symmetrische Bewertung von −2 bis +2 statt inflationärer 1–5 Sterne. Drei Sterne = „hat den Job gemacht". Harte Kriterien für Bestnoten: Gegenpositionen, Bias-Reflexion, strukturelle Tiefe.</p>
-                    <span class="new-feature-detail">Modelle empirisch vergleichen</span>
+                    <span class="new-feature-icon">🔭</span>
+                    <h3>Perspektive-Parameter</h3>
+                    <p>Steuere die Haltung des KI-Modells zur Quelle: Neutral-Deskriptiv, Kritisch-Analytisch oder Empathisch-Rekonstruktiv. Pro Preset ein Default, jederzeit manuell überschreibbar.</p>
+                    <span class="new-feature-detail">Drei Haltungen · formatbewusst</span>
                 </div>
                 <div class="new-feature-card new-feature-card-highlight">
-                    <span class="new-feature-icon">📺</span>
-                    <h3>Kanal-Bewertungsdialog</h3>
-                    <p>Eigener Dialog für Kanalprofile: Faktenqualität (−2 bis +2), Argumentationsstruktur, Bias-Richtung (10 Kategorien), Bias-Stärke und 11 Modus-Tags – von News bis Musik/Art.</p>
-                    <span class="new-feature-detail">170+ Kanäle differenziert bewerten</span>
+                    <span class="new-feature-icon">🧩</span>
+                    <h3>6 Analyse-Module</h3>
+                    <p>Zwei neue Module: <strong>SUBTEXT</strong> dekodiert implizite Botschaften ohne zu bewerten. <strong>FAKTENCHECK</strong> priorisiert überprüfungsbedürftige Aussagen für den Leser.</p>
+                    <span class="new-feature-detail">Von 4 auf 6 Module erweitert</span>
                 </div>
                 <div class="new-feature-card">
-                    <span class="new-feature-icon">💾</span>
-                    <h3>Kanal-Datenbank + CSV</h3>
-                    <p>Separate <code>channels</code>-Tabelle mit Schema-Versionierung. Export/Import als CSV (UTF-8-sig für Excel). Historische Analyse-Daten bleiben unangetastet.</p>
-                    <span class="new-feature-detail">Exportieren · Bearbeiten · Reimportieren</span>
+                    <span class="new-feature-icon">📈</span>
+                    <h3>Modul-Statistik</h3>
+                    <p>Welches Modul wird wie oft gewählt? SQLite-Tracking pro Analyse zeigt Muster auf und liefert Daten für die Prompt-Optimierung.</p>
+                    <span class="new-feature-detail">Datengetriebene Analyse-Qualität</span>
                 </div>
                 <div class="new-feature-card">
-                    <span class="new-feature-icon">🎼</span>
-                    <h3>Songstruktur-Preset</h3>
-                    <p>Musikalische Formanalyse: Songform, Arrangements, Dynamik, Harmonik. Mit eingebettetem Musiktheorie-Glossar und Web-Search-Pflicht für Akkordquellen.</p>
-                    <span class="new-feature-detail">Web-Search erforderlich (Perplexity)</span>
+                    <span class="new-feature-icon">🔀</span>
+                    <h3>Anti-Monotonie</h3>
+                    <p>Wählt das Modell dreimal hintereinander dasselbe Modul? Ein sanfter Prompt-Nudge sorgt für Abwechslung – ohne zu verbieten.</p>
+                    <span class="new-feature-detail">Intelligente Rotation statt Zufall</span>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Kanal-Bewertungssystem Detail -->
+    <!-- Perspektive-System Detail -->
+    <section class="perspective-section">
+        <div class="container">
+            <h2>🔭 Drei Perspektiven – Eine Quelle</h2>
+            <p class="section-intro">Dasselbe Video, drei verschiedene Analysen. Die Perspektive steuert die Haltung – nicht den Inhalt.</p>
+            <div class="perspective-grid">
+                <div class="perspective-card">
+                    <span class="perspective-icon">🪞</span>
+                    <h3>Neutral-Deskriptiv</h3>
+                    <p class="perspective-question">„Was wird gesagt?"</p>
+                    <p>Sachliche Wiedergabe ohne Wertung. Gibt die Logik des Sprechers wieder, auch wenn sie fehlerhaft ist. Das Modell als Spiegel.</p>
+                </div>
+                <div class="perspective-card perspective-card-highlight">
+                    <span class="perspective-icon">🔬</span>
+                    <h3>Kritisch-Analytisch</h3>
+                    <p class="perspective-question">„Welche Techniken, was fehlt?"</p>
+                    <p>Hinterfragt Rhetorik, identifiziert Auslassungen, bewertet Argumentation. Bei Paneldiskussionen: Wer dominiert? Das Modell als Mikroskop.</p>
+                </div>
+                <div class="perspective-card">
+                    <span class="perspective-icon">📡</span>
+                    <h3>Empathisch-Rekonstruktiv</h3>
+                    <p class="perspective-question">„Warum überzeugt das?"</p>
+                    <p>Erklärt die Wirkung auf die Zielgruppe, rekonstruiert die innere Logik. Verständnis statt Zustimmung. Das Modell als Verstärker-Antenne.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Kanal-Bewertungssystem -->
     <section class="rating-section">
         <div class="container">
             <h2>⚖️ Medienkompetenz-Toolkit</h2>
@@ -217,7 +245,7 @@
                     <p>Songtext-Analyse mit eigenem Schema</p>
                     <span class="preset-meta">3 Sätze · max. 2.400 Zeichen</span>
                 </div>
-                <div class="preset-card preset-card-new">
+                <div class="preset-card">
                     <span class="preset-icon">🎼</span>
                     <h3>Songstruktur</h3>
                     <p>Musikalische Formanalyse mit Glossar</p>
@@ -241,13 +269,13 @@
                 <div class="step">
                     <span class="step-number">2</span>
                     <h3>Konfigurieren</h3>
-                    <p>Preset, Modell und optional Zeitbereich wählen</p>
+                    <p>Preset, Perspektive, Modell und optional Zeitbereich wählen</p>
                 </div>
                 <div class="step-arrow">→</div>
                 <div class="step">
                     <span class="step-number">3</span>
                     <h3>Analysieren</h3>
-                    <p>Ein Klick – die KI analysiert automatisch</p>
+                    <p>Ein Klick – die KI analysiert mit gewählter Haltung</p>
                 </div>
                 <div class="step-arrow">→</div>
                 <div class="step">
@@ -287,7 +315,7 @@
                 </div>
                 <div class="schema-block schema-block-module">
                     <strong>[MODUL]</strong>
-                    <span>Kritik · Zitate · Offene Fragen · Verbindungen</span>
+                    <span>Kritik · Zitate · Offene Fragen · Verbindungen · Subtext · Faktencheck</span>
                 </div>
             </div>
 
@@ -312,7 +340,7 @@
                 </div>
             </div>
 
-            <h3 style="margin-top: 1.5em; margin-bottom: 0.5em;">Songstruktur-Schema <span style="background: #dbeafe; color: #1e40af; font-size: 0.7em; padding: 2px 8px; border-radius: 4px; font-weight: 600; vertical-align: middle;">NEU</span></h3>
+            <h3 style="margin-top: 1.5em; margin-bottom: 0.5em;">Songstruktur-Schema</h3>
             <p style="color: #666; margin-bottom: 0.8em;">Formanalyse, Arrangements, Harmonik (Web-Search erforderlich)</p>
             <div class="schema-blocks">
                 <div class="schema-block">

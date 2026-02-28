@@ -1,4 +1,4 @@
-/* SOMAS Prompt Generator - Landing Page Styles v0.5.2 */
+/* SOMAS Prompt Generator - Landing Page Styles v0.6.0 */
 
 /* ========== Reset & Base ========== */
 * {
@@ -746,6 +746,69 @@ a:hover {
     margin-top: 12px;
 }
 
+/* ========== Perspective Section ========== */
+.perspective-section {
+    padding: 80px 20px;
+    background: #eff6ff;
+}
+
+.perspective-section h2 {
+    text-align: center;
+    font-size: 2rem;
+    margin-bottom: 12px;
+    color: #1e3a5f;
+}
+
+.perspective-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+}
+
+.perspective-card {
+    background: white;
+    padding: 32px 24px;
+    border-radius: 12px;
+    border-top: 4px solid #93c5fd;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.perspective-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+}
+
+.perspective-card-highlight {
+    border-top-color: #2563eb;
+    background: #f8faff;
+}
+
+.perspective-icon {
+    font-size: 2.2rem;
+    display: block;
+    margin-bottom: 12px;
+}
+
+.perspective-card h3 {
+    font-size: 1.2rem;
+    margin-bottom: 4px;
+    color: #1e3a5f;
+}
+
+.perspective-question {
+    font-style: italic;
+    color: #2563eb;
+    margin-bottom: 12px;
+    font-size: 0.95rem;
+}
+
+.perspective-card p:last-child {
+    color: #555;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
 /* ========== Responsive ========== */
 @media (max-width: 768px) {
     .hero h1 {
@@ -763,14 +826,16 @@ a:hover {
     .whats-new h2,
     .precision-section h2,
     .api-section h2,
-    .rating-section h2 {
+    .rating-section h2,
+    .perspective-section h2 {
         font-size: 1.6rem;
     }
 
     .new-features-grid,
     .precision-grid,
     .provider-grid,
-    .rating-grid {
+    .rating-grid,
+    .perspective-grid {
         grid-template-columns: 1fr;
     }
 

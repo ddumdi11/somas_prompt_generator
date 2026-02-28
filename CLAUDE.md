@@ -7,7 +7,7 @@
 ## 🎯 Projektkontext
 
 **Name:** SOMAS Prompt Generator
-**Version:** 0.5.2
+**Version:** 0.6.0
 **Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
 **Sprache:** Python 3.11+
 **GUI-Framework:** PyQt6
@@ -245,16 +245,18 @@ TEST_URLS = [
 - [x] Kanal-Meta-Anzeige Toggle in Einstellungen
 - [x] Songstruktur-Preset für musikalische Formanalyse (Web-Search erforderlich)
 
-### Phase 8: SOMAS Schema-Erweiterung (v0.6.0) — Nächster Schritt
+### Phase 8: SOMAS Schema-Erweiterung ✅ (v0.6.0)
 
-- [ ] Standard-Schema formell als Variante dokumentieren
-- [ ] Musik-Schema formell beschreiben
-- [ ] Weitere Schema-Varianten evaluieren (Interview, Tutorial)
-- [ ] README, CLAUDE.md, Landing Page als modulares Framework darstellen
-- [ ] Changelog pflegen
+- [x] Perspektive-Parameter (neutral/critical/empathic) mit UI-Dropdown und Preset-Defaults
+- [x] Modulpool-Erweiterung 4→6 (SUBTEXT, FAKTENCHECK) in allen relevanten Templates
+- [x] Modul-Statistik (DB-Schema v3, chosen_module Tracking, Regex-Extraktion)
+- [x] Anti-Monotonie-Mechanismus (Lookback über letzte 3 Analysen, Variationshinweis)
+- [x] README, CLAUDE.md, Landing Page aktualisiert
+- [x] Spec dokumentiert (SOMAS_v0.6.0_SPEC.md)
 
 ### Backlog
 
+- [ ] Wochentags-basierte Perspektive-Defaults (nach Recherche)
 - [ ] Englisch-Support
 - [ ] PDF-Export
 - [ ] Batch-Modus
@@ -277,4 +279,4 @@ Bei Unklarheiten: Frag nach! Lieber einmal zu viel als eine falsche Annahme tref
 
 ---
 
-Letzte Aktualisierung: 2026-02-20
+Letzte Aktualisierung: 2026-03-01

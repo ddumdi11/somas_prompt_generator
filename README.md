@@ -14,7 +14,14 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuelle Version (v0.5.2) — "Bewertungs-Redesign & Songstruktur"
+### Aktuelle Version (v0.6.0) — "Schema-Erweiterung"
+
+- **Perspektive-Parameter** – Drei Analysehaltungen: Neutral-Deskriptiv, Kritisch-Analytisch, Empathisch-Rekonstruktiv. Jedes Preset hat einen Default, jederzeit manuell überschreibbar via UI-Dropdown
+- **6 Analyse-Module** – Modulpool von 4 auf 6 erweitert: SUBTEXT (implizite Botschaften dekodieren) und FAKTENCHECK (überprüfungsbedürftige Aussagen priorisieren)
+- **Modul-Statistik** – Gewähltes Modul wird pro Analyse in SQLite gespeichert (Schema v3, automatische Migration)
+- **Anti-Monotonie** – Erkennt wenn 3x hintereinander dasselbe Modul gewählt wurde und gibt dem Modell einen Variationshinweis
+
+### Seit v0.5.2
 
 - **Bewertungs-Redesign** – Z-Skala (-2 bis +2) statt 1-5 Sterne, separater Kanal-Bewertungsdialog mit Fakten-/Argumentationsqualität, Bias-Spektrum (10 Richtungen), Modus-Tags (11 Kategorien), Freitext-Notizen
 - **Kanal-Datenbank** – Eigene `channels`-Tabelle mit Schema-Versionierung und automatischer Migration
@@ -56,7 +63,7 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ### Nächste Schritte
 
-- **v0.6.0** – SOMAS Schema-Erweiterung (modulares Framework mit Content-Type-Varianten)
+- Wochentags-basierte Perspektive-Defaults (nach Recherche)
 - PDF-Export
 - Batch-Verarbeitung
 
@@ -220,7 +227,7 @@ Die App implementiert das SOMAS-Framework mit Content-Type-spezifischen Analyse-
 2. **KERNTHESE** – Zentrale Aussage/Position
 3. **ELABORATION** – Vertiefung, Belege, Details
 4. **IMPLIKATION** – Fazit, Empfehlung, Bedeutung
-5. **[MODUL]** – Automatisch gewählt: Kritik · Zitate · Offene Fragen · Verbindungen
+5. **[MODUL]** – Automatisch gewählt: Kritik · Zitate · Offene Fragen · Verbindungen · Subtext · Faktencheck
 
 ### Musik-Schema (Songtexte, Musikvideos)
 
@@ -235,6 +242,7 @@ Die App implementiert das SOMAS-Framework mit Content-Type-spezifischen Analyse-
 
 | Version | Datum | Änderungen |
 | --------- | ------- | ------------ |
+| 0.6.0 | 2026-03-01 | Schema-Erweiterung: Perspektive-Parameter (3 Haltungen), Modulpool 4→6 (SUBTEXT, FAKTENCHECK), Modul-Statistik, Anti-Monotonie |
 | 0.5.2 | 2026-02-20 | Bewertungs-Redesign (Z-Skala, Kanal-Dialog, CSV Export/Import, Meta-Toggle), Songstruktur-Preset |
 | 0.5.0 | 2026-02-14 | Musik-Preset, Bewertungssystem (Sterne+Daumen), Zeichenlimit-Kontrolle (Counter, Sandwich, Rework), Transkript-Disclaimer, Stale-State-Fix |
 | 0.4.1 | 2026-02-07 | UI-Redesign (Collapsible Sections), Transkript-Brücke, Transkript-Einbettung in Prompts |
