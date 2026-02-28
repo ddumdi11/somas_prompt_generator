@@ -11,6 +11,11 @@ STRIKTE FORMATVORGABEN:
 {% if time_range.include_context %}Zeitbereich: Ausschnitt {{ time_range.start }} bis {{ time_range.end }} im Kontext des Gesamtvideos (Dauer: {{ time_range.video_duration_formatted }})
 {% else %}Zeitbereich: AUSSCHLIESSLICH {{ time_range.start }} bis {{ time_range.end }}
 {% endif %}{% endif %}
+{% if perspective_text %}{{ perspective_text }}
+
+{% endif %}MODUL: KRITIK, ZITATE, OFFENE_FRAGEN, VERBINDUNGEN, SUBTEXT oder FAKTENCHECK.
+{% if anti_monotony_hint %}{{ anti_monotony_hint }}
+{% endif %}
 STRUKTUR:
 ### FRAMING
 [1 präziser Satz zu Sprecher & Kontext]

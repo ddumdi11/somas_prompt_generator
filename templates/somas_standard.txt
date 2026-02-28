@@ -9,14 +9,17 @@ KONFIGURATION:
 {% if time_range %}{% if time_range.include_context %}- Zeitbereich: Analysiere den Ausschnitt {{ time_range.start }} bis {{ time_range.end }} im Kontext des Gesamtvideos (Dauer: {{ time_range.video_duration_formatted }})
 {% else %}- Zeitbereich: Analysiere AUSSCHLIESSLICH {{ time_range.start }} bis {{ time_range.end }}
 {% endif %}{% endif %}
-STRIKTE FORMATVORGABEN:
+{% if perspective_text %}{{ perspective_text }}
+
+{% endif %}STRIKTE FORMATVORGABEN:
 1. KEIN Einleitungstext, KEINE Höflichkeitsfloskeln. Starte direkt mit ### FRAMING.
 2. Genau 5 Absätze mit jeweils maximal 3 KURZEN Sätzen.
 3. Die Antwort auf die Anschlussfrage darf maximal 4 Sätze umfassen.
 4. GESAMTZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter 2.800 Zeichen bleiben.
 
-MODUL-AUSWAHL: KRITIK, OFFENE_FRAGEN, ZITATE oder VERBINDUNGEN (Inhaltsbasiert).
-
+MODUL-AUSWAHL: KRITIK, ZITATE, OFFENE_FRAGEN, VERBINDUNGEN, SUBTEXT oder FAKTENCHECK (Inhaltsbasiert).
+{% if anti_monotony_hint %}{{ anti_monotony_hint }}
+{% endif %}
 STRUKTUR:
 ### FRAMING
 [3 kurze Sätze zu Sprecher & Kontext]

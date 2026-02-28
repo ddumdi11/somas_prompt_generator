@@ -86,7 +86,14 @@ CREATE TABLE IF NOT EXISTS channels (
 );
 """
 
-CURRENT_SCHEMA_VERSION = 2
+# Schema Version 3: Modul-Statistik (v0.6.0)
+# - chosen_module Spalte in analyses (vom Modell gewähltes Erweiterungsmodul)
+VALID_MODULES = frozenset({
+    "KRITIK", "ZITATE", "OFFENE_FRAGEN", "VERBINDUNGEN",
+    "SUBTEXT", "FAKTENCHECK",
+})
+
+CURRENT_SCHEMA_VERSION = 3
 
 
 @dataclass
@@ -137,6 +144,8 @@ class RatingStore:
                 version = 1
             if version < 2:
                 self._migrate_to_v2(conn)
+            if version < 3:
+                self._migrate_to_v3(conn)
 
     def _connect(self) -> sqlite3.Connection:
         """Erstellt eine DB-Verbindung."""
@@ -198,6 +207,24 @@ class RatingStore:
             logger.exception(f"Migration auf Version 2 fehlgeschlagen: {e}")
             raise
 
+    def _migrate_to_v3(self, conn: sqlite3.Connection) -> None:
+        """Migration zu Version 3: chosen_module in analyses."""
+        logger.info("Migriere DB-Schema auf Version 3")
+        try:
+            try:
+                conn.execute(
+                    "ALTER TABLE analyses ADD COLUMN chosen_module TEXT DEFAULT NULL"
+                )
+            except sqlite3.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    raise
+
+            self._set_schema_version(conn, 3)
+            logger.info("DB-Schema auf Version 3 migriert")
+        except Exception as e:
+            logger.exception(f"Migration auf Version 3 fehlgeschlagen: {e}")
+            raise
+
     # --- Analyse-CRUD ---
 
     def save_analysis(self, record: AnalysisRecord) -> int:
@@ -250,6 +277,48 @@ class RatingStore:
                 "UPDATE analyses SET model_rating_z = ? WHERE id = ?",
                 (z_score, analysis_id),
             )
+
+    def update_chosen_module(self, analysis_id: int, module_name: str) -> None:
+        """Speichert das vom Modell gewählte Erweiterungsmodul.
+
+        Args:
+            analysis_id: ID der Analyse.
+            module_name: Name des Moduls (KRITIK, ZITATE, etc.).
+        """
+        if module_name not in VALID_MODULES:
+            logger.warning(
+                f"Unbekanntes Modul '{module_name}' für Analyse {analysis_id}"
+            )
+            return
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE analyses SET chosen_module = ? WHERE id = ?",
+                (module_name, analysis_id),
+            )
+
+    def get_recent_modules(self, limit: int = 3) -> list[str]:
+        """Gibt die letzten N gewählten Module zurück (neueste zuerst).
+
+        Args:
+            limit: Anzahl der letzten Analysen.
+
+        Returns:
+            Liste der Modulnamen (leer wenn keine Daten).
+        """
+        if limit <= 0:
+            return []
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT chosen_module FROM analyses "
+                "ORDER BY id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        modules = [row[0] for row in rows]
+        # Wenn eine der letzten N Analysen kein Modul hat,
+        # kein Anti-Monotonie-Trigger (unvollständige Datenlage)
+        if any(m is None for m in modules):
+            return []
+        return modules
 
     def update_ratings(
         self, analysis_id: int,

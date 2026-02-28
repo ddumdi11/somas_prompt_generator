@@ -1,7 +1,7 @@
 {
   "version": "1.1",
   "author": "SOMAS Team (Claude.ai + Gemini + Thorsten)",
-  "module_logic": "Select one module based on content: KRITIK (bias/ads), OFFENE_FRAGEN (complexity), ZITATE (interviews), or VERBINDUNGEN (history/context).",
+  "module_logic": "Select one module based on content: KRITIK (bias/ads), ZITATE (interviews), OFFENE_FRAGEN (complexity), VERBINDUNGEN (history/context), SUBTEXT (implicit messages), or FAKTENCHECK (claims to verify).",
   "api_settings": {
     "temperature": 0.4,
     "stop_sequences": ["###"]
@@ -16,6 +16,7 @@
       "reading_time_seconds": 90,
       "system_prompt": "Role: Expert Video Analyst. Output: SOMAS-Schema in German. Sections: FRAMING, KERNTHESE, ELABORATION, IMPLIKATION, [MODULE]. Constraints: Exactly 3 short sentences per section. No intro/outro. Direct start with '### FRAMING'. Follow-up question: Max 4 sentences.",
       "template_file": "somas_standard.txt",
+      "perspective": "neutral",
       "recommended_models": null,
       "show_model_hint": false
     },
@@ -28,6 +29,7 @@
       "reading_time_seconds": 60,
       "system_prompt": "Role: Social Media Content Strategist. Output: SOMAS-Schema in German. Sections: FRAMING, KERNTHESE (written as a catchy 'Hook'), ELABORATION, IMPLIKATION, [MODULE]. Constraints: Exactly 3 punchy sentences per section. Use active voice. No intro/outro. Follow-up question: Max 3 sentences.",
       "template_file": "somas_linkedin.txt",
+      "perspective": "neutral",
       "recommended_models": null,
       "show_model_hint": false
     },
@@ -40,6 +42,7 @@
       "reading_time_seconds": 20,
       "system_prompt": "Role: Ultra-Concise Summarizer. Output: SOMAS-Schema in German. Sections: FRAMING, KERNTHESE, ELABORATION, IMPLIKATION, [MODULE]. Constraints: Exactly ONE precise sentence per section. Absolute focus on core facts. No intro/outro. Follow-up question: Max 2 sentences.",
       "template_file": "somas_minimal.txt",
+      "perspective": "neutral",
       "recommended_models": null,
       "show_model_hint": false
     },
@@ -52,6 +55,7 @@
       "reading_time_seconds": 120,
       "system_prompt": "Role: Academic Researcher & Peer-Reviewer. Output: SOMAS-Schema in German. Sections: FRAMING (Source/Context), KERNTHESE (Primary Hypothesis), ELABORATION (Evidence/Data/Mechanisms), IMPLIKATION (Scientific Impact/Future Research), [MODULE]. Constraints: Formal, objective tone. Exactly 4 precise sentences per section for higher depth. Focus on reproducibility and logical consistency. No intro/outro. Follow-up question: Technical/Academic focus, max 5 sentences.",
       "template_file": "somas_academia.txt",
+      "perspective": "critical",
       "recommended_models": null,
       "show_model_hint": false
     },
@@ -64,6 +68,7 @@
       "reading_time_seconds": 75,
       "system_prompt": "Role: Music & Lyrics Analyst. Output: SOMAS-Musik-Schema in German. Sections: KONTEXT, SONGTEXT-ANALYSE, EINORDNUNG, BEWERTUNG. Constraints: Exactly 3 sentences per section. Focus on lyrics/text analysis only, NOT audio/music quality. No intro/outro. Direct start with '### KONTEXT'.",
       "template_file": "somas_music.txt",
+      "perspective": "empathic",
       "transcript_aware": true,
       "recommended_models": null,
       "show_model_hint": true,
@@ -78,6 +83,7 @@
       "reading_time_seconds": 0,
       "system_prompt": "Role: Music Theory Analyst & Song Structure Expert. Task: Analyze the formal structure of a song in detail. Output in German. Sections: KONTEXT (metadata), FORMÜBERSICHT (formula notation), STRUKTURKARTE (chronological part-by-part analysis), WIRKUNGSANALYSE (why does the structure feel like it does). Use established music theory terminology. Only state chord progressions if verifiable from reliable sources. No length constraints - be as thorough as needed, especially in the Strukturkarte. Cite sources.",
       "template_file": "somas_songstruktur.txt",
+      "perspective": "neutral",
       "transcript_aware": true,
       "requires_web_search": true,
       "recommended_models": [
@@ -96,6 +102,7 @@
       "reading_time_seconds": 0,
       "system_prompt": "Role: Deep Research Analyst with Web Access. Task: Conduct comprehensive multi-source research on the video content. Output in German. Structure: Use clear sections with headers (## Heading). Include: Executive Summary, detailed analysis of all key points, cross-references to external sources, critical evaluation of claims, and a comprehensive source list at the end. No length constraints - prioritize depth and thoroughness. Always cite sources with [n] notation and list all URLs at the end.",
       "template_file": "somas_research.txt",
+      "perspective": "neutral",
       "recommended_models": [
         "perplexity/sonar-deep-research",
         "perplexity/sonar-pro",

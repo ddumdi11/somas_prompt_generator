@@ -16,6 +16,7 @@ from src.core.youtube_client import get_video_info
 from src.core.prompt_builder import (
     build_prompt, build_prompt_from_transcript,
     load_presets, get_preset_by_name, PromptPreset,
+    get_anti_monotony_hint,
 )
 from src.core.linkedin_formatter import format_for_linkedin
 from src.core.export import export_to_markdown, get_suggested_filename
@@ -331,6 +332,16 @@ class MainWindow(QMainWindow):
             self.preset_combo.addItem(preset.name)
         layout.addWidget(self.preset_combo)
 
+        # Perspektive-Dropdown
+        perspective_label = QLabel("Perspektive:")
+        layout.addWidget(perspective_label)
+        self.perspective_combo = QComboBox()
+        self.perspective_combo.addItem("Neutral-Deskriptiv", "neutral")
+        self.perspective_combo.addItem("Kritisch-Analytisch", "critical")
+        self.perspective_combo.addItem("Empathisch-Rekonstruktiv", "empathic")
+        self.perspective_combo.setMinimumWidth(180)
+        layout.addWidget(self.perspective_combo)
+
         # Preset-Beschreibung
         self.preset_description = QLabel("")
         self.preset_description.setStyleSheet("color: gray; font-style: italic;")
@@ -583,6 +594,12 @@ class MainWindow(QMainWindow):
             self.max_chars_label.setText(
                 f"Max: {self.current_preset.max_chars_display} Zeichen"
             )
+            # Perspektive auf Preset-Default setzen
+            perspective_index = self.perspective_combo.findData(
+                self.current_preset.perspective
+            )
+            if perspective_index >= 0:
+                self.perspective_combo.setCurrentIndex(perspective_index)
             # Model-Hint anzeigen (z.B. bei Research-Preset)
             if self.current_preset.show_model_hint and self.current_preset.model_hint_message:
                 QMessageBox.information(
@@ -866,8 +883,13 @@ class MainWindow(QMainWindow):
 
         questions = self.questions_text.toPlainText()
 
-        # Verwende das ausgewählte Preset
+        # Verwende das ausgewählte Preset und Perspektive
         preset_name = self.current_preset.name if self.current_preset else None
+        perspective = self.perspective_combo.currentData()
+
+        # Anti-Monotonie: Hint berechnen falls letzte Module identisch waren
+        recent_modules = self._rating_store.get_recent_modules(3)
+        anti_monotony_hint = get_anti_monotony_hint(recent_modules)
 
         # Wenn Transkript vorhanden → transkript-aware Prompt bauen
         if self.video_info.transcript:
@@ -888,10 +910,16 @@ class MainWindow(QMainWindow):
                 questions=questions,
                 preset_name=preset_name,
                 is_auto_transcript=True,
+                perspective=perspective,
+                anti_monotony_hint=anti_monotony_hint,
             )
         else:
             # Kein Transkript → nur URL/Metadaten (bisheriges Verhalten)
-            prompt = build_prompt(self.video_info, self.config, questions, preset_name)
+            prompt = build_prompt(
+                self.video_info, self.config, questions, preset_name,
+                perspective=perspective,
+                anti_monotony_hint=anti_monotony_hint,
+            )
 
         self.prompt_text.setText(prompt)
 
@@ -934,6 +962,11 @@ class MainWindow(QMainWindow):
 
         questions = self.questions_text.toPlainText()
         preset_name = self.current_preset.name if self.current_preset else None
+        perspective = self.perspective_combo.currentData()
+
+        # Anti-Monotonie: Hint berechnen falls letzte Module identisch waren
+        recent_modules = self._rating_store.get_recent_modules(3)
+        anti_monotony_hint = get_anti_monotony_hint(recent_modules)
 
         prompt = build_prompt_from_transcript(
             title=data["title"],
@@ -944,6 +977,8 @@ class MainWindow(QMainWindow):
             questions=questions,
             preset_name=preset_name,
             is_auto_transcript=self.transcript_widget.is_auto_source(),
+            perspective=perspective,
+            anti_monotony_hint=anti_monotony_hint,
         )
         self.prompt_text.setText(prompt)
 
@@ -1575,9 +1610,43 @@ class MainWindow(QMainWindow):
         try:
             self._current_analysis_id = self._rating_store.save_analysis(record)
             logger.info(f"Analyse #{self._current_analysis_id} gespeichert")
+
+            # Gewähltes Modul aus Ergebnis extrahieren und speichern
+            self._extract_and_store_module(
+                self._current_analysis_id, response.content
+            )
         except Exception as e:
             logger.exception(f"Analyse-Speicherung fehlgeschlagen: {e}")
             self._current_analysis_id = None
+
+    def _extract_and_store_module(
+        self, analysis_id: int, result_text: str
+    ) -> None:
+        """Extrahiert das gewählte Modul aus dem API-Ergebnis per Regex."""
+        import re
+
+        from src.core.rating_store import VALID_MODULES
+        modules_pattern = "|".join(re.escape(m) for m in sorted(VALID_MODULES))
+        pattern = rf"^###\s*({modules_pattern})\b"
+        match = re.search(
+            pattern, result_text,
+            flags=re.IGNORECASE | re.MULTILINE,
+        )
+        if match:
+            module_name = match.group(1).upper()
+            try:
+                self._rating_store.update_chosen_module(
+                    analysis_id, module_name
+                )
+                logger.info(
+                    f"Analyse #{analysis_id}: Modul '{module_name}' erkannt"
+                )
+            except Exception as e:
+                logger.warning(f"Modul-Speicherung fehlgeschlagen: {e}")
+        else:
+            logger.debug(
+                f"Analyse #{analysis_id}: Kein Modulname im Ergebnis erkannt"
+            )
 
     @pyqtSlot(int)
     def _on_rating_submitted(self, z_score: int) -> None:

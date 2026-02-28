@@ -7,13 +7,18 @@ KONFIGURATION:
 {% if time_range %}{% if time_range.include_context %}- Zeitbereich: Analysiere den Ausschnitt {{ time_range.start }} bis {{ time_range.end }} im Kontext des Gesamtvideos (Dauer: {{ time_range.video_duration_formatted }})
 {% else %}- Zeitbereich: Analysiere AUSSCHLIESSLICH {{ time_range.start }} bis {{ time_range.end }}
 {% endif %}{% endif %}
-MODUL-AUSWAHL:
-Wähle das Erweiterungsmodul basierend auf dem Inhalt:
-- KRITIK (bei werblichen/einseitigen Inhalten)
-- OFFENE_FRAGEN (bei komplexen/unvollständigen Themen)
-- ZITATE (bei Interviews mit starken O-Tönen)
-- VERBINDUNGEN (bei Themen mit historischen Bezügen)
+{% if perspective_text %}{{ perspective_text }}
 
+{% endif %}MODUL-AUSWAHL:
+Wähle genau eines der folgenden Module als 5. Abschnitt:
+- KRITIK: Identifiziere Bias, versteckte Werbung oder sachlich problematische Aussagen.
+- ZITATE: Wähle die 2–3 aussagekräftigsten O-Töne des Sprechers.
+- OFFENE_FRAGEN: Benenne, was ungeklärt bleibt oder bewusst ausgelassen wird.
+- VERBINDUNGEN: Ordne den Inhalt in einen größeren historischen oder gesellschaftlichen Kontext ein.
+- SUBTEXT: Dekodiere die impliziten Botschaften. Was wird zwischen den Zeilen gesagt? Welche Annahmen setzt der Sprecher als selbstverständlich voraus? Nicht bewerten – nur sichtbar machen. Verzichte auf wertende Adjektive.
+- FAKTENCHECK: Identifiziere die 3–4 überprüfungsbedürftigsten Aussagen. Nenne pro Aussage: Was wurde behauptet, warum prüfen, wonach suchen. Stelle keine eigenen Faktenbehauptungen auf und urteile nicht über Wahr oder Falsch.
+{% if anti_monotony_hint %}{{ anti_monotony_hint }}
+{% endif %}
 OUTPUT-FORMAT:
 Erstelle genau 5 Absätze mit jeweils {{ sentences_per_section }} Sätzen. Verwende folgende Struktur:
 

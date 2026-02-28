@@ -37,6 +37,8 @@ class PromptPreset:
     transcript_aware: bool = False
     # Neu in v0.5.1: Preset erfordert Web-Search-fähiges Modell
     requires_web_search: bool = False
+    # Neu in v0.6.0: Default-Perspektive für Analysehaltung
+    perspective: str = "neutral"
 
     @property
     def reading_time_display(self) -> str:
@@ -98,6 +100,7 @@ def load_presets() -> Dict[str, PromptPreset]:
             model_hint_message=preset_data.get("model_hint_message"),
             transcript_aware=preset_data.get("transcript_aware", False),
             requires_web_search=preset_data.get("requires_web_search", False),
+            perspective=preset_data.get("perspective", "neutral"),
         )
     return presets
 
@@ -126,6 +129,86 @@ def get_preset_by_id(preset_id: str) -> Optional[PromptPreset]:
     return None
 
 
+# Perspektive-Texte (v0.6.0)
+PERSPECTIVE_TEXTS = {
+    "neutral": (
+        "PERSPEKTIVE: Neutral-Deskriptiv.\n"
+        "Beschreibe in nüchterner Sprache, was gesagt wird, ohne eigene Wertung. "
+        "Ordne Positionen und Argumente ein, ohne sie zu bewerten. Gib die Logik "
+        "des Sprechers wieder, auch wenn sie fehlerhaft ist – die Einordnung "
+        "übernimmt der Leser. Bei mehreren Sprechern: Stelle die verschiedenen "
+        "Standpunkte gleichwertig dar."
+    ),
+    "critical": (
+        "PERSPEKTIVE: Kritisch-Analytisch.\n"
+        "Hinterfrage in analytischer Sprache rhetorische Techniken, identifiziere "
+        "Auslassungen und bewerte die Schlüssigkeit der Argumentation. Benenne, "
+        "was gesagt wird, aber auch, was bewusst nicht gesagt wird. Bei mehreren "
+        "Sprechern: Analysiere, wer den Diskurs dominiert und mit welchen Mitteln."
+    ),
+    "empathic": (
+        "PERSPEKTIVE: Empathisch-Rekonstruktiv.\n"
+        "Versetze dich in die Position der Zielgruppe und erkläre in einfühlsamer "
+        "Sprache, warum der Inhalt sie überzeugt. Rekonstruiere die innere Logik "
+        "und emotionale Wirkung, ohne sie dir zu eigen zu machen oder zu bewerten. "
+        "Ziel ist Verständnis, nicht Zustimmung. Bei mehreren Sprechern: Beschreibe "
+        "die emotionalen Dynamiken zwischen den Teilnehmern."
+    ),
+}
+
+
+def get_perspective_text(perspective: str) -> str:
+    """Gibt den Perspektive-Textblock für ein Prompt-Template zurück.
+
+    Args:
+        perspective: Perspektiv-Schlüssel ("neutral", "critical", "empathic").
+
+    Returns:
+        Perspektiv-Text; bei unbekanntem Schlüssel der neutrale Standardtext.
+    """
+    return PERSPECTIVE_TEXTS.get(perspective, PERSPECTIVE_TEXTS["neutral"])
+
+
+# Alle Standard-Schema-Module (für Anti-Monotonie)
+ALL_MODULES = [
+    "KRITIK", "ZITATE", "OFFENE_FRAGEN", "VERBINDUNGEN",
+    "SUBTEXT", "FAKTENCHECK",
+]
+
+
+def get_anti_monotony_hint(
+    recent_modules: List[str], threshold: int = 3
+) -> str:
+    """Generiert einen Anti-Monotonie-Hinweis wenn nötig.
+
+    Prüft ob die letzten `threshold` Module identisch sind.
+    Wenn ja, wird ein Hinweis generiert, der andere Module bevorzugt.
+
+    Args:
+        recent_modules: Liste der letzten N Module (neueste zuerst).
+        threshold: Ab wie vielen Wiederholungen der Hinweis greift.
+
+    Returns:
+        Hinweis-Text oder leere Zeichenkette.
+    """
+    if len(recent_modules) < threshold:
+        return ""
+
+    # Prüfe ob die letzten threshold Module alle identisch sind
+    last_n = recent_modules[:threshold]
+    if len(set(last_n)) != 1:
+        return ""
+
+    repeated_module = last_n[0]
+    alternatives = [m for m in ALL_MODULES if m != repeated_module]
+    alternatives_str = ", ".join(alternatives)
+
+    return (
+        f"Wähle für diese Analyse bevorzugt eines der folgenden Module: "
+        f"{alternatives_str}."
+    )
+
+
 def get_template_dir() -> Path:
     """Gibt den Pfad zum Templates-Verzeichnis zurück."""
     # Vom src/core/ aus zwei Ebenen hoch, dann in templates/
@@ -151,7 +234,9 @@ def build_prompt(
     video_info: VideoInfo,
     config: SomasConfig,
     questions: str = "",
-    preset_name: Optional[str] = None
+    preset_name: Optional[str] = None,
+    perspective: Optional[str] = None,
+    anti_monotony_hint: str = "",
 ) -> str:
     """Generiert einen SOMAS-Prompt aus Template und Konfiguration.
 
@@ -160,6 +245,8 @@ def build_prompt(
         config: SOMAS-Konfiguration (Tiefe, Sprache, etc.)
         questions: Optionale Anschlussfragen
         preset_name: Name des zu verwendenden Presets (None für Legacy-Template)
+        perspective: Perspektive-Override (None = Preset-Default verwenden)
+        anti_monotony_hint: Optionaler Hinweis zur Modul-Variation.
 
     Returns:
         Fertig gerenderte Prompt-Zeichenkette
@@ -191,6 +278,10 @@ def build_prompt(
 
     template = env.get_template(template_file)
 
+    # Perspektive: expliziter Override > Preset-Default > "neutral"
+    effective_perspective = perspective or (preset.perspective if preset else "neutral")
+    perspective_text = get_perspective_text(effective_perspective)
+
     return template.render(
         video_title=video_info.title,
         channel_name=video_info.channel,
@@ -202,6 +293,8 @@ def build_prompt(
         time_range=config.time_range,
         max_chars=preset.max_chars if preset else 0,
         questions=questions.strip() if questions else "",
+        perspective_text=perspective_text,
+        anti_monotony_hint=anti_monotony_hint,
     )
 
 
@@ -214,6 +307,8 @@ def build_prompt_from_transcript(
     questions: str = "",
     preset_name: Optional[str] = None,
     is_auto_transcript: bool = False,
+    perspective: Optional[str] = None,
+    anti_monotony_hint: str = "",
 ) -> str:
     """Generiert einen SOMAS-Prompt aus manuellem Transkript.
 
@@ -230,6 +325,8 @@ def build_prompt_from_transcript(
         preset_name: Name des Presets (für sentences_per_section).
         is_auto_transcript: True wenn automatisch transkribiert (YouTube STT).
             Fügt einen Disclaimer über typische Erkennungsfehler ein.
+        perspective: Perspektive-Override (None = Preset-Default verwenden).
+        anti_monotony_hint: Optionaler Hinweis zur Modul-Variation.
 
     Returns:
         Fertig gerenderte Prompt-Zeichenkette.
@@ -256,6 +353,10 @@ def build_prompt_from_transcript(
     else:
         template = env.get_template("somas_prompt_transcript.txt")
 
+    # Perspektive: expliziter Override > Preset-Default > "neutral"
+    effective_perspective = perspective or (preset.perspective if preset else "neutral")
+    perspective_text = get_perspective_text(effective_perspective)
+
     return template.render(
         title=title,
         author=author,
@@ -273,6 +374,8 @@ def build_prompt_from_transcript(
         time_range=config.time_range,
         max_chars=preset.max_chars if preset else 0,
         questions=questions.strip() if questions else "",
+        perspective_text=perspective_text,
+        anti_monotony_hint=anti_monotony_hint,
     )
 
 
