@@ -156,6 +156,44 @@ class MainWindow(QMainWindow):
         self._connect_signals()
         self._on_preset_changed()  # Initialisiere mit erstem Preset
         self._restore_api_selection()  # Letzte Provider/Modell-Auswahl wiederherstellen
+        self._check_batch_recovery()  # Unvollständige Batch-Sessions prüfen
+
+    def _check_batch_recovery(self):
+        """Prüft beim Start auf unvollständige Batch-Sessions und bietet Wiederherstellung an."""
+        from src.core.batch_persistence import find_recoverable_sessions, load_session, delete_batch_session
+        sessions = find_recoverable_sessions()
+        if not sessions:
+            return
+
+        session = sessions[0]  # Neueste Session
+        reply = QMessageBox.question(
+            self,
+            "Batch-Session wiederherstellen",
+            f"Es wurde eine unvollständige Batch-Session gefunden "
+            f"({session['item_count']} URLs, {session['timestamp']}).\n\n"
+            "Möchten Sie die Ergebnisse wiederherstellen?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                config, items = load_session(session["path"])
+                from src.gui.batch_dialog import BatchDialog
+                dialog = BatchDialog(
+                    self, config, self._rating_store, self._debug_logger
+                )
+                dialog.load_recovered_items(items)
+                dialog.show()
+            except Exception as e:
+                logging.warning("Batch-Recovery fehlgeschlagen: %s", e)
+                delete_batch_session(session["path"])
+        else:
+            delete_batch_session(session["path"])
+
+        # Weitere alte Sessions aufräumen
+        for old_session in sessions[1:]:
+            delete_batch_session(old_session["path"])
 
     def _setup_ui(self):
         """Initialisiert das UI-Layout."""
@@ -204,11 +242,18 @@ class MainWindow(QMainWindow):
         # API-Modus
         main_layout.addWidget(self._create_api_section())
 
-        # Generate Button
+        # Generate + Batch Buttons
+        generate_row = QHBoxLayout()
         self.btn_generate = QPushButton("Generate Prompt")
         self.btn_generate.setMinimumHeight(40)
         self.btn_generate.setEnabled(False)
-        main_layout.addWidget(self.btn_generate)
+        generate_row.addWidget(self.btn_generate, stretch=1)
+
+        self.btn_batch = QPushButton("Batch-Modus...")
+        self.btn_batch.setMinimumHeight(40)
+        self.btn_batch.setToolTip("2\u20135 YouTube-URLs sequenziell analysieren")
+        generate_row.addWidget(self.btn_batch)
+        main_layout.addLayout(generate_row)
 
         # Generierter Prompt
         main_layout.addWidget(self._create_prompt_section())
@@ -542,6 +587,7 @@ class MainWindow(QMainWindow):
         """Verbindet Signals mit Slots."""
         self.btn_get_meta.clicked.connect(self._on_get_meta)
         self.btn_generate.clicked.connect(self._on_generate_prompt)
+        self.btn_batch.clicked.connect(self._on_batch_mode)
         self.btn_copy_prompt.clicked.connect(self._on_copy_prompt)
         self.btn_paste_result.clicked.connect(self._on_paste_result)
         self.url_input.returnPressed.connect(self._on_get_meta)
@@ -810,6 +856,47 @@ class MainWindow(QMainWindow):
             color="#2E7D32",
         )
         self.meta_section.collapse()
+
+    @pyqtSlot()
+    def _on_batch_mode(self):
+        """Öffnet den Batch-Verarbeitungsdialog."""
+        from src.core.batch_item import BatchConfig
+        from src.gui.batch_dialog import BatchDialog
+
+        provider_id = self.provider_combo.currentData()
+        if not provider_id:
+            QMessageBox.warning(self, "Provider fehlt", "Bitte Provider wählen.")
+            return
+
+        api_key = get_api_key(provider_id)
+        if not api_key:
+            QMessageBox.warning(
+                self, "API-Key fehlt",
+                f"Kein API-Key für {self.provider_combo.currentText()} konfiguriert.\n"
+                "Bitte in den Einstellungen hinterlegen.",
+            )
+            return
+
+        model_id = self._get_active_model_id()
+        if not model_id:
+            QMessageBox.warning(self, "Modell fehlt", "Bitte ein Modell auswählen.")
+            return
+
+        config = BatchConfig(
+            provider_id=provider_id,
+            model_id=model_id,
+            model_name=self._get_model_display_name(model_id),
+            preset_name=self.current_preset.name if self.current_preset else "Standard",
+            perspective=self.perspective_combo.currentData() or "neutral",
+            depth=self.config.depth,
+            language=self.config.language,
+            api_key=api_key,
+        )
+
+        dialog = BatchDialog(
+            self, config, self._rating_store, self._debug_logger
+        )
+        dialog.show()
 
     @pyqtSlot()
     def _on_generate_prompt(self):
