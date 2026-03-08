@@ -185,7 +185,7 @@ class MainWindow(QMainWindow):
                 )
                 dialog.batch_completed.connect(self._on_batch_completed)
                 dialog.batch_dismissed.connect(self._on_batch_dismissed)
-                dialog.load_recovered_items(items)
+                dialog.load_recovered_items(items, session_dir=session["path"])
                 dialog.show()
             except Exception as e:
                 logger.warning("Batch-Recovery fehlgeschlagen: %s", e)

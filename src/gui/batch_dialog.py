@@ -342,12 +342,21 @@ class BatchDialog(QDialog):
             f"Verarbeitung gestartet: {len(self._items)} URLs"
         )
 
-        # Session erstellen (Crash-Resistenz)
+        # Session erstellen + Worker starten
         from src.core.batch_persistence import create_batch_session
-        self._session_dir = create_batch_session(self._config, urls)
-
-        # Worker starten (wird in PR 3 implementiert)
-        self._start_worker()
+        try:
+            self._session_dir = create_batch_session(self._config, urls)
+            self._start_worker()
+        except Exception as exc:
+            self._session_dir = None
+            self._set_running_state(False)
+            self.progress_bar.setVisible(False)
+            self.status_label.setText("Batch konnte nicht gestartet werden.")
+            QMessageBox.critical(
+                self,
+                "Batch-Start fehlgeschlagen",
+                f"Die Batch-Verarbeitung konnte nicht gestartet werden:\n{exc}",
+            )
 
     def _start_worker(self):
         """Erstellt und startet den BatchWorker."""
@@ -519,7 +528,15 @@ class BatchDialog(QDialog):
 
     @pyqtSlot()
     def on_batch_finished(self):
-        """Wird aufgerufen wenn alle Items verarbeitet sind."""
+        """Wird aufgerufen wenn alle Items verarbeitet sind.
+
+        Unterscheidet zwischen echtem Abschluss und Abbruch:
+        batch_completed wird nur bei Vollverarbeitung emittiert.
+        """
+        # Bei Abbruch wird _on_cancel_confirmed den UI-State setzen
+        if self._batch_worker and self._batch_worker._cancelled:
+            return
+
         self._set_running_state(False)
 
         done = sum(1 for item in self._items if item.status == "done")
@@ -604,12 +621,17 @@ class BatchDialog(QDialog):
 
     # --- Recovery-Support ---
 
-    def load_recovered_items(self, items: list[BatchItem]):
+    def load_recovered_items(self, items: list[BatchItem], session_dir=None):
         """Lädt wiederhergestellte Items aus einer früheren Session.
 
         Wird von main_window aufgerufen bei Crash-Recovery.
+
+        Args:
+            items: Wiederhergestellte BatchItems.
+            session_dir: Pfad zur Session (für Cleanup in _on_all_done).
         """
         self._items = items
+        self._session_dir = session_dir
         self._create_result_tabs(items)
 
         done = sum(1 for item in items if item.status == "done")
