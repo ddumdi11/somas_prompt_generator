@@ -413,6 +413,14 @@ class BatchDialog(QDialog):
         """Bricht die laufende Batch-Verarbeitung ab."""
         if self._batch_worker:
             self._batch_worker.cancel()
+            self._batch_worker.finished.connect(self._on_cancel_confirmed)
+            self.status_label.setText("Abbruch angefordert...")
+        else:
+            self._set_running_state(False)
+            self.status_label.setText("Batch abgebrochen.")
+
+    def _on_cancel_confirmed(self):
+        """Wird aufgerufen wenn der Worker nach Abbruch tatsächlich beendet ist."""
         self._set_running_state(False)
         self.status_label.setText("Batch abgebrochen.")
 
