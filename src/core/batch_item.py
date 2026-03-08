@@ -61,6 +61,7 @@ class BatchItem:
                 "channel": self.video_info.channel,
                 "duration": self.video_info.duration,
                 "url": self.video_info.url,
+                "transcript": self.video_info.transcript,
             }
         return {
             "url": self.url,
@@ -86,6 +87,7 @@ class BatchItem:
                 channel=vi.get("channel", ""),
                 duration=vi.get("duration", 0),
                 url=vi.get("url", ""),
+                transcript=vi.get("transcript", ""),
             )
         return cls(
             url=data["url"],

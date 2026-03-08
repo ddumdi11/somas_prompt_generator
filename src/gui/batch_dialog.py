@@ -418,13 +418,9 @@ class BatchDialog(QDialog):
 
     def _on_all_done(self):
         """Markiert alle Items als erledigt und schließt den Dialog."""
-        from src.core.batch_persistence import (
-            delete_batch_session,
-            mark_batch_completed,
-        )
+        from src.core.batch_persistence import delete_batch_session
 
         if self._session_dir:
-            mark_batch_completed(self._session_dir)
             delete_batch_session(self._session_dir)
 
         self.batch_dismissed.emit()
@@ -458,8 +454,11 @@ class BatchDialog(QDialog):
             self.result_tabs.setTabText(index, f"{index + 1}. {title} {icon}")
 
     @pyqtSlot(int, str, object)
-    def on_item_completed(self, index: int, result_text: str, response):
-        """Zeigt das Ergebnis im Tab und aktiviert Rating/Erledigt."""
+    def on_item_completed(self, index: int, result_text: str, _response):
+        """Zeigt das Ergebnis im Tab und aktiviert Rating/Erledigt.
+
+        _response is reserved for future use (e.g. token stats display).
+        """
         if 0 <= index < len(self._items):
             self._items[index].result_text = result_text
             self._items[index].status = "done"

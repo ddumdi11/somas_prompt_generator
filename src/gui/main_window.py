@@ -183,10 +183,12 @@ class MainWindow(QMainWindow):
                 dialog = BatchDialog(
                     self, config, self._rating_store, self._debug_logger
                 )
+                dialog.batch_completed.connect(self._on_batch_completed)
+                dialog.batch_dismissed.connect(self._on_batch_dismissed)
                 dialog.load_recovered_items(items)
                 dialog.show()
             except Exception as e:
-                logging.warning("Batch-Recovery fehlgeschlagen: %s", e)
+                logger.warning("Batch-Recovery fehlgeschlagen: %s", e)
                 delete_batch_session(session["path"])
         else:
             delete_batch_session(session["path"])
@@ -896,7 +898,17 @@ class MainWindow(QMainWindow):
         dialog = BatchDialog(
             self, config, self._rating_store, self._debug_logger
         )
+        dialog.batch_completed.connect(self._on_batch_completed)
+        dialog.batch_dismissed.connect(self._on_batch_dismissed)
         dialog.show()
+
+    def _on_batch_completed(self):
+        """Callback wenn alle Batch-Items verarbeitet wurden."""
+        logger.info("Batch-Verarbeitung abgeschlossen")
+
+    def _on_batch_dismissed(self):
+        """Callback wenn Batch-Dialog geschlossen wird."""
+        logger.info("Batch-Dialog geschlossen")
 
     @pyqtSlot()
     def _on_generate_prompt(self):

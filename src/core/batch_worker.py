@@ -104,13 +104,11 @@ class BatchWorker(QThread):
                 self._config.provider_id, self._config.api_key
             )
         except Exception as e:
-            logger.error(f"Client-Erstellung fehlgeschlagen: {e}")
+            logger.exception("Client-Erstellung fehlgeschlagen")
             for i in range(len(self._items)):
                 self.item_error.emit(i, f"Provider-Fehler: {e}")
             self.batch_finished.emit()
             return
-
-        from src.config.defaults import SomasConfig
 
         for i, item in enumerate(self._items):
             if self._cancelled:

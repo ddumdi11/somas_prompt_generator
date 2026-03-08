@@ -114,9 +114,9 @@ def find_recoverable_sessions() -> list[dict]:
 
     Returns:
         Liste von Dicts mit Session-Metadaten:
-        - session_dir: Path
+        - path: Path
         - item_count: int
-        - started_at: str
+        - timestamp: str
         - done_count: int (Anzahl fertiger Items)
     """
     base = BATCH_BASE_DIR
@@ -156,9 +156,9 @@ def find_recoverable_sessions() -> list[dict]:
                     pass
 
         sessions.append({
-            "session_dir": entry,
+            "path": entry,
             "item_count": item_count,
-            "started_at": status.get("started_at", ""),
+            "timestamp": status.get("started_at", ""),
             "done_count": done_count,
         })
 
@@ -211,5 +211,5 @@ def load_session(
         return config, items
 
     except (json.JSONDecodeError, KeyError, OSError) as e:
-        logger.error(f"Session laden fehlgeschlagen: {session_dir}: {e}")
+        logger.exception(f"Session laden fehlgeschlagen: {session_dir}")
         return None
