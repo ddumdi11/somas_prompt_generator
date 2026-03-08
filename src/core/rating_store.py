@@ -96,6 +96,47 @@ VALID_MODULES = frozenset({
 CURRENT_SCHEMA_VERSION = 3
 
 
+def extract_module_from_result(
+    store: "RatingStore", analysis_id: int, result_text: str
+) -> str | None:
+    """Extrahiert das gewählte Modul aus dem API-Ergebnis und speichert es.
+
+    Sucht per Regex nach ### MODULE_NAME Headern im Ergebnis-Text.
+    Case-insensitive Matching, normalisiert auf Großbuchstaben.
+
+    Args:
+        store: RatingStore-Instanz für DB-Zugriff.
+        analysis_id: ID der Analyse in der DB.
+        result_text: Der vollständige API-Ergebnis-Text.
+
+    Returns:
+        Erkannter Modulname (Großbuchstaben) oder None.
+    """
+    import re
+
+    modules_pattern = "|".join(re.escape(m) for m in sorted(VALID_MODULES))
+    pattern = rf"^###\s*({modules_pattern})\b"
+    match = re.search(
+        pattern, result_text,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+    if match:
+        module_name = match.group(1).upper()
+        try:
+            store.update_chosen_module(analysis_id, module_name)
+            logger.info(
+                f"Analyse #{analysis_id}: Modul '{module_name}' erkannt"
+            )
+        except Exception as e:
+            logger.warning(f"Modul-Speicherung fehlgeschlagen: {e}")
+        return module_name
+
+    logger.debug(
+        f"Analyse #{analysis_id}: Kein Modulname im Ergebnis erkannt"
+    )
+    return None
+
+
 @dataclass
 class AnalysisRecord:
     """Datensatz für eine einzelne Analyse."""
