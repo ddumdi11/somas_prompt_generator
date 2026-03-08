@@ -32,7 +32,7 @@ class OpenAIClient(LLMClient):
         {
             "id": "o3",
             "name": "o3",
-            "description": "Reasoning-Modell – langsam, sehr präzise",
+            "description": "Reasoning-Modell - langsam, sehr präzise",
         },
         {
             "id": "o4-mini",
@@ -69,11 +69,18 @@ class OpenAIClient(LLMClient):
             from openai import OpenAI
 
             client = OpenAI(api_key=self.api_key)
-            response = client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=4096,
-            )
+
+            # o-series Modelle verwenden max_completion_tokens statt max_tokens
+            params = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+            }
+            if model.startswith("o"):
+                params["max_completion_tokens"] = 4096
+            else:
+                params["max_tokens"] = 4096
+
+            response = client.chat.completions.create(**params)
 
             content = response.choices[0].message.content or ""
             tokens_used = response.usage.total_tokens if response.usage else 0
@@ -112,16 +119,12 @@ class OpenAIClient(LLMClient):
             )
 
     def validate_key(self) -> bool:
-        """Prüft ob der API-Key gültig ist."""
+        """Prüft ob der API-Key gültig ist (kostenlos via models.list)."""
         try:
             from openai import OpenAI
 
             client = OpenAI(api_key=self.api_key)
-            client.chat.completions.create(
-                model="gpt-4o-mini",
-                max_tokens=10,
-                messages=[{"role": "user", "content": "Hi"}],
-            )
+            client.models.list()
             return True
         except Exception:
             return False

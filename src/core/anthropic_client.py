@@ -70,8 +70,21 @@ class AnthropicClient(LLMClient):
                 messages=[{"role": "user", "content": prompt}],
             )
 
-            content = message.content[0].text
-            tokens_used = message.usage.input_tokens + message.usage.output_tokens
+            # Robust: nur TextBlocks extrahieren, leere Antworten abfangen
+            content = ""
+            if message.content:
+                text_parts = [
+                    block.text for block in message.content
+                    if hasattr(block, "text")
+                ]
+                content = "\n".join(text_parts)
+
+            tokens_used = 0
+            if message.usage:
+                tokens_used = (
+                    getattr(message.usage, "input_tokens", 0)
+                    + getattr(message.usage, "output_tokens", 0)
+                )
 
             logger.info(
                 f"Anthropic Antwort: {len(content)} Zeichen, "
