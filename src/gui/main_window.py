@@ -1623,30 +1623,10 @@ class MainWindow(QMainWindow):
         self, analysis_id: int, result_text: str
     ) -> None:
         """Extrahiert das gewählte Modul aus dem API-Ergebnis per Regex."""
-        import re
-
-        from src.core.rating_store import VALID_MODULES
-        modules_pattern = "|".join(re.escape(m) for m in sorted(VALID_MODULES))
-        pattern = rf"^###\s*({modules_pattern})\b"
-        match = re.search(
-            pattern, result_text,
-            flags=re.IGNORECASE | re.MULTILINE,
+        from src.core.rating_store import extract_module_from_result
+        extract_module_from_result(
+            self._rating_store, analysis_id, result_text
         )
-        if match:
-            module_name = match.group(1).upper()
-            try:
-                self._rating_store.update_chosen_module(
-                    analysis_id, module_name
-                )
-                logger.info(
-                    f"Analyse #{analysis_id}: Modul '{module_name}' erkannt"
-                )
-            except Exception as e:
-                logger.warning(f"Modul-Speicherung fehlgeschlagen: {e}")
-        else:
-            logger.debug(
-                f"Analyse #{analysis_id}: Kein Modulname im Ergebnis erkannt"
-            )
 
     @pyqtSlot(int)
     def _on_rating_submitted(self, z_score: int) -> None:

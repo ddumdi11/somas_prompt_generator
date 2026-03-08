@@ -350,9 +350,33 @@ class BatchDialog(QDialog):
         self._start_worker()
 
     def _start_worker(self):
-        """Startet den BatchWorker. Stub für PR 3."""
-        # Wird in PR 3 mit BatchWorker implementiert
-        logger.info("BatchWorker-Start (Stub — wird in PR 3 implementiert)")
+        """Erstellt und startet den BatchWorker."""
+        from src.core.batch_worker import BatchWorker
+
+        self._batch_worker = BatchWorker(
+            config=self._config,
+            items=self._items,
+            rating_store=self._rating_store,
+            session_dir=self._session_dir,
+            debug_logger=self._debug_logger,
+        )
+
+        # Signals verdrahten
+        self._batch_worker.item_status_changed.connect(
+            self.on_item_status_changed
+        )
+        self._batch_worker.item_metadata_loaded.connect(
+            self.on_item_metadata_loaded
+        )
+        self._batch_worker.item_completed.connect(self.on_item_completed)
+        self._batch_worker.item_error.connect(self.on_item_error)
+        self._batch_worker.batch_finished.connect(self.on_batch_finished)
+
+        self._batch_worker.start()
+        logger.info(
+            f"BatchWorker gestartet: {len(self._items)} URLs, "
+            f"Modell: {self._config.model_name}"
+        )
 
     def _collect_urls(self) -> list[str]:
         """Sammelt und validiert die eingegebenen URLs."""
