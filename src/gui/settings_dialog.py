@@ -400,6 +400,14 @@ class SettingsDialog(QDialog):
         elif provider_id == "openrouter":
             client = OpenRouterClient(api_key=key)
             success = client.validate_key()
+        elif provider_id == "anthropic":
+            from src.core.anthropic_client import AnthropicClient
+            client = AnthropicClient(api_key=key)
+            success = client.validate_key()
+        elif provider_id == "openai":
+            from src.core.openai_client import OpenAIClient
+            client = OpenAIClient(api_key=key)
+            success = client.validate_key()
         else:
             status_label.setText("Test nicht verfügbar für diesen Provider")
             status_label.setStyleSheet("color: #FFC107; font-style: italic;")

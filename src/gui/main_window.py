@@ -1587,6 +1587,12 @@ class MainWindow(QMainWindow):
             client = PerplexityClient(api_key)
         elif provider_id == "openrouter":
             client = OpenRouterClient(api_key)
+        elif provider_id == "anthropic":
+            from src.core.anthropic_client import AnthropicClient
+            client = AnthropicClient(api_key)
+        elif provider_id == "openai":
+            from src.core.openai_client import OpenAIClient
+            client = OpenAIClient(api_key)
         else:
             self._update_api_status("error")
             self.api_status_label.setText("Provider nicht unterstützt")
