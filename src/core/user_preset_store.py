@@ -56,10 +56,14 @@ class UserPresetStore:
             return
         try:
             data = json.loads(self._path.read_text(encoding="utf-8"))
-            self._presets = [
-                UserPreset(**p) for p in data.get("presets", [])
-            ]
-        except Exception as e:
+            self._presets = []
+            for p in data.get("presets", []):
+                # Ungültige Module beim Laden auf None normalisieren
+                module = p.get("fixed_module")
+                if module is not None and module not in VALID_MODULES:
+                    p["fixed_module"] = None
+                self._presets.append(UserPreset(**p))
+        except (json.JSONDecodeError, OSError, TypeError, ValueError) as e:
             logger.warning("user_presets.json konnte nicht geladen werden: %s", e)
             self._presets = []
 
@@ -110,6 +114,9 @@ class UserPresetStore:
 
     def save_preset(self, preset: UserPreset) -> None:
         """Speichert ein neues Preset oder überschreibt ein bestehendes (gleiche ID)."""
+        # Ungültige Module vor dem Speichern auf None normalisieren
+        if preset.fixed_module is not None and preset.fixed_module not in VALID_MODULES:
+            preset.fixed_module = None
         self._presets = [p for p in self._presets if p.id != preset.id]
         self._presets.append(preset)
         self._save()
