@@ -81,7 +81,7 @@ def create_post_header(
         Formatierter Header für LinkedIn-Post
     """
     bold_title = to_bold(title)
-    bold_somas = to_bold("SOMAS-Analyse")
+    bold_somas = to_bold("Analyse · SOMAS")
     header = f"{bold_title}\n{channel}, YT\n\n{bold_somas}\n"
     if model_name and provider_name:
         header += f"via {model_name}, {provider_name}\n"

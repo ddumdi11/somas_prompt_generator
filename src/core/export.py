@@ -193,7 +193,7 @@ def get_markdown_content(
     if video_info:
         # Sanitize den Titel für den Header
         safe_title = sanitize_unicode_for_export(video_info.title)
-        parts.append(f"# SOMAS-Analyse: {safe_title}\n")
+        parts.append(f"# Analyse · SOMAS: {safe_title}\n")
         parts.append(f"**Kanal:** {video_info.channel}  ")
         if video_info.duration > 0:
             parts.append(f"**Dauer:** {video_info.duration_formatted}  ")
