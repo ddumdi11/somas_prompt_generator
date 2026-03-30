@@ -1,4 +1,4 @@
-/* SOMAS Prompt Generator - Landing Page Styles v0.6.0 */
+/* SOMAS Prompt Generator - Landing Page Styles v0.8.0 */
 
 /* ========== Reset & Base ========== */
 * {
@@ -211,6 +211,40 @@ a:hover {
     color: #2563eb;
 }
 
+/* v0.7.0 section (blue tint) */
+.whats-new-v07 {
+    background: #eff6ff;
+}
+
+.whats-new-v07 h2 {
+    color: #1e40af;
+}
+
+.new-feature-card-blue {
+    border-top-color: #3b82f6;
+}
+
+.new-feature-card-blue .new-feature-detail {
+    color: #2563eb;
+}
+
+/* v0.6.0 section (gray tint) */
+.whats-new-v06 {
+    background: #f8fafc;
+}
+
+.whats-new-v06 h2 {
+    color: #475569;
+}
+
+.whats-new-v06 .new-feature-card {
+    border-top-color: #94a3b8;
+}
+
+.whats-new-v06 .new-feature-detail {
+    color: #64748b;
+}
+
 /* ========== Rating System Section ========== */
 .rating-section {
     padding: 80px 20px;
@@ -402,6 +436,10 @@ a:hover {
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: 24px;
     margin-bottom: 48px;
+}
+
+.provider-grid-4 {
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
 }
 
 .provider-card {

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="SOMAS Prompt Generator v0.6.0 – Strukturierte YouTube-Analysen mit KI-Power. Perspektive-Steuerung, 6 Analyse-Module, Anti-Monotonie, 200+ Modelle.">
+    <meta name="description" content="SOMAS Prompt Generator v0.8.0 – Strukturierte YouTube-Analysen mit KI-Power. Custom Prompt Editor, 4 API-Provider, Batch-Modus, 200+ Modelle.">
     <title>SOMAS Prompt Generator – KI-gestützte Video-Analysen</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -13,7 +13,7 @@
         <div class="container">
             <h1>🎯 SOMAS Prompt Generator</h1>
             <p class="tagline">Strukturierte YouTube-Analysen mit KI-Power.<br>200+ Modelle · Ein Klick · LinkedIn-ready.</p>
-            <p class="version-badge">✨ v0.6.0: Perspektive-Steuerung · 6 Module · Anti-Monotonie · Modul-Statistik</p>
+            <p class="version-badge">✨ v0.8.0: Custom Prompt Editor · 4 API-Provider · Batch-Modus · Benutzerdefinierte Presets</p>
             <div class="cta-buttons">
                 <a href="https://github.com/ddumdi11/somas_prompt_generator" class="btn btn-primary">GitHub Repo</a>
                 <a href="https://github.com/ddumdi11/somas_prompt_generator/releases" class="btn btn-secondary">Download</a>
@@ -29,35 +29,103 @@
         </div>
     </section>
 
-    <!-- NEU in v0.6.0 -->
+    <!-- NEU in v0.8.0 -->
     <section class="whats-new">
         <div class="container">
-            <h2>🆕 Neu in v0.6.0</h2>
-            <p class="section-intro">Drei orthogonale Steuerungsachsen – Preset, Perspektive, Modul – für maximale Kontrolle über jede Analyse.</p>
+            <h2>🆕 Neu in v0.8.0</h2>
+            <p class="section-intro">Volle Kontrolle über den Prompt – anpassen, speichern, wiederverwenden.</p>
             <div class="new-features-grid">
                 <div class="new-feature-card new-feature-card-highlight">
-                    <span class="new-feature-icon">🔭</span>
-                    <h3>Perspektive-Parameter</h3>
-                    <p>Steuere die Haltung des KI-Modells zur Quelle: Neutral-Deskriptiv, Kritisch-Analytisch oder Empathisch-Rekonstruktiv. Pro Preset ein Default, jederzeit manuell überschreibbar.</p>
-                    <span class="new-feature-detail">Drei Haltungen · formatbewusst</span>
+                    <span class="new-feature-icon">✏️</span>
+                    <h3>Custom Prompt Editor</h3>
+                    <p>System-Prompt vor der Generierung anpassen: Rollenanweisung editieren, Modul fixieren. Benutzerdefinierte Anweisungen werden dem Template vorangestellt.</p>
+                    <span class="new-feature-detail">Prompt-Kontrolle · Modul-Override</span>
                 </div>
                 <div class="new-feature-card new-feature-card-highlight">
+                    <span class="new-feature-icon">💾</span>
+                    <h3>Benutzerdefinierte Presets</h3>
+                    <p>Nach jeder API-Analyse wird das angepasste Preset automatisch gespeichert. Umbenennen und Löschen per Rechtsklick, Toggle zwischen Standard und eigenen Presets.</p>
+                    <span class="new-feature-detail">Auto-Save · UPSERT · JSON-Persistenz</span>
+                </div>
+                <div class="new-feature-card">
+                    <span class="new-feature-icon">🧩</span>
+                    <h3>Modul-Fixierung</h3>
+                    <p>Eines der 6 Module fest vorgeben – das Modell muss genau dieses verwenden. Anti-Monotonie wird automatisch unterdrückt wenn ein Pflicht-Modul gesetzt ist.</p>
+                    <span class="new-feature-detail">PFLICHT-MODUL · gezielt steuern</span>
+                </div>
+                <div class="new-feature-card">
+                    <span class="new-feature-icon">🏷️</span>
+                    <h3>Export-Branding</h3>
+                    <p>Neuer Titel in LinkedIn- und Markdown-Exporten: „Analyse · SOMAS" statt „SOMAS-Analyse" für ein klareres Branding.</p>
+                    <span class="new-feature-detail">LinkedIn · Markdown · konsistent</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- v0.7.0 -->
+    <section class="whats-new whats-new-v07">
+        <div class="container">
+            <h2>🔌 v0.7.0 – Batch & Direkte APIs</h2>
+            <p class="section-intro">Mehr Videos auf einmal, mehr Provider ohne Umwege.</p>
+            <div class="new-features-grid">
+                <div class="new-feature-card new-feature-card-blue">
+                    <span class="new-feature-icon">📦</span>
+                    <h3>Batch-Verarbeitung</h3>
+                    <p>2–5 YouTube-URLs in einem Durchlauf analysieren. Non-modaler Dialog, Tab-basierte Ergebnisse, integrierte Bewertung pro Video.</p>
+                    <span class="new-feature-detail">Sequenziell · Crash-resistent</span>
+                </div>
+                <div class="new-feature-card new-feature-card-blue">
+                    <span class="new-feature-icon">🤖</span>
+                    <h3>Anthropic API (direkt)</h3>
+                    <p>Claude Opus 4.6, Sonnet 4.6, Haiku 4.5 – direkt über die Anthropic Messages API, ohne OpenRouter-Umweg.</p>
+                    <span class="new-feature-detail">Native SDK · console.anthropic.com</span>
+                </div>
+                <div class="new-feature-card new-feature-card-blue">
+                    <span class="new-feature-icon">🧠</span>
+                    <h3>OpenAI API (direkt)</h3>
+                    <p>GPT-4o, GPT-4o mini, o3, o4-mini – über die Chat Completions API mit nativem SDK.</p>
+                    <span class="new-feature-detail">Standard-API-Key · 4 Modelle</span>
+                </div>
+                <div class="new-feature-card new-feature-card-blue">
+                    <span class="new-feature-icon">4️⃣</span>
+                    <h3>4 API-Provider</h3>
+                    <p>Perplexity (Web-Search), OpenRouter (200+ Modelle), Anthropic (direkt), OpenAI (direkt) – alle in einer App.</p>
+                    <span class="new-feature-detail">Freie Wahl · ein Interface</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- v0.6.0 -->
+    <section class="whats-new whats-new-v06">
+        <div class="container">
+            <h2>🔭 v0.6.0 – Perspektive & Module</h2>
+            <p class="section-intro">Drei orthogonale Steuerungsachsen – Preset, Perspektive, Modul.</p>
+            <div class="new-features-grid">
+                <div class="new-feature-card">
+                    <span class="new-feature-icon">🔭</span>
+                    <h3>Perspektive-Parameter</h3>
+                    <p>Neutral-Deskriptiv, Kritisch-Analytisch oder Empathisch-Rekonstruktiv. Pro Preset ein Default, jederzeit überschreibbar.</p>
+                    <span class="new-feature-detail">Drei Haltungen · formatbewusst</span>
+                </div>
+                <div class="new-feature-card">
                     <span class="new-feature-icon">🧩</span>
                     <h3>6 Analyse-Module</h3>
-                    <p>Zwei neue Module: <strong>SUBTEXT</strong> dekodiert implizite Botschaften ohne zu bewerten. <strong>FAKTENCHECK</strong> priorisiert überprüfungsbedürftige Aussagen für den Leser.</p>
+                    <p><strong>SUBTEXT</strong> dekodiert implizite Botschaften. <strong>FAKTENCHECK</strong> priorisiert überprüfungsbedürftige Aussagen.</p>
                     <span class="new-feature-detail">Von 4 auf 6 Module erweitert</span>
                 </div>
                 <div class="new-feature-card">
                     <span class="new-feature-icon">📈</span>
                     <h3>Modul-Statistik</h3>
-                    <p>Welches Modul wird wie oft gewählt? SQLite-Tracking pro Analyse zeigt Muster auf und liefert Daten für die Prompt-Optimierung.</p>
-                    <span class="new-feature-detail">Datengetriebene Analyse-Qualität</span>
+                    <p>SQLite-Tracking pro Analyse zeigt Muster auf und liefert Daten für die Prompt-Optimierung.</p>
+                    <span class="new-feature-detail">Datengetriebene Qualität</span>
                 </div>
                 <div class="new-feature-card">
                     <span class="new-feature-icon">🔀</span>
                     <h3>Anti-Monotonie</h3>
-                    <p>Wählt das Modell dreimal hintereinander dasselbe Modul? Ein sanfter Prompt-Nudge sorgt für Abwechslung – ohne zu verbieten.</p>
-                    <span class="new-feature-detail">Intelligente Rotation statt Zufall</span>
+                    <p>Dreimal dasselbe Modul? Ein sanfter Prompt-Nudge sorgt für Abwechslung – ohne zu verbieten.</p>
+                    <span class="new-feature-detail">Intelligente Rotation</span>
                 </div>
             </div>
         </div>
@@ -159,27 +227,45 @@
             <h2>🚀 Integrierte KI-Analyse</h2>
             <p class="section-intro">Keine Copy-Paste-Workflows mehr. Wähle ein Modell und lass die App die Analyse automatisch erstellen.</p>
 
-            <div class="provider-grid">
+            <div class="provider-grid provider-grid-4">
                 <div class="provider-card">
                     <span class="provider-icon">🔮</span>
                     <h3>Perplexity AI</h3>
-                    <p>Sonar-Modelle mit integrierter Web-Suche für aktuelle Kontexte</p>
+                    <p>Web-Suche inklusive</p>
                     <ul class="provider-features">
-                        <li>Sonar, Sonar Pro, Sonar Reasoning</li>
-                        <li>Deep Research für unbegrenzte Analysen</li>
-                        <li>Web-Suche inklusive</li>
-                        <li>Pflicht-Provider für Songstruktur-Preset</li>
+                        <li>Sonar, Sonar Pro, Reasoning</li>
+                        <li>Deep Research (unbegrenzt)</li>
+                        <li>Pflicht für Songstruktur</li>
                     </ul>
                 </div>
                 <div class="provider-card provider-card-highlight">
                     <span class="provider-icon">🌐</span>
                     <h3>OpenRouter</h3>
-                    <p>200+ Modelle von allen großen Anbietern – oft kostenlos testbar</p>
+                    <p>200+ Modelle, oft kostenlos</p>
                     <ul class="provider-features">
-                        <li>Claude, Gemini, GPT, Llama, DeepSeek, Grok...</li>
+                        <li>Claude, Gemini, GPT, Llama...</li>
                         <li>Dynamische Preisanzeige</li>
-                        <li>Suchbare Modell-Liste mit Filtern</li>
-                        <li>Kostenlose Testmodelle bei neuen Releases</li>
+                        <li>Suchbare Modell-Liste</li>
+                    </ul>
+                </div>
+                <div class="provider-card">
+                    <span class="provider-icon">🤖</span>
+                    <h3>Anthropic</h3>
+                    <p>Claude direkt, ohne Umweg</p>
+                    <ul class="provider-features">
+                        <li>Opus 4.6, Sonnet 4.6, Haiku 4.5</li>
+                        <li>Native Messages API</li>
+                        <li>console.anthropic.com</li>
+                    </ul>
+                </div>
+                <div class="provider-card">
+                    <span class="provider-icon">🧠</span>
+                    <h3>OpenAI</h3>
+                    <p>GPT und o-Series direkt</p>
+                    <ul class="provider-features">
+                        <li>GPT-4o, GPT-4o mini</li>
+                        <li>o3, o4-mini (Reasoning)</li>
+                        <li>Standard-API-Key</li>
                     </ul>
                 </div>
             </div>
@@ -199,6 +285,11 @@
                     <span>🔄</span>
                     <strong>Web-Search-Erkennung</strong>
                     <p>Automatischer Provider-Wechsel bei Bedarf</p>
+                </div>
+                <div class="api-highlight">
+                    <span>📦</span>
+                    <strong>Batch-Modus</strong>
+                    <p>2–5 URLs in einem Durchlauf analysieren</p>
                 </div>
             </div>
         </div>
@@ -269,7 +360,7 @@
                 <div class="step">
                     <span class="step-number">2</span>
                     <h3>Konfigurieren</h3>
-                    <p>Preset, Perspektive, Modell und optional Zeitbereich wählen</p>
+                    <p>Preset, Perspektive, Modell wählen – optional Prompt anpassen</p>
                 </div>
                 <div class="step-arrow">→</div>
                 <div class="step">
