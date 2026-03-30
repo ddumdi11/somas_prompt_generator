@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QTextEdit, QMessageBox,
     QFrame, QApplication, QComboBox, QCheckBox, QTabWidget,
-    QScrollArea,
+    QScrollArea, QMenu, QInputDialog,
 )
 from PyQt6.QtCore import Qt, pyqtSlot
 from PyQt6.QtGui import QFont
@@ -620,6 +620,13 @@ class MainWindow(QMainWindow):
         self.preset_combo.currentTextChanged.connect(self._on_preset_changed)
         self.btn_prompt_edit.clicked.connect(self._on_prompt_edit)
         self.user_presets_checkbox.toggled.connect(self._on_user_presets_toggle)
+        # Rechtsklick-Kontextmenü für User-Preset-Verwaltung
+        self.preset_combo.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu
+        )
+        self.preset_combo.customContextMenuRequested.connect(
+            self._on_preset_combo_context_menu
+        )
         # Export-Buttons
         self.btn_export_linkedin.clicked.connect(self._on_export_linkedin)
         self.btn_export_markdown.clicked.connect(self._on_export_markdown)
@@ -1856,6 +1863,52 @@ class MainWindow(QMainWindow):
         """Aktualisiert das User-Preset-Dropdown nach Speichern/Umbenennen/Löschen."""
         if self._show_user_presets:
             self._rebuild_preset_dropdown()
+
+    @pyqtSlot("QPoint")
+    def _on_preset_combo_context_menu(self, pos) -> None:
+        """Rechtsklick-Kontextmenü für Umbenennen/Löschen von User-Presets."""
+        if not self._show_user_presets:
+            return
+
+        preset_id = self.preset_combo.currentData()
+        if not preset_id:
+            return
+
+        preset = self._user_preset_store.get_by_id(preset_id)
+        if not preset:
+            return
+
+        menu = QMenu(self)
+        action_rename = menu.addAction("Umbenennen…")
+        action_delete = menu.addAction("Löschen")
+
+        action = menu.exec(self.preset_combo.mapToGlobal(pos))
+
+        if action == action_rename:
+            new_name, ok = QInputDialog.getText(
+                self,
+                "Preset umbenennen",
+                "Neuer Name:",
+                text=preset.name,
+            )
+            if ok and new_name.strip():
+                self._user_preset_store.rename_preset(preset_id, new_name.strip())
+                self._refresh_user_preset_dropdown()
+
+        elif action == action_delete:
+            reply = QMessageBox.question(
+                self,
+                "Preset löschen",
+                f"Benutzerdefiniertes Preset \"{preset.name}\" wirklich löschen?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self._user_preset_store.delete_preset(preset_id)
+                self._custom_system_prompt = None
+                self._custom_module = None
+                self._update_prompt_edit_button_style()
+                self._refresh_user_preset_dropdown()
 
     # ── Ende Custom Prompt Editor ────────────────────────────────────
 
