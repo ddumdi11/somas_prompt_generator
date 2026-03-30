@@ -71,7 +71,9 @@ class PromptEditDialog(QDialog):
         layout.addWidget(label)
 
         self.system_prompt_edit = QTextEdit()
-        self.system_prompt_edit.setPlainText(system_prompt)
+        # Formatiere einzeilige Preset-Strings für bessere Lesbarkeit
+        display_prompt = system_prompt.replace(". ", ".\n")
+        self.system_prompt_edit.setPlainText(display_prompt)
         self.system_prompt_edit.setMinimumHeight(180)
         layout.addWidget(self.system_prompt_edit)
 
@@ -123,7 +125,8 @@ class PromptEditDialog(QDialog):
 
     def _on_reset(self) -> None:
         """Setzt alle Felder auf die ursprünglichen Preset-Werte zurück."""
-        self.system_prompt_edit.setPlainText(self._original_system_prompt)
+        display_prompt = self._original_system_prompt.replace(". ", ".\n")
+        self.system_prompt_edit.setPlainText(display_prompt)
         idx = self.module_combo.findData(self._original_module)
         self.module_combo.setCurrentIndex(max(0, idx))
 
