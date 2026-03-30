@@ -7,7 +7,7 @@
 ## 🎯 Projektkontext
 
 **Name:** SOMAS Prompt Generator
-**Version:** 0.6.0
+**Version:** 0.8.0
 **Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
 **Sprache:** Python 3.11+
 **GUI-Framework:** PyQt6
@@ -32,7 +32,9 @@ somas_prompt_generator/
 │   │   ├── rating_widget.py    # Z-Skala Modell-Bewertung (-2 bis +2)
 │   │   ├── channel_dialog.py   # Kanal-Bewertungsdialog (Fakten, Bias, Tags)
 │   │   ├── settings_dialog.py  # Einstellungsdialog (API-Keys, CSV-Export)
-│   │   └── transcript_widget.py # Transkript-Eingabewidget
+│   │   ├── transcript_widget.py # Transkript-Eingabewidget
+│   │   ├── batch_dialog.py     # Batch-Verarbeitung (2-5 URLs, non-modaler Dialog)
+│   │   └── prompt_edit_dialog.py # Prompt-Anpassungsdialog (System-Prompt + Modul)
 │   │
 │   ├── core/               # Business-Logik
 │   │   ├── youtube_client.py   # Metadaten via yt-dlp
@@ -43,14 +45,21 @@ somas_prompt_generator/
 │   │   ├── api_worker.py       # QThread-Worker für async API-Calls
 │   │   ├── perplexity_client.py # Perplexity Sonar/Deep Research
 │   │   ├── openrouter_client.py # OpenRouter (200+ Modelle)
+│   │   ├── anthropic_client.py # Anthropic API (Claude direkt, Messages API)
+│   │   ├── openai_client.py    # OpenAI API (GPT/o-Series direkt)
+│   │   ├── batch_item.py       # BatchItem/BatchConfig Datenmodelle
+│   │   ├── batch_worker.py     # QThread-Worker für sequenzielle Batch-Verarbeitung
+│   │   ├── batch_persistence.py # Crash-resistente Batch-Session-Persistenz (JSON)
 │   │   ├── rating_store.py     # SQLite-Bewertungsspeicher (Schema-Versionierung, Kanal-DB)
+│   │   ├── user_preset_store.py # Benutzerdefinierte Presets (JSON-CRUD)
 │   │   └── debug_logger.py     # Debug-Logging mit Version/Session-Info
 │   │
 │   └── config/             # Konfiguration
 │       ├── defaults.py         # SOMAS-Defaults (VideoInfo, SomasConfig, TimeRange)
 │       ├── api_config.py       # API-Provider-Konfiguration
 │       ├── prompt_presets.json  # 7 Preset-Varianten
-│       ├── api_providers.json   # Provider-Definitionen (Perplexity, OpenRouter)
+│       ├── api_providers.json   # Provider-Definitionen (Perplexity, OpenRouter, Anthropic, OpenAI)
+│       ├── user_presets.json    # Benutzerdefinierte Presets (Auto-Save)
 │       └── user_preferences.json # Benutzereinstellungen
 │
 ├── templates/
@@ -66,9 +75,8 @@ somas_prompt_generator/
 │
 ├── specs/                  # Entwicklungs-Spezifikationen
 │   ├── API_INTEGRATION_SPEC.md
-│   ├── OPENROUTER_MODEL_FILTER_SPEC.md
-│   ├── KURT_FEATURE_rating_system.md
-│   └── UI_REDESIGN_SPEC.md
+│   ├── api_providers.json
+│   └── SOMAS_v0.6.0_SPEC.md
 │
 ├── docs/                   # GitHub Pages Landing Page
 │   ├── index.html
@@ -104,7 +112,7 @@ somas_prompt_generator/
 
 ### Fehlerbehandlung
 
-- `try/except` um externe API-Aufrufe (YouTube, Perplexity, OpenRouter)
+- `try/except` um externe API-Aufrufe (YouTube, Perplexity, OpenRouter, Anthropic, OpenAI)
 - Benutzerfreundliche Fehlermeldungen in der GUI (`QMessageBox`)
 - Logging über `debug_logger.py` (`logging` Modul)
 
@@ -120,11 +128,13 @@ somas_prompt_generator/
 
 ```txt
 PyQt6>=6.4.0
-youtube-transcript-api>=0.6.0
+youtube-transcript-api>=1.0.0
 yt-dlp>=2024.1.0
 Jinja2>=3.1.0
 requests>=2.31.0
 keyring>=24.0.0
+anthropic>=0.40.0
+openai>=1.50.0
 ```
 
 **Installation:**
@@ -254,12 +264,29 @@ TEST_URLS = [
 - [x] README, CLAUDE.md, Landing Page aktualisiert
 - [x] Spec dokumentiert (SOMAS_v0.6.0_SPEC.md)
 
+### Phase 9: Batch & Direkte APIs ✅ (v0.7.0)
+
+- [x] Batch-Verarbeitung: 2-5 YouTube-URLs sequenziell analysieren (non-modaler Dialog)
+- [x] BatchItem/BatchConfig Datenmodelle, BatchWorker (QThread), Batch-Persistenz (JSON in %TEMP%)
+- [x] Tab-basierte Ergebnisansicht mit integrierter Bewertung pro Video
+- [x] Anthropic API direkt (Claude Opus 4.6, Sonnet 4.6, Haiku 4.5) via `anthropic` SDK
+- [x] OpenAI API direkt (GPT-4o, GPT-4o mini, o3, o4-mini) via `openai` SDK
+- [x] 4 Provider in api_providers.json (Perplexity, OpenRouter, Anthropic, OpenAI)
+
+### Phase 10: Custom Prompt Editor ✅ (v0.8.0)
+
+- [x] UserPresetStore mit JSON-Persistenz (user_presets.json, CRUD-Operationen)
+- [x] PromptEditDialog: System-Prompt + Modul-Fixierung vor Generierung
+- [x] prompt_builder: custom_system_prompt/custom_module als Prepend-Overrides
+- [x] main_window: "Anpassen…"-Button, Auto-Save nach API-Analyse, Checkbox für User-Presets
+- [x] Rechtsklick-Kontextmenü: Umbenennen/Löschen von User-Presets
+- [x] Export-Branding: "Analyse · SOMAS" in LinkedIn- und Markdown-Export
+
 ### Backlog
 
 - [ ] Wochentags-basierte Perspektive-Defaults (nach Recherche)
 - [ ] Englisch-Support
 - [ ] PDF-Export
-- [ ] Batch-Modus
 
 ---
 
@@ -279,4 +306,4 @@ Bei Unklarheiten: Frag nach! Lieber einmal zu viel als eine falsche Annahme tref
 
 ---
 
-Letzte Aktualisierung: 2026-03-01
+Letzte Aktualisierung: 2026-03-30
