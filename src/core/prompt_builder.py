@@ -230,6 +230,39 @@ def load_template(template_name: str = "somas_prompt.txt") -> str:
         return f.read()
 
 
+def _apply_custom_overrides(
+    rendered: str,
+    custom_system_prompt: Optional[str] = None,
+    custom_module: Optional[str] = None,
+) -> str:
+    """Wendet Custom-Overrides auf einen gerenderten Prompt an.
+
+    Args:
+        rendered: Der bereits gerenderte Template-Prompt.
+        custom_system_prompt: Optionaler System-Prompt-Override (wird vorangestellt).
+        custom_module: Optionales erzwungenes Modul (z.B. "KRITIK").
+
+    Returns:
+        Prompt mit angewendeten Overrides.
+    """
+    parts = []
+
+    if custom_system_prompt:
+        parts.append(custom_system_prompt.strip())
+
+    if custom_module:
+        parts.append(
+            f"PFLICHT-MODUL: Verwende ausschließlich das Modul '{custom_module}'. "
+            f"Keine andere Wahl ist erlaubt."
+        )
+
+    if parts:
+        parts.append(rendered)
+        return "\n\n".join(parts)
+
+    return rendered
+
+
 def build_prompt(
     video_info: VideoInfo,
     config: SomasConfig,
@@ -237,6 +270,8 @@ def build_prompt(
     preset_name: Optional[str] = None,
     perspective: Optional[str] = None,
     anti_monotony_hint: str = "",
+    custom_system_prompt: Optional[str] = None,
+    custom_module: Optional[str] = None,
 ) -> str:
     """Generiert einen SOMAS-Prompt aus Template und Konfiguration.
 
@@ -247,6 +282,8 @@ def build_prompt(
         preset_name: Name des zu verwendenden Presets (None für Legacy-Template)
         perspective: Perspektive-Override (None = Preset-Default verwenden)
         anti_monotony_hint: Optionaler Hinweis zur Modul-Variation.
+        custom_system_prompt: Optionaler System-Prompt-Override aus PromptEditDialog.
+        custom_module: Optionales erzwungenes Modul aus PromptEditDialog.
 
     Returns:
         Fertig gerenderte Prompt-Zeichenkette
@@ -272,7 +309,7 @@ def build_prompt(
     # Verwende sentences_per_section vom Preset wenn vorhanden
     # Bei Research-Preset (sentences_per_section=0) wird dieser Wert nicht verwendet
     sentences_per_section = (
-        preset.sentences_per_section if preset and preset.sentences_per_section > 0 
+        preset.sentences_per_section if preset and preset.sentences_per_section > 0
         else config.sentences_per_section
     )
 
@@ -282,7 +319,10 @@ def build_prompt(
     effective_perspective = perspective or (preset.perspective if preset else "neutral")
     perspective_text = get_perspective_text(effective_perspective)
 
-    return template.render(
+    # Anti-Monotonie wird durch custom_module überschrieben
+    effective_hint = "" if custom_module else anti_monotony_hint
+
+    rendered = template.render(
         video_title=video_info.title,
         channel_name=video_info.channel,
         video_url=video_info.url,
@@ -294,8 +334,10 @@ def build_prompt(
         max_chars=preset.max_chars if preset else 0,
         questions=questions.strip() if questions else "",
         perspective_text=perspective_text,
-        anti_monotony_hint=anti_monotony_hint,
+        anti_monotony_hint=effective_hint,
     )
+
+    return _apply_custom_overrides(rendered, custom_system_prompt, custom_module)
 
 
 def build_prompt_from_transcript(
@@ -309,6 +351,8 @@ def build_prompt_from_transcript(
     is_auto_transcript: bool = False,
     perspective: Optional[str] = None,
     anti_monotony_hint: str = "",
+    custom_system_prompt: Optional[str] = None,
+    custom_module: Optional[str] = None,
 ) -> str:
     """Generiert einen SOMAS-Prompt aus manuellem Transkript.
 
@@ -327,6 +371,8 @@ def build_prompt_from_transcript(
             Fügt einen Disclaimer über typische Erkennungsfehler ein.
         perspective: Perspektive-Override (None = Preset-Default verwenden).
         anti_monotony_hint: Optionaler Hinweis zur Modul-Variation.
+        custom_system_prompt: Optionaler System-Prompt-Override aus PromptEditDialog.
+        custom_module: Optionales erzwungenes Modul aus PromptEditDialog.
 
     Returns:
         Fertig gerenderte Prompt-Zeichenkette.
@@ -357,7 +403,10 @@ def build_prompt_from_transcript(
     effective_perspective = perspective or (preset.perspective if preset else "neutral")
     perspective_text = get_perspective_text(effective_perspective)
 
-    return template.render(
+    # Anti-Monotonie wird durch custom_module überschrieben
+    effective_hint = "" if custom_module else anti_monotony_hint
+
+    rendered = template.render(
         title=title,
         author=author,
         url=url,
@@ -375,8 +424,10 @@ def build_prompt_from_transcript(
         max_chars=preset.max_chars if preset else 0,
         questions=questions.strip() if questions else "",
         perspective_text=perspective_text,
-        anti_monotony_hint=anti_monotony_hint,
+        anti_monotony_hint=effective_hint,
     )
+
+    return _apply_custom_overrides(rendered, custom_system_prompt, custom_module)
 
 
 def build_prompt_with_preset(
