@@ -15,7 +15,7 @@ from src.config.defaults import VideoInfo, SomasConfig, TimeRange
 from src.core.youtube_client import get_video_info
 from src.core.prompt_builder import (
     build_prompt, build_prompt_from_transcript,
-    load_presets, get_preset_by_name, PromptPreset,
+    load_presets, get_preset_by_name, get_preset_by_id, PromptPreset,
     get_anti_monotony_hint,
 )
 from src.core.linkedin_formatter import format_for_linkedin
@@ -134,6 +134,15 @@ class MainWindow(QMainWindow):
         self._rating_store = RatingStore()
         self._current_analysis_id: int | None = None
         self._is_rework: bool = False
+
+        # Custom Prompt Overrides (gesetzt durch PromptEditDialog)
+        self._custom_system_prompt: str | None = None
+        self._custom_module: str | None = None
+
+        # User-Preset-Verwaltung
+        from src.core.user_preset_store import UserPresetStore
+        self._user_preset_store = UserPresetStore()
+        self._show_user_presets: bool = False
 
         # Debug-Logger (Preference-gesteuert)
         prefs = load_preferences()
@@ -379,6 +388,20 @@ class MainWindow(QMainWindow):
             self.preset_combo.addItem(preset.name)
         layout.addWidget(self.preset_combo)
 
+        # "Anpassen…" Button
+        self.btn_prompt_edit = QPushButton("Anpassen\u2026")
+        self.btn_prompt_edit.setToolTip(
+            "System-Prompt und Modul-Vorgabe des Presets anpassen"
+        )
+        layout.addWidget(self.btn_prompt_edit)
+
+        # Toggle-Checkbox: Standard ↔ Benutzerdefiniert
+        self.user_presets_checkbox = QCheckBox("Benutzerdefiniert")
+        self.user_presets_checkbox.setToolTip(
+            "Zwischen Standard-Presets und eigenen gespeicherten Presets wechseln"
+        )
+        layout.addWidget(self.user_presets_checkbox)
+
         # Perspektive-Dropdown
         perspective_label = QLabel("Perspektive:")
         layout.addWidget(perspective_label)
@@ -595,6 +618,8 @@ class MainWindow(QMainWindow):
         self.url_input.returnPressed.connect(self._on_get_meta)
         # Preset-Dropdown
         self.preset_combo.currentTextChanged.connect(self._on_preset_changed)
+        self.btn_prompt_edit.clicked.connect(self._on_prompt_edit)
+        self.user_presets_checkbox.toggled.connect(self._on_user_presets_toggle)
         # Export-Buttons
         self.btn_export_linkedin.clicked.connect(self._on_export_linkedin)
         self.btn_export_markdown.clicked.connect(self._on_export_markdown)
@@ -628,6 +653,37 @@ class MainWindow(QMainWindow):
     @pyqtSlot()
     def _on_preset_changed(self) -> None:
         """Handler für Preset-Auswahl."""
+        # User-Preset-Modus: Lade Custom-Overrides aus gespeichertem Preset
+        if self._show_user_presets:
+            preset_id = self.preset_combo.currentData()
+            user_preset = self._user_preset_store.get_by_id(preset_id) if preset_id else None
+            if user_preset:
+                self._custom_system_prompt = user_preset.system_prompt or None
+                self._custom_module = user_preset.fixed_module
+                # Basis-Preset für max_chars, reading_time etc. laden
+                base = get_preset_by_name(user_preset.base_preset)
+                if not base:
+                    base = get_preset_by_id(user_preset.base_preset)
+                self.current_preset = base
+                if base:
+                    self.preset_description.setText(
+                        f"Benutzerdefiniert \u2013 basiert auf: {base.name}"
+                    )
+                    self.reading_time_label.setText(
+                        f"Lesezeit: {base.reading_time_display}"
+                    )
+                    self.max_chars_label.setText(
+                        f"Max: {base.max_chars_display} Zeichen"
+                    )
+                self._update_prompt_edit_button_style()
+            self._update_result_char_counter()
+            return
+
+        # Standard-Preset: Custom-Overrides zurücksetzen
+        self._custom_system_prompt = None
+        self._custom_module = None
+        self._update_prompt_edit_button_style()
+
         preset_name = self.preset_combo.currentText()
         self.current_preset = get_preset_by_name(preset_name)
 
@@ -1011,6 +1067,8 @@ class MainWindow(QMainWindow):
                 is_auto_transcript=True,
                 perspective=perspective,
                 anti_monotony_hint=anti_monotony_hint,
+                custom_system_prompt=self._custom_system_prompt,
+                custom_module=self._custom_module,
             )
         else:
             # Kein Transkript → nur URL/Metadaten (bisheriges Verhalten)
@@ -1018,6 +1076,8 @@ class MainWindow(QMainWindow):
                 self.video_info, self.config, questions, preset_name,
                 perspective=perspective,
                 anti_monotony_hint=anti_monotony_hint,
+                custom_system_prompt=self._custom_system_prompt,
+                custom_module=self._custom_module,
             )
 
         self.prompt_text.setText(prompt)
@@ -1078,6 +1138,8 @@ class MainWindow(QMainWindow):
             is_auto_transcript=self.transcript_widget.is_auto_source(),
             perspective=perspective,
             anti_monotony_hint=anti_monotony_hint,
+            custom_system_prompt=self._custom_system_prompt,
+            custom_module=self._custom_module,
         )
         self.prompt_text.setText(prompt)
 
@@ -1650,6 +1712,11 @@ class MainWindow(QMainWindow):
             # Kanal-Button zeigen wenn channel_name vorhanden
             channel_name = self._get_current_channel_name()
             self.btn_channel_rating.setVisible(bool(channel_name))
+        # Automatisch speichern wenn Custom-Overrides aktiv
+        has_custom = any([self._custom_system_prompt, self._custom_module])
+        if has_custom and not self._is_rework:
+            self._autosave_user_preset()
+
         self._is_rework = False
 
         # UI entsperren
@@ -1677,6 +1744,120 @@ class MainWindow(QMainWindow):
         # Rework-Button zurücksetzen
         self.btn_rework.setText("\u2702 Kürzen lassen")
         self.btn_rework.setEnabled(True)
+
+    # ── Custom Prompt Editor ──────────────────────────────────────────
+
+    @pyqtSlot()
+    def _on_prompt_edit(self) -> None:
+        """Öffnet den Prompt-Edit-Dialog mit den aktuellen Preset-Werten."""
+        from src.gui.prompt_edit_dialog import PromptEditDialog
+
+        preset = self.current_preset
+        if not preset:
+            QMessageBox.warning(self, "Kein Preset", "Bitte zuerst ein Preset auswählen.")
+            return
+
+        # System-Prompt: Custom-Werte wenn vorhanden, sonst Preset-Default
+        system_prompt = self._custom_system_prompt or preset.system_prompt
+        module = self._custom_module
+
+        dialog = PromptEditDialog(
+            self,
+            preset_name=preset.name,
+            system_prompt=system_prompt,
+            fixed_module=module,
+        )
+        dialog.apply_clicked.connect(self._on_prompt_edit_applied)
+        dialog.exec()
+
+    @pyqtSlot(str, object)
+    def _on_prompt_edit_applied(self, system_prompt: str, module: object) -> None:
+        """Übernimmt die Custom-Werte aus dem Edit-Dialog und startet Generierung."""
+        # Prüfe ob tatsächlich etwas verändert wurde vs. Original-Preset
+        preset = self.current_preset
+        original_sp = preset.system_prompt if preset else ""
+
+        if system_prompt == original_sp and module is None:
+            # Nichts verändert → Overrides löschen
+            self._custom_system_prompt = None
+            self._custom_module = None
+        else:
+            self._custom_system_prompt = system_prompt or None
+            self._custom_module = module  # str oder None
+
+        self._update_prompt_edit_button_style()
+
+        # Direkt generieren
+        self._on_generate_prompt()
+
+    def _update_prompt_edit_button_style(self) -> None:
+        """Zeigt visuell an ob Custom-Overrides aktiv sind."""
+        has_custom = any([self._custom_system_prompt, self._custom_module])
+        self.btn_prompt_edit.setStyleSheet(
+            "color: #1565C0; font-weight: bold;" if has_custom else ""
+        )
+
+    def _autosave_user_preset(self) -> None:
+        """Speichert die aktuellen Custom-Overrides automatisch als User-Preset.
+
+        Name: 'UserVersion_{Preset-Name}' — überschreibt gleichnamiges Preset (UPSERT).
+        """
+        from src.core.user_preset_store import UserPreset
+        from datetime import datetime
+
+        base_name = self.current_preset.name if self.current_preset else "Standard"
+        auto_name = f"UserVersion_{base_name}"
+
+        # Bestehenden Eintrag mit gleichem Namen finden und ID wiederverwenden
+        existing = self._user_preset_store.find_by_name(auto_name)
+        preset_id = existing.id if existing else self._user_preset_store.generate_id()
+
+        preset = UserPreset(
+            id=preset_id,
+            name=auto_name,
+            base_preset=self.current_preset.name if self.current_preset else "standard",
+            created_at=datetime.now().isoformat(timespec="seconds"),
+            system_prompt=self._custom_system_prompt or "",
+            fixed_module=self._custom_module,
+        )
+        self._user_preset_store.save_preset(preset)
+        self._refresh_user_preset_dropdown()
+        logger.info(f"User-Preset automatisch gespeichert: '{auto_name}' (ID: {preset_id})")
+
+    @pyqtSlot(bool)
+    def _on_user_presets_toggle(self, checked: bool) -> None:
+        """Schaltet das Preset-Dropdown zwischen Standard und Benutzerdefiniert."""
+        self._show_user_presets = checked
+        self._rebuild_preset_dropdown()
+
+    def _rebuild_preset_dropdown(self) -> None:
+        """Befüllt das Preset-Dropdown je nach Toggle-State."""
+        self.preset_combo.blockSignals(True)
+        self.preset_combo.clear()
+
+        if self._show_user_presets:
+            user_presets = self._user_preset_store.get_all()
+            if not user_presets:
+                self.preset_combo.addItem("(Noch keine benutzerdefinierten Presets)")
+                self.preset_combo.setEnabled(False)
+            else:
+                for up in user_presets:
+                    self.preset_combo.addItem(up.name, up.id)
+                self.preset_combo.setEnabled(True)
+        else:
+            for preset in self.presets.values():
+                self.preset_combo.addItem(preset.name)
+            self.preset_combo.setEnabled(True)
+
+        self.preset_combo.blockSignals(False)
+        self._on_preset_changed()
+
+    def _refresh_user_preset_dropdown(self) -> None:
+        """Aktualisiert das User-Preset-Dropdown nach Speichern/Umbenennen/Löschen."""
+        if self._show_user_presets:
+            self._rebuild_preset_dropdown()
+
+    # ── Ende Custom Prompt Editor ────────────────────────────────────
 
     def _save_analysis_record(self, response: APIResponse) -> None:
         """Speichert die automatischen Metriken einer Analyse."""
