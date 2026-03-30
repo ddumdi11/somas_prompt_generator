@@ -55,3 +55,10 @@ Archiv/            # Local archive for old/unused files
 
 # API Config (user-specific, not for GitHub)
 src/config/user_preferences.json
+
+# Tokens / Secrets
+token_*.txt
+*.token
+
+# Claude Code
+.claude/
