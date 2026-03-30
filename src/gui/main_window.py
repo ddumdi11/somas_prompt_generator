@@ -679,6 +679,7 @@ class MainWindow(QMainWindow):
                         f"Max: {base.max_chars_display} Zeichen"
                     )
                 self._update_prompt_edit_button_style()
+            self._check_web_search_compatibility()
             self._update_result_char_counter()
             return
 
@@ -1804,28 +1805,42 @@ class MainWindow(QMainWindow):
         """Speichert die aktuellen Custom-Overrides automatisch als User-Preset.
 
         Name: 'UserVersion_{Preset-Name}' — überschreibt gleichnamiges Preset (UPSERT).
+        Verwendet base_preset als stabilen Key (nicht den veränderbaren Anzeigenamen).
         """
         from src.core.user_preset_store import UserPreset
         from datetime import datetime
 
-        base_name = self.current_preset.name if self.current_preset else "Standard"
-        auto_name = f"UserVersion_{base_name}"
+        # Stabilen base_preset Key verwenden (Preset-ID aus prompt_presets.json)
+        base_key = ""
+        base_display = "Standard"
+        if self.current_preset:
+            base_key = self.current_preset.id or self.current_preset.name
+            base_display = self.current_preset.name
 
-        # Bestehenden Eintrag mit gleichem Namen finden und ID wiederverwenden
-        existing = self._user_preset_store.find_by_name(auto_name)
+        auto_name = f"UserVersion_{base_display}"
+
+        # Bestehenden Eintrag mit gleichem base_preset finden (stabil über Renames)
+        existing = None
+        for p in self._user_preset_store.get_all():
+            if p.base_preset == base_key:
+                existing = p
+                break
+
         preset_id = existing.id if existing else self._user_preset_store.generate_id()
+        # Bestehenden Anzeigenamen beibehalten falls umbenannt
+        display_name = existing.name if existing else auto_name
 
         preset = UserPreset(
             id=preset_id,
-            name=auto_name,
-            base_preset=self.current_preset.name if self.current_preset else "standard",
+            name=display_name,
+            base_preset=base_key,
             created_at=datetime.now().isoformat(timespec="seconds"),
             system_prompt=self._custom_system_prompt or "",
             fixed_module=self._custom_module,
         )
         self._user_preset_store.save_preset(preset)
         self._refresh_user_preset_dropdown()
-        logger.info(f"User-Preset automatisch gespeichert: '{auto_name}' (ID: {preset_id})")
+        logger.info(f"User-Preset automatisch gespeichert: '{display_name}' (ID: {preset_id})")
 
     @pyqtSlot(bool)
     def _on_user_presets_toggle(self, checked: bool) -> None:

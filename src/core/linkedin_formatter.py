@@ -68,7 +68,7 @@ def create_post_header(
         𝗩𝗶𝗱𝗲𝗼-𝗧𝗶𝘁𝗲𝗹 (fett)
         Kanal, YT
 
-        𝗦𝗢𝗠𝗔𝗦-𝗔𝗻𝗮𝗹𝘆𝘀𝗲 (fett)
+        𝗔𝗻𝗮𝗹𝘆𝘀𝗲 · 𝗦𝗢𝗠𝗔𝗦 (fett)
         via Modell, Provider (optional)
 
     Args:

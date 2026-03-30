@@ -7,7 +7,7 @@ die Werte per Signal zurückgegeben.
 
 import logging
 
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QComboBox,
@@ -71,9 +71,8 @@ class PromptEditDialog(QDialog):
         layout.addWidget(label)
 
         self.system_prompt_edit = QTextEdit()
-        # Formatiere einzeilige Preset-Strings für bessere Lesbarkeit
-        display_prompt = system_prompt.replace(". ", ".\n")
-        self.system_prompt_edit.setPlainText(display_prompt)
+        self.system_prompt_edit.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self.system_prompt_edit.setPlainText(system_prompt)
         self.system_prompt_edit.setMinimumHeight(180)
         layout.addWidget(self.system_prompt_edit)
 
@@ -123,13 +122,14 @@ class PromptEditDialog(QDialog):
 
         layout.addLayout(btn_layout)
 
+    @pyqtSlot()
     def _on_reset(self) -> None:
         """Setzt alle Felder auf die ursprünglichen Preset-Werte zurück."""
-        display_prompt = self._original_system_prompt.replace(". ", ".\n")
-        self.system_prompt_edit.setPlainText(display_prompt)
+        self.system_prompt_edit.setPlainText(self._original_system_prompt)
         idx = self.module_combo.findData(self._original_module)
         self.module_combo.setCurrentIndex(max(0, idx))
 
+    @pyqtSlot()
     def _on_apply(self) -> None:
         """Emittiert die Werte und schließt den Dialog."""
         system_prompt = self.system_prompt_edit.toPlainText().strip()

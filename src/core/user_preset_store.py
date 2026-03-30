@@ -64,12 +64,14 @@ class UserPresetStore:
             self._presets = []
 
     def _save_raw(self, data: dict) -> None:
-        """Schreibt Roh-Dict als JSON."""
+        """Schreibt Roh-Dict als JSON (atomar via Temp-Datei + Replace)."""
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._path.write_text(
+        tmp_path = self._path.with_suffix(".json.tmp")
+        tmp_path.write_text(
             json.dumps(data, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+        tmp_path.replace(self._path)
 
     def _save(self) -> None:
         """Persistiert den aktuellen Stand."""
