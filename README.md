@@ -14,7 +14,21 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuelle Version (v0.6.0) — "Schema-Erweiterung"
+### Aktuell (v0.8.0) — Custom Prompt Editor
+
+- **Prompt-Anpassung** – System-Prompt und Modul vor der Generierung anpassen ("Anpassen…"-Button). Benutzerdefinierte Anweisungen werden dem Template vorangestellt
+- **Modul-Fixierung** – Eines der 6 Module fest wählen (PFLICHT-MODUL), Anti-Monotonie wird automatisch unterdrückt
+- **Benutzerdefinierte Presets** – Auto-Save nach API-Analyse, JSON-Persistenz, Umbenennen/Löschen per Rechtsklick
+- **Export-Branding** – Titel in LinkedIn- und Markdown-Export: "Analyse · SOMAS"
+
+### Seit v0.7.0
+
+- **Batch-Verarbeitung** – 2-5 YouTube-URLs in einem Durchlauf analysieren. Non-modaler Dialog mit Fortschrittsanzeige, Tab-basierte Ergebnisansicht, integrierte Bewertung pro Video, Crash-resistente Persistenz (JSON in %TEMP%)
+- **Anthropic API (direkt)** – Claude-Modelle ohne Umweg über OpenRouter: Opus 4.6, Sonnet 4.6, Haiku 4.5
+- **OpenAI API (direkt)** – GPT-4o, GPT-4o mini, o3, o4-mini über die Chat Completions API
+- **4 API-Provider** – Perplexity (Web-Search), OpenRouter (200+ Modelle), Anthropic (direkt), OpenAI (direkt)
+
+### Seit v0.6.0
 
 - **Perspektive-Parameter** – Drei Analysehaltungen: Neutral-Deskriptiv, Kritisch-Analytisch, Empathisch-Rekonstruktiv. Jedes Preset hat einen Default, jederzeit manuell überschreibbar via UI-Dropdown
 - **6 Analyse-Module** – Modulpool von 4 auf 6 erweitert: SUBTEXT (implizite Botschaften dekodieren) und FAKTENCHECK (überprüfungsbedürftige Aussagen priorisieren)
@@ -45,8 +59,10 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 - **Zeitbereich-Analyse** – Nur einen bestimmten Abschnitt des Videos analysieren (MM:SS oder HH:MM:SS)
 - **Manuelles Transkript** – Podcasts, Vorträge, Interviews – jede Textquelle analysierbar
 - **Integrierte KI-Analyse** – Ein-Klick-Analyse über API:
-  - **Perplexity AI** – Sonar, Sonar Pro, Deep Research
+  - **Perplexity AI** – Sonar, Sonar Pro, Sonar Reasoning (Web-Search)
   - **OpenRouter** – 200+ Modelle (Claude, Gemini, GPT, Llama, DeepSeek...)
+  - **Anthropic** – Claude direkt (Opus 4.6, Sonnet 4.6, Haiku 4.5)
+  - **OpenAI** – GPT-4o, GPT-4o mini, o3, o4-mini direkt
   - Suchbare Modell-Liste mit dynamischer Preisanzeige
 - **7 Prompt-Presets:**
   - **Standard** – Ausgewogene Analyse (2.800 Zeichen, ~2 Min Lesezeit)
@@ -64,8 +80,8 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 ### Nächste Schritte
 
 - Wochentags-basierte Perspektive-Defaults (nach Recherche)
+- Englisch-Support
 - PDF-Export
-- Batch-Verarbeitung
 
 ---
 
@@ -86,7 +102,9 @@ somas_prompt_generator/
 │   │   ├── rating_widget.py    # Z-Skala Modell-Bewertung (-2 bis +2)
 │   │   ├── channel_dialog.py   # Kanal-Bewertungsdialog (Fakten, Bias, Tags)
 │   │   ├── settings_dialog.py  # Einstellungsdialog (API-Keys, CSV-Export)
-│   │   └── transcript_widget.py # Transkript-Eingabewidget
+│   │   ├── transcript_widget.py # Transkript-Eingabewidget
+│   │   ├── batch_dialog.py     # Batch-Verarbeitung (2-5 URLs, non-modaler Dialog)
+│   │   └── prompt_edit_dialog.py # Prompt-Anpassungsdialog (System-Prompt + Modul)
 │   │
 │   ├── core/
 │   │   ├── youtube_client.py   # YouTube-Metadaten via yt-dlp
@@ -97,7 +115,13 @@ somas_prompt_generator/
 │   │   ├── api_worker.py       # QThread-Worker für async API-Calls
 │   │   ├── perplexity_client.py # Perplexity Sonar/Deep Research
 │   │   ├── openrouter_client.py # OpenRouter (200+ Modelle)
+│   │   ├── anthropic_client.py # Anthropic API (Claude direkt)
+│   │   ├── openai_client.py    # OpenAI API (GPT/o-Series direkt)
+│   │   ├── batch_item.py       # BatchItem/BatchConfig Datenmodelle
+│   │   ├── batch_worker.py     # QThread-Worker für Batch-Verarbeitung
+│   │   ├── batch_persistence.py # Crash-resistente Batch-Persistenz (JSON)
 │   │   ├── rating_store.py     # SQLite-Bewertungsspeicher (Schema-Versionierung, Kanal-DB)
+│   │   ├── user_preset_store.py # Benutzerdefinierte Presets (JSON-Persistenz)
 │   │   └── debug_logger.py     # Debug-Logging
 │   │
 │   └── config/
@@ -105,6 +129,7 @@ somas_prompt_generator/
 │       ├── api_config.py       # API-Provider-Konfiguration
 │       ├── prompt_presets.json  # 7 Preset-Konfigurationen
 │       ├── api_providers.json   # Provider-Definitionen
+│       ├── user_presets.json    # Benutzerdefinierte Presets
 │       └── user_preferences.json # Benutzereinstellungen
 │
 ├── templates/
@@ -136,7 +161,7 @@ somas_prompt_generator/
 | **YouTube** | `youtube-transcript-api` | Leichtgewichtig, direkter Transkript-Zugriff |
 | **YouTube Metadaten** | `yt-dlp` | Robuste Metadaten-Extraktion (Titel, Dauer, Thumbnail) |
 | **Templates** | `Jinja2` | Flexible Prompt-Generierung mit Conditionals |
-| **API-Calls** | `requests` | HTTP-Kommunikation mit Perplexity/OpenRouter |
+| **API-Calls** | `requests`, `anthropic`, `openai` | HTTP-Kommunikation mit Perplexity/OpenRouter + native SDKs für Anthropic/OpenAI |
 | **Key-Storage** | `keyring` | Sichere API-Key-Verwaltung (Windows Credential Manager) |
 | **Markdown** | Built-in | Keine externe Abhängigkeit |
 
@@ -151,6 +176,8 @@ yt-dlp>=2024.1.0
 Jinja2>=3.1.0
 requests>=2.31.0
 keyring>=24.0.0
+anthropic>=0.40.0
+openai>=1.50.0
 ```
 
 ---
@@ -193,11 +220,18 @@ python main.py
 2. **Titel, Autor** und **Transkript-Text** eingeben
 3. **"Generate Prompt" klicken** → Analyse aus dem Transkript
 
+### Batch-Modus
+
+1. **"Batch" klicken** im Hauptfenster
+2. **2-5 YouTube-URLs** einfügen (eine pro Zeile)
+3. **Preset und Provider** wählen → Alle Videos werden sequenziell analysiert
+4. **Ergebnisse** in Tabs anzeigen, einzeln bewerten und exportieren
+
 ### API-Integration
 
 - API-Keys werden sicher im System-Keyring gespeichert
-- Perplexity oder OpenRouter als Provider wählbar
-- Modellauswahl mit Suchfeld und Preisanzeige
+- 4 Provider wählbar: Perplexity, OpenRouter, Anthropic, OpenAI
+- Modellauswahl mit Suchfeld und Preisanzeige (OpenRouter)
 
 ---
 
@@ -242,6 +276,8 @@ Die App implementiert das SOMAS-Framework mit Content-Type-spezifischen Analyse-
 
 | Version | Datum | Änderungen |
 | --------- | ------- | ------------ |
+| 0.8.0 | 2026-03-30 | Custom Prompt Editor (System-Prompt + Modul anpassen), Benutzerdefinierte Presets (Auto-Save, Rename, Delete), Export-Branding "Analyse · SOMAS" |
+| 0.7.0 | 2026-03-08 | Batch-Verarbeitung (2-5 URLs), Anthropic API direkt, OpenAI API direkt, 4 Provider |
 | 0.6.0 | 2026-03-01 | Schema-Erweiterung: Perspektive-Parameter (3 Haltungen), Modulpool 4→6 (SUBTEXT, FAKTENCHECK), Modul-Statistik, Anti-Monotonie |
 | 0.5.2 | 2026-02-20 | Bewertungs-Redesign (Z-Skala, Kanal-Dialog, CSV Export/Import, Meta-Toggle), Songstruktur-Preset |
 | 0.5.0 | 2026-02-14 | Musik-Preset, Bewertungssystem (Sterne+Daumen), Zeichenlimit-Kontrolle (Counter, Sandwich, Rework), Transkript-Disclaimer, Stale-State-Fix |
