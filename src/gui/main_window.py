@@ -208,7 +208,7 @@ class MainWindow(QMainWindow):
 
     def _setup_ui(self):
         """Initialisiert das UI-Layout."""
-        self.setWindowTitle("SOMAS Prompt Generator")
+        self.setWindowTitle(f"SOMAS Prompt Generator v{APP_VERSION}")
         self.setMinimumSize(800, 700)
 
         # ScrollArea als Container (damit CollapsibleSections Platz erzwingen können)
@@ -372,68 +372,75 @@ class MainWindow(QMainWindow):
 
         return frame
 
-    def _create_preset_section(self) -> QHBoxLayout:
-        """Erstellt die Preset-Auswahl mit Lesezeit-Anzeige."""
-        layout = QHBoxLayout()
+    def _create_preset_section(self) -> QVBoxLayout:
+        """Erstellt die Preset-Auswahl zweizeilig (Preset | Perspektive)."""
+        outer = QVBoxLayout()
+        outer.setSpacing(6)
 
-        # Preset-Label
+        # --- Zeile 1: Preset-Dropdown + Anpassen-Button + Benutzerdefiniert-Checkbox ---
+        row1 = QHBoxLayout()
+
         label = QLabel("Variante:")
         label.setMinimumWidth(60)
-        layout.addWidget(label)
+        row1.addWidget(label)
 
-        # Preset-Dropdown
         self.preset_combo = QComboBox()
         self.preset_combo.setMinimumWidth(150)
         for preset in self.presets.values():
             self.preset_combo.addItem(preset.name)
-        layout.addWidget(self.preset_combo)
+        row1.addWidget(self.preset_combo)
 
         # "Anpassen…" Button
         self.btn_prompt_edit = QPushButton("Anpassen\u2026")
         self.btn_prompt_edit.setToolTip(
             "System-Prompt und Modul-Vorgabe des Presets anpassen"
         )
-        layout.addWidget(self.btn_prompt_edit)
+        row1.addWidget(self.btn_prompt_edit)
 
         # Toggle-Checkbox: Standard ↔ Benutzerdefiniert
         self.user_presets_checkbox = QCheckBox("Benutzerdefiniert")
         self.user_presets_checkbox.setToolTip(
             "Zwischen Standard-Presets und eigenen gespeicherten Presets wechseln"
         )
-        layout.addWidget(self.user_presets_checkbox)
+        row1.addWidget(self.user_presets_checkbox)
 
-        # Perspektive-Dropdown
+        row1.addStretch()
+        outer.addLayout(row1)
+
+        # --- Zeile 2: Perspektive + Beschreibung + Lesezeit + Max-Zeichen ---
+        row2 = QHBoxLayout()
+
         perspective_label = QLabel("Perspektive:")
-        layout.addWidget(perspective_label)
+        row2.addWidget(perspective_label)
+
         self.perspective_combo = QComboBox()
         self.perspective_combo.addItem("Neutral-Deskriptiv", "neutral")
         self.perspective_combo.addItem("Kritisch-Analytisch", "critical")
         self.perspective_combo.addItem("Empathisch-Rekonstruktiv", "empathic")
         self.perspective_combo.setMinimumWidth(180)
-        layout.addWidget(self.perspective_combo)
+        row2.addWidget(self.perspective_combo)
 
-        # Preset-Beschreibung
         self.preset_description = QLabel("")
         self.preset_description.setStyleSheet("color: gray; font-style: italic;")
-        layout.addWidget(self.preset_description)
+        row2.addWidget(self.preset_description)
 
-        layout.addStretch()
+        row2.addStretch()
 
-        # Lesezeit-Anzeige
         self.reading_time_label = QLabel("")
         self.reading_time_label.setStyleSheet(
             "background-color: #e8f4e8; padding: 4px 8px; border-radius: 4px;"
         )
-        layout.addWidget(self.reading_time_label)
+        row2.addWidget(self.reading_time_label)
 
-        # Max-Zeichen-Anzeige
         self.max_chars_label = QLabel("")
         self.max_chars_label.setStyleSheet(
             "background-color: #e8e8f4; padding: 4px 8px; border-radius: 4px;"
         )
-        layout.addWidget(self.max_chars_label)
+        row2.addWidget(self.max_chars_label)
 
-        return layout
+        outer.addLayout(row2)
+
+        return outer
 
     def _create_api_section(self) -> QFrame:
         """Erstellt den API-Modus-Bereich."""
