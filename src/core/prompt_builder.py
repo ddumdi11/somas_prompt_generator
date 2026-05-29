@@ -9,6 +9,7 @@ Changelog v0.5.1:
 """
 
 import json
+import re
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
@@ -533,7 +534,6 @@ def normalize_markdown_headings(text: str) -> str:
     """
     if not text:
         return text
-    import re
     # Zeilenanfang, optionale Einrückung, 1-6 Rauten, direkt gefolgt von einem
     # Zeichen, das weder Raute noch Whitespace ist (Lookahead verhindert, dass
     # bei "### FRAMING" das dritte # fälschlich als Nicht-Space gegriffen wird).

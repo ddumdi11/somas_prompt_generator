@@ -28,9 +28,8 @@ from .youtube_client import get_video_info
 logger = logging.getLogger(__name__)
 
 
-# Client-Factory lebt seit v0.9.0 zentral in api_client.create_client().
-# Alias für Rückwärtskompatibilität (bestehende Referenzen/Tests).
-_create_client = create_client
+# Client-Factory lebt seit v0.9.0 zentral in api_client.create_client()
+# (von BatchWorker und ComparisonWorker gemeinsam genutzt).
 
 
 class BatchWorker(QThread):
