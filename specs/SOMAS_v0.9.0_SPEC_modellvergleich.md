@@ -515,6 +515,28 @@ PDF-Beispielen vergleichen.
 
 ---
 
+## Umsetzungsnotizen / Abweichungen (Stand: implementiert & gemergt, v0.9.0)
+
+Diese Spec war die Planungsgrundlage. Die Umsetzung (Claude Code) folgte ihr im Wesentlichen
+1:1; eine bewusste, vom PO freigegebene Abweichung ist festzuhalten:
+
+### Abweichung: Transkript wird einbezogen
+- **Geplant (Entscheidung #3 / Synthese-Input):** Reine Analyse-zu-Analyse-Synthese — das
+  Transkript sollte *nicht* einfließen (Begründung: Tokenkosten, STT-Rauschen,
+  Re-Analyse-Risiko statt Zusammenfassung).
+- **Umgesetzt:** Das YouTube-Transkript wird — sofern vorhanden — in den Fluss einbezogen.
+  Vom PO bewusst zum Ausprobieren freigegeben.
+- **Ergebnis:** Funktioniert in der Praxis gut und zuverlässig. Belegt durch mehrere reale
+  Läufe, u.a. „A Nuclear Engineer's View on War" (Opus 4.8 vs. GPT-5.5) und „Why can't
+  Trump's America Win Wars?" (Tencent Hy3 vs. Gemini Flash). Die Kurzbeschreibungen sind
+  kohärent, neutral und benennen den Konsens beider Analysen sauber — kein erkennbarer
+  Qualitätsverlust durch das Transkript.
+- **Fazit:** Empfehlung durch Praxis-Evidenz überstimmt. Mögliche Nachjustierung *nur falls*
+  bei sehr langen Transkripten Tokenkosten oder Drift auffallen → dann optional schaltbar
+  machen (Backlog, kein akuter Bedarf).
+
+---
+
 ## Nicht-Ziele (bewusst ausgeschlossen für v0.9.0)
 
 1. **Parallele Ausführung** der beiden Analysen — sequenziell ist robuster (Rate-Limits,
