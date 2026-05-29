@@ -13,9 +13,18 @@ Changelog v0.3.1:
 import re
 import unicodedata
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from src.config.defaults import VideoInfo
+
+
+def get_exports_dir() -> Path:
+    """Gibt das Export-Verzeichnis (exports/ im Projektroot) zurück und legt es an."""
+    base_dir = Path(__file__).parent.parent.parent  # von src/core/ zwei Ebenen hoch
+    exports_dir = base_dir / "exports"
+    exports_dir.mkdir(parents=True, exist_ok=True)
+    return exports_dir
 
 
 # Mapping von problematischen Unicode-Zeichen zu sicheren Alternativen
@@ -215,6 +224,42 @@ def get_markdown_content(
             parts.append(f"[{i}] {url}  ")
 
     return '\n'.join(parts)
+
+
+def save_markdown(
+    content: str,
+    suggested_title: str,
+    output_path: Optional[str] = None,
+) -> str:
+    """Speichert ein bereits vollständiges Markdown-Dokument (z.B. Modellvergleich).
+
+    Im Gegensatz zu export_to_markdown() wird KEIN zusätzlicher Header
+    vorangestellt — der Inhalt ist bereits ein komplettes Dokument. Es werden
+    nur Unicode-Bereinigung (Pandoc-Kompatibilität) und ein sicherer Dateiname
+    angewandt; gespeichert wird mit UTF-8-BOM und Unix-Zeilenenden.
+
+    Args:
+        content: Das fertige Markdown-Dokument.
+        suggested_title: Titel-Basis für den Dateinamen (z.B. Videotitel).
+        output_path: Optionaler Zielpfad. Ohne Angabe wird nach exports/
+            mit Suffix "_Modellvergleich" und Zeitstempel gespeichert.
+
+    Returns:
+        Pfad zur geschriebenen Datei.
+    """
+    safe_content = sanitize_unicode_for_export(content)
+
+    if not output_path:
+        base_name = sanitize_filename(suggested_title) if suggested_title else "SOMAS"
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        output_path = str(
+            get_exports_dir() / f"{base_name}_Modellvergleich_{timestamp}.md"
+        )
+
+    with open(output_path, 'w', encoding='utf-8-sig', newline='\n') as f:
+        f.write(safe_content)
+
+    return output_path
 
 
 def get_suggested_filename(video_info: Optional[VideoInfo], preset_name: str = "") -> str:
