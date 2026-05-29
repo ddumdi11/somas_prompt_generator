@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="SOMAS Prompt Generator v0.8.0 – Strukturierte YouTube-Analysen mit KI-Power. Custom Prompt Editor, 4 API-Provider, Batch-Modus, 200+ Modelle.">
+    <meta name="description" content="SOMAS Prompt Generator v0.9.0 – Strukturierte YouTube-Analysen mit KI-Power. Modellvergleich (2 Analysen + Synthese), Custom Prompt Editor, 4 API-Provider, Batch-Modus, 200+ Modelle.">
     <title>SOMAS Prompt Generator – KI-gestützte Video-Analysen</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -13,7 +13,7 @@
         <div class="container">
             <h1>🎯 SOMAS Prompt Generator</h1>
             <p class="tagline">Strukturierte YouTube-Analysen mit KI-Power.<br>200+ Modelle · Ein Klick · LinkedIn-ready.</p>
-            <p class="version-badge">✨ v0.8.0: Custom Prompt Editor · 4 API-Provider · Batch-Modus · Benutzerdefinierte Presets</p>
+            <p class="version-badge">✨ v0.9.0: Modellvergleich · Custom Prompt Editor · 4 API-Provider · Batch-Modus · 200+ Modelle</p>
             <div class="cta-buttons">
                 <a href="https://github.com/ddumdi11/somas_prompt_generator" class="btn btn-primary">GitHub Repo</a>
                 <a href="https://github.com/ddumdi11/somas_prompt_generator/releases" class="btn btn-secondary">Download</a>
@@ -29,10 +29,44 @@
         </div>
     </section>
 
-    <!-- NEU in v0.8.0 -->
+    <!-- NEU in v0.9.0 -->
     <section class="whats-new">
         <div class="container">
-            <h2>🆕 Neu in v0.8.0</h2>
+            <h2>🆕 Neu in v0.9.0 – Modellvergleich</h2>
+            <p class="section-intro">Ein Video, zwei Modelle, eine Synthese – vollautomatisch als fertiges Dokument.</p>
+            <div class="new-features-grid">
+                <div class="new-feature-card new-feature-card-highlight">
+                    <span class="new-feature-icon">⚖️</span>
+                    <h3>Zwei Analysen im Vergleich</h3>
+                    <p>Dasselbe Video von zwei frei wählbaren Modellen nach dem SOMAS-Schema analysieren – gleiches Preset, gleiche Perspektive, nur das Modell variiert. Fairer Direktvergleich.</p>
+                    <span class="new-feature-detail">Provider-übergreifend · A vs. B</span>
+                </div>
+                <div class="new-feature-card new-feature-card-highlight">
+                    <span class="new-feature-icon">📝</span>
+                    <h3>Automatische Synthese</h3>
+                    <p>Ein drittes Modell fasst beide Analysen zu einer neutralen Kurzbeschreibung zusammen – ohne das Transkript neu zu lesen, nur aus den verdichteten Analysetexten.</p>
+                    <span class="new-feature-detail">Eigenes Synthese-Modell · 1 Absatz</span>
+                </div>
+                <div class="new-feature-card">
+                    <span class="new-feature-icon">🧱</span>
+                    <h3>Deterministisches Layout</h3>
+                    <p>Die App baut das Markdown-Dokument selbst (Jinja2): Titel, YouTube-Thumbnail, verwendete Modelle, Kurzbeschreibung, beide Analysen. Kein Format-Glücksspiel.</p>
+                    <span class="new-feature-detail">Reproduzierbar · Pandoc-ready</span>
+                </div>
+                <div class="new-feature-card">
+                    <span class="new-feature-icon">💾</span>
+                    <h3>Export für PDF</h3>
+                    <p>Das fertige Dokument landet direkt in <code>exports/…_Modellvergleich.md</code> (UTF-8-BOM) – ideal für die anschließende PDF-Erzeugung über einen Markdown-Konverter.</p>
+                    <span class="new-feature-detail">YouTube &amp; Transkript · ohne Doppel-Header</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- v0.8.0 -->
+    <section class="whats-new whats-new-v07">
+        <div class="container">
+            <h2>✏️ v0.8.0 – Custom Prompt Editor</h2>
             <p class="section-intro">Volle Kontrolle über den Prompt – anpassen, speichern, wiederverwenden.</p>
             <div class="new-features-grid">
                 <div class="new-feature-card new-feature-card-highlight">
