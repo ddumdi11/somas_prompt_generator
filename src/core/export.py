@@ -34,6 +34,8 @@ UNICODE_REPLACEMENTS = {
     '\u2018': "'",      # Left Single Quotation Mark → normales Apostroph
     '\u201C': '"',      # Left Double Quotation Mark → normales Anführungszeichen
     '\u201D': '"',      # Right Double Quotation Mark → normales Anführungszeichen
+    '\u2024': '.',      # One Dot Leader \u2192 normaler Punkt (z.B. YouTube-Handle "t3.gg")
+    '\u2025': '..',     # Two Dot Leader \u2192 zwei Punkte
     '\u2026': '...',    # Horizontal Ellipsis → drei Punkte
     '\u2013': '-',      # En Dash → Bindestrich
     '\u2014': '--',     # Em Dash → zwei Bindestriche

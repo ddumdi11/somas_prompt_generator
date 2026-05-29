@@ -517,6 +517,29 @@ def build_synthesis_prompt(
     )
 
 
+def normalize_markdown_headings(text: str) -> str:
+    """Korrigiert Markdown-Überschriften ohne Leerzeichen nach den Rauten.
+
+    Manche Modelle geben `###FRAMING` statt `### FRAMING` aus — das rendert in
+    strikten Markdown-Parsern nicht als Überschrift. Diese Funktion fügt rein
+    strukturell ein Leerzeichen ein (`###Foo` → `### Foo`), ohne den Inhalt zu
+    verändern. Bereits korrekt gesetzte Überschriften bleiben unberührt.
+
+    Args:
+        text: Beliebiger Markdown-Text (z.B. eine SOMAS-Analyse).
+
+    Returns:
+        Text mit normalisierten Überschriften-Markern.
+    """
+    if not text:
+        return text
+    import re
+    # Zeilenanfang, optionale Einrückung, 1-6 Rauten, direkt gefolgt von einem
+    # Zeichen, das weder Raute noch Whitespace ist (Lookahead verhindert, dass
+    # bei "### FRAMING" das dritte # fälschlich als Nicht-Space gegriffen wird).
+    return re.sub(r'(?m)^(\s*#{1,6})(?=[^#\s])', r'\1 ', text)
+
+
 def clean_synthesis_output(text: str) -> str:
     """Bereinigt die Synthese-Ausgabe für die saubere Einbettung ins Layout.
 

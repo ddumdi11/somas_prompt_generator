@@ -26,6 +26,7 @@ from .prompt_builder import (
     build_synthesis_prompt,
     clean_synthesis_output,
     get_template_dir,
+    normalize_markdown_headings,
 )
 from .youtube_client import build_thumbnail_urls, extract_video_id, get_video_info
 
@@ -174,7 +175,7 @@ class ComparisonWorker(QThread):
             if resp_a.status != APIStatus.RECEIVED:
                 self._fail("a", resp_a.error_message or "Analyse A fehlgeschlagen.")
                 return
-            self._result.analysis_a_text = resp_a.content
+            self._result.analysis_a_text = normalize_markdown_headings(resp_a.content)
             self._result.tokens_a = resp_a.tokens_used
             self.analysis_completed.emit("a", resp_a.content, resp_a)
 
@@ -186,7 +187,7 @@ class ComparisonWorker(QThread):
             if resp_b.status != APIStatus.RECEIVED:
                 self._fail("b", resp_b.error_message or "Analyse B fehlgeschlagen.")
                 return
-            self._result.analysis_b_text = resp_b.content
+            self._result.analysis_b_text = normalize_markdown_headings(resp_b.content)
             self._result.tokens_b = resp_b.tokens_used
             self.analysis_completed.emit("b", resp_b.content, resp_b)
 
