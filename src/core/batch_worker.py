@@ -9,7 +9,7 @@ import time
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from .api_client import APIResponse, APIStatus, LLMClient
+from .api_client import APIResponse, APIStatus, LLMClient, create_client
 from .batch_item import BatchConfig, BatchItem
 from .batch_persistence import save_item_state
 from .prompt_builder import (
@@ -28,33 +28,9 @@ from .youtube_client import get_video_info
 logger = logging.getLogger(__name__)
 
 
-def _create_client(provider_id: str, api_key: str) -> LLMClient:
-    """Erstellt den passenden API-Client für einen Provider.
-
-    Args:
-        provider_id: Provider-ID (perplexity, openrouter, anthropic, openai).
-        api_key: API-Key.
-
-    Returns:
-        LLMClient-Instanz.
-
-    Raises:
-        ValueError: Bei unbekanntem Provider.
-    """
-    if provider_id == "perplexity":
-        from .perplexity_client import PerplexityClient
-        return PerplexityClient(api_key)
-    elif provider_id == "openrouter":
-        from .openrouter_client import OpenRouterClient
-        return OpenRouterClient(api_key)
-    elif provider_id == "anthropic":
-        from .anthropic_client import AnthropicClient
-        return AnthropicClient(api_key)
-    elif provider_id == "openai":
-        from .openai_client import OpenAIClient
-        return OpenAIClient(api_key)
-    else:
-        raise ValueError(f"Unbekannter Provider: {provider_id}")
+# Client-Factory lebt seit v0.9.0 zentral in api_client.create_client().
+# Alias für Rückwärtskompatibilität (bestehende Referenzen/Tests).
+_create_client = create_client
 
 
 class BatchWorker(QThread):
@@ -106,7 +82,7 @@ class BatchWorker(QThread):
         """Verarbeitet alle Items sequenziell."""
         client = None
         try:
-            client = _create_client(
+            client = create_client(
                 self._config.provider_id, self._config.api_key
             )
         except Exception as e:

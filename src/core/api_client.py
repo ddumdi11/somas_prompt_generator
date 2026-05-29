@@ -75,3 +75,36 @@ class LLMClient(ABC):
             return len(models) > 0
         except Exception:
             return False
+
+
+def create_client(provider_id: str, api_key: str) -> LLMClient:
+    """Erstellt den passenden API-Client für einen Provider.
+
+    Zentrale Factory, die von BatchWorker und ComparisonWorker gemeinsam
+    genutzt wird. Die konkreten Client-Klassen werden lazy importiert, um
+    Import-Zyklen und unnötige Abhängigkeiten zu vermeiden.
+
+    Args:
+        provider_id: Provider-ID (perplexity, openrouter, anthropic, openai).
+        api_key: API-Key.
+
+    Returns:
+        LLMClient-Instanz.
+
+    Raises:
+        ValueError: Bei unbekanntem Provider.
+    """
+    if provider_id == "perplexity":
+        from .perplexity_client import PerplexityClient
+        return PerplexityClient(api_key)
+    elif provider_id == "openrouter":
+        from .openrouter_client import OpenRouterClient
+        return OpenRouterClient(api_key)
+    elif provider_id == "anthropic":
+        from .anthropic_client import AnthropicClient
+        return AnthropicClient(api_key)
+    elif provider_id == "openai":
+        from .openai_client import OpenAIClient
+        return OpenAIClient(api_key)
+    else:
+        raise ValueError(f"Unbekannter Provider: {provider_id}")
