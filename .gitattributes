@@ -1,0 +1,19 @@
+# Normalisierung der Zeilenenden – verhindert CRLF/LF-Rauschen in Diffs.
+# Im Repository werden alle Textdateien als LF gespeichert.
+* text=auto eol=lf
+
+# Windows-spezifische Skripte behalten CRLF
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+# Binärdateien nicht anfassen
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.zip   binary
+*.db    binary
+*.sqlite binary

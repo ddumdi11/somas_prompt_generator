@@ -50,8 +50,15 @@ Thumbs.db
 # Project specific
 *.md.bak
 exports/
-examples/          # Local examples, images, test outputs (not for GitHub)
-Archiv/            # Local archive for old/unused files
+
+# Local examples, images, test outputs (not for GitHub)
+examples/
+
+# Local archive for old/unused files
+Archiv/
+
+# Local launcher (machine-specific, not for GitHub)
+start.bat
 
 # API Config (user-specific, not for GitHub)
 src/config/user_preferences.json
