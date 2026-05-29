@@ -1,0 +1,59 @@
+# {{ video_title }}
+**{{ channel }}{{ ", YT" if is_youtube else "" }}**
+
+{% if is_youtube %}
+![Thumbnail zum Video „{{ video_title }}"]({{ thumbnail_url }})
+
+> Falls das Bild nicht angezeigt wird, diese Varianten testen:
+> - {{ thumbnail_url_sd }}
+> - {{ thumbnail_url_hq }}
+
+{% endif %}
+## Modellvergleich – Zwei Analysen (SOMAS) eines {{ "YouTube-Videos" if is_youtube else "Transkripts" }}
+
+### Verwendete Modelle
+
+- {{ model_a_provider }}: {{ model_a_name }}
+- {{ model_b_provider }}: {{ model_b_name }}
+
+## Kurzbeschreibung des {{ "Videos" if is_youtube else "Inhalts" }}
+
+{{ synthesis_summary }}
+
+---
+
+# Analyse · SOMAS: {{ video_title }}
+
+**Kanal:** {{ channel }}
+{% if duration_formatted %}
+**Dauer:** {{ duration_formatted }}
+{% endif %}
+{% if url %}
+**{{ "URL" if is_youtube else "Quelle" }}:** {{ url }}
+{% endif %}
+**Modell:** {{ model_a_name }} ({{ model_a_provider }})
+
+---
+
+{{ analysis_a }}
+
+---
+
+# Analyse · SOMAS: {{ video_title }}
+
+**Kanal:** {{ channel }}
+{% if duration_formatted %}
+**Dauer:** {{ duration_formatted }}
+{% endif %}
+{% if url %}
+**{{ "URL" if is_youtube else "Quelle" }}:** {{ url }}
+{% endif %}
+**Modell:** {{ model_b_name }} ({{ model_b_provider }})
+
+---
+
+{{ analysis_b }}
+
+---
+
+*Analyse · SOMAS · Synthese durch {{ synthesis_model_name }} ({{ synthesis_provider }})*
