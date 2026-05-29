@@ -35,6 +35,27 @@ def extract_video_id(url: str) -> Optional[str]:
     return None
 
 
+def build_thumbnail_urls(video_id: str) -> dict:
+    """Baut die YouTube-Thumbnail-URLs für eine Video-ID.
+
+    Es findet KEIN Download statt — die URLs werden direkt ins Markdown
+    eingebettet (so auch in den Referenzbeispielen). `maxres` dient als
+    Primär-URL, `sd`/`hq` als Fallback-Hinweise.
+
+    Args:
+        video_id: Die 11-stellige YouTube-Video-ID (via extract_video_id()).
+
+    Returns:
+        Dict mit den Schlüsseln "maxres", "sd", "hq".
+    """
+    base = f"https://i.ytimg.com/vi/{video_id}"
+    return {
+        "maxres": f"{base}/maxresdefault.jpg",
+        "sd": f"{base}/sddefault.jpg",
+        "hq": f"{base}/hqdefault.jpg",
+    }
+
+
 def get_video_info(url: str) -> VideoInfo:
     """Holt Metadaten eines YouTube-Videos via yt-dlp.
 

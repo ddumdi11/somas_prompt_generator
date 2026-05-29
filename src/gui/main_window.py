@@ -19,7 +19,7 @@ from src.core.prompt_builder import (
     get_anti_monotony_hint,
 )
 from src.core.linkedin_formatter import format_for_linkedin
-from src.core.export import export_to_markdown, get_suggested_filename
+from src.core.export import export_to_markdown, get_suggested_filename, save_markdown
 from src.core.api_client import APIResponse, APIStatus
 from src.core.api_worker import APIWorker
 from src.core.debug_logger import DebugLogger, APP_VERSION
@@ -31,6 +31,9 @@ from src.core.openrouter_client import OpenRouterClient
 from src.gui.collapsible_section import CollapsibleSection
 from src.gui.model_selector import FilterableModelSelector, ModelData, extract_provider
 from src.gui.transcript_widget import TranscriptInputWidget
+from src.gui.provider_model_picker import ProviderModelPicker
+from src.core.comparison_item import ComparisonConfig
+from src.core.comparison_worker import ComparisonWorker
 from src.config.api_config import (
     load_providers, get_api_key, has_api_key,
     get_last_provider, get_last_model, save_last_selection,
@@ -129,6 +132,11 @@ class MainWindow(QMainWindow):
         self._api_providers = load_providers()
         self._last_api_response: APIResponse | None = None
         self._openrouter_raw_models: list[dict] = []
+
+        # Modellvergleich-State (v0.9.0)
+        self._comparison_worker: ComparisonWorker | None = None
+        self._comparison_config: ComparisonConfig | None = None
+        self._is_comparison_result: bool = False
 
         # Rating-System (SQLite)
         self._rating_store = RatingStore()
@@ -496,6 +504,42 @@ class MainWindow(QMainWindow):
 
         layout.addLayout(controls_layout)
 
+        # --- Modellvergleich (v0.9.0) ---
+        self.compare_checkbox = QCheckBox("Zwei Modell-Analysen vergleichen")
+        self.compare_checkbox.setToolTip(
+            "Dasselbe Video von zwei Modellen analysieren lassen und ein "
+            "drittes Modell eine Kurzbeschreibung erzeugen lassen."
+        )
+        layout.addWidget(self.compare_checkbox)
+
+        self.compare_section = CollapsibleSection("Modellvergleich")
+        compare_content = QWidget()
+        compare_layout = QVBoxLayout(compare_content)
+        compare_layout.setContentsMargins(0, 0, 0, 0)
+        compare_layout.setSpacing(6)
+
+        self.picker_a = ProviderModelPicker("Modell A (Analyse):", self._api_providers)
+        self.picker_b = ProviderModelPicker("Modell B (Analyse):", self._api_providers)
+        self.picker_synth = ProviderModelPicker(
+            "Modell C (Zusammenfassung):", self._api_providers
+        )
+        compare_layout.addWidget(self.picker_a)
+        compare_layout.addWidget(self.picker_b)
+        compare_layout.addWidget(self.picker_synth)
+
+        # Abbrechen-Button (nur während eines Laufs aktiv)
+        cancel_row = QHBoxLayout()
+        cancel_row.addStretch()
+        self.btn_compare_cancel = QPushButton("Abbrechen")
+        self.btn_compare_cancel.setEnabled(False)
+        self.btn_compare_cancel.clicked.connect(self._on_compare_cancel)
+        cancel_row.addWidget(self.btn_compare_cancel)
+        compare_layout.addLayout(cancel_row)
+
+        self.compare_section.set_content_widget(compare_content)
+        self.compare_section.setVisible(False)
+        layout.addWidget(self.compare_section)
+
         # Initial: Controls deaktiviert bis Checkbox aktiv
         self._set_api_controls_enabled(False)
 
@@ -655,6 +699,7 @@ class MainWindow(QMainWindow):
         self.time_context_checkbox.toggled.connect(self._update_time_range_summary)
         # API-Controls
         self.api_checkbox.toggled.connect(self._on_api_toggle)
+        self.compare_checkbox.toggled.connect(self._on_compare_toggled)
         self.provider_combo.currentIndexChanged.connect(self._on_provider_changed)
         self.model_combo.currentIndexChanged.connect(self._on_model_changed)
         self.model_selector.model_selected.connect(self._on_openrouter_model_selected)
@@ -980,6 +1025,11 @@ class MainWindow(QMainWindow):
     @pyqtSlot()
     def _on_generate_prompt(self):
         """Handler für 'Generate Prompt' Button."""
+        # Modellvergleich aktiv → eigener Pfad
+        if self.compare_checkbox.isChecked():
+            self._start_comparison()
+            return
+
         # Transcript-Tab aktiv → eigene Generierungslogik
         if self.input_tabs.currentIndex() == 1:
             self._generate_from_transcript()
@@ -1256,6 +1306,11 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Fehler", "Kein Analyse-Ergebnis vorhanden.")
             return
 
+        # Modellvergleich: bereits vollständiges Dokument → ohne Header speichern
+        if self._is_comparison_result:
+            self._export_comparison_markdown(result)
+            return
+
         # Dateiname vorschlagen (sanitized für sichere Dateinamen)
         preset_name = self.current_preset.name if self.current_preset else ""
         suggested = get_suggested_filename(self.video_info, preset_name)
@@ -1291,6 +1346,28 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "Fehler", f"Export fehlgeschlagen: {e}")
                 logger.error(f"Markdown-Export fehlgeschlagen: {e}")
+
+    def _export_comparison_markdown(self, content: str) -> None:
+        """Speichert das fertige Vergleichs-Markdown ohne zusätzlichen Header."""
+        from PyQt6.QtWidgets import QFileDialog
+        from src.core.export import get_exports_dir, sanitize_filename
+
+        title = self.video_info.title if self.video_info else "SOMAS"
+        base = sanitize_filename(title) if title else "SOMAS"
+        default_path = str(get_exports_dir() / f"{base}_Modellvergleich.md")
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Modellvergleich exportieren", default_path,
+            "Markdown Files (*.md);;All Files (*)",
+        )
+        if not file_path:
+            return
+        try:
+            save_markdown(content, title, file_path)
+            self._show_button_feedback(self.btn_export_markdown, "Saved!")
+        except Exception as e:
+            QMessageBox.critical(self, "Fehler", f"Export fehlgeschlagen: {e}")
+            logger.error(f"Vergleichs-Export fehlgeschlagen: {e}")
 
     @pyqtSlot()
     def _on_copy_sources_detail(self) -> None:
@@ -1707,6 +1784,7 @@ class MainWindow(QMainWindow):
     def _on_api_response(self, response: APIResponse) -> None:
         """Handler für erfolgreiche API-Antwort."""
         self._last_api_response = response
+        self._is_comparison_result = False
         self._clear_stale_sources()
         self.result_text.setText(response.content)
         logger.info(
@@ -1755,6 +1833,223 @@ class MainWindow(QMainWindow):
         # Rework-Button zurücksetzen
         self.btn_rework.setText("\u2702 Kürzen lassen")
         self.btn_rework.setEnabled(True)
+
+    # ── Modellvergleich (v0.9.0) ──────────────────────────────────────
+
+    @pyqtSlot(bool)
+    def _on_compare_toggled(self, checked: bool) -> None:
+        """Blendet den Modellvergleich ein/aus (gegenseitiger Ausschluss mit Einzel-API)."""
+        self.compare_section.setVisible(checked)
+        if checked:
+            self.compare_section.expand()
+            if self.api_checkbox.isChecked():
+                self.api_checkbox.setChecked(False)
+            self.api_checkbox.setEnabled(False)
+            self.btn_generate.setText("Modellvergleich starten")
+        else:
+            self.api_checkbox.setEnabled(True)
+            self.btn_generate.setText("Generate Prompt")
+
+    def _set_comparison_running(self, running: bool) -> None:
+        """Sperrt/entsperrt Controls während eines Vergleichslaufs."""
+        self.btn_generate.setEnabled(not running)
+        self.btn_compare_cancel.setEnabled(running)
+        self.compare_checkbox.setEnabled(not running)
+        self.btn_batch.setEnabled(not running)
+        self.picker_a.set_enabled(not running)
+        self.picker_b.set_enabled(not running)
+        self.picker_synth.set_enabled(not running)
+        if running:
+            self.btn_generate.setText("Vergleich läuft…")
+        else:
+            self.btn_generate.setText(
+                "Modellvergleich starten"
+                if self.compare_checkbox.isChecked()
+                else "Generate Prompt"
+            )
+
+    def _start_comparison(self) -> None:
+        """Validiert die Auswahl und startet den ComparisonWorker."""
+        if self._comparison_worker and self._comparison_worker.isRunning():
+            return
+
+        sel_a = self.picker_a.get_selection()
+        sel_b = self.picker_b.get_selection()
+        sel_s = self.picker_synth.get_selection()
+        if not (sel_a and sel_b and sel_s):
+            QMessageBox.warning(
+                self, "Modelle fehlen",
+                "Bitte für alle drei Picker (A, B, Synthese) ein Modell wählen.",
+            )
+            return
+
+        # API-Keys prüfen (kein Start bei fehlendem Key)
+        missing = sorted({
+            (ch.provider_name or ch.provider_id)
+            for ch in (sel_a, sel_b, sel_s)
+            if not get_api_key(ch.provider_id)
+        })
+        if missing:
+            QMessageBox.warning(
+                self, "API-Key fehlt",
+                "Kein API-Key für: " + ", ".join(missing) + ".\n"
+                "Bitte in den Einstellungen hinterlegen.",
+            )
+            return
+
+        # A==B Hinweis (kein echter Vergleich)
+        if sel_a.provider_id == sel_b.provider_id and sel_a.model_id == sel_b.model_id:
+            reply = QMessageBox.question(
+                self, "Identische Modelle",
+                "Modell A und B sind identisch — das ist kein echter Vergleich.\n"
+                "Trotzdem fortfahren?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+
+        config = self._build_comparison_config(sel_a, sel_b, sel_s)
+        if not config:
+            return
+
+        # Ergebnisbereich zurücksetzen
+        self.result_text.clear()
+        self._is_comparison_result = False
+        self._last_api_response = None
+        self.rating_widget.setVisible(False)
+        self.btn_channel_rating.setVisible(False)
+        self._current_analysis_id = None
+
+        worker = ComparisonWorker(
+            config, rating_store=self._rating_store, debug_logger=self._debug_logger
+        )
+        worker.step_status_changed.connect(self._on_compare_step)
+        worker.metadata_loaded.connect(self._on_compare_meta)
+        worker.analysis_completed.connect(self._on_compare_analysis)
+        worker.synthesis_completed.connect(self._on_compare_synth)
+        worker.comparison_finished.connect(self._on_compare_finished)
+        worker.error_occurred.connect(self._on_compare_error)
+        worker.finished.connect(lambda: self._set_comparison_running(False))
+
+        self._comparison_worker = worker
+        self._comparison_config = config
+        self._set_comparison_running(True)
+        self.compare_section.set_summary("Vergleich gestartet…", color="#1565C0")
+        worker.start()
+
+    def _build_comparison_config(self, sel_a, sel_b, sel_s) -> ComparisonConfig | None:
+        """Baut die ComparisonConfig aus dem aktiven Eingabetab."""
+        preset_name = self.current_preset.name if self.current_preset else "Standard"
+        perspective = self.perspective_combo.currentData() or "neutral"
+        questions = self.questions_text.toPlainText()
+
+        if self.input_tabs.currentIndex() == 1:
+            data = self.transcript_widget.get_data()
+            if not data:
+                QMessageBox.warning(
+                    self, "Fehlende Eingaben", "Bitte Titel und Transkript eingeben."
+                )
+                return None
+            return ComparisonConfig(
+                input_mode="transcript",
+                transcript_title=data["title"],
+                transcript_author=data["author"],
+                transcript_text=data["transcript"],
+                is_auto_transcript=self.transcript_widget.is_auto_source(),
+                preset_name=preset_name,
+                perspective=perspective,
+                depth=self.config.depth,
+                language=self.config.language,
+                questions=questions,
+                model_a=sel_a, model_b=sel_b, model_synth=sel_s,
+            )
+
+        url = self.url_input.text().strip()
+        if not url:
+            QMessageBox.warning(self, "URL fehlt", "Bitte eine YouTube-URL eingeben.")
+            return None
+        return ComparisonConfig(
+            input_mode="youtube",
+            url=url,
+            preset_name=preset_name,
+            perspective=perspective,
+            depth=self.config.depth,
+            language=self.config.language,
+            questions=questions,
+            model_a=sel_a, model_b=sel_b, model_synth=sel_s,
+        )
+
+    @pyqtSlot(str)
+    def _on_compare_step(self, step: str) -> None:
+        """Aktualisiert die kompakte Fortschrittsanzeige im Section-Header."""
+        labels = {
+            "meta": "Metadaten werden geladen…",
+            "a": "Analyse A läuft…",
+            "b": "Analyse B läuft…",
+            "synth": "Kurzbeschreibung wird erstellt…",
+            "render": "Dokument wird gebaut…",
+            "done": "Fertig ✓",
+        }
+        color = "#2E7D32" if step == "done" else "#1565C0"
+        self.compare_section.set_summary(labels.get(step, step), color=color)
+
+    @pyqtSlot(object)
+    def _on_compare_meta(self, video_info) -> None:
+        """Übernimmt die Metadaten (für Export-Dateiname etc.)."""
+        self.video_info = video_info
+        if self._comparison_config:
+            self.video_info_source = (
+                "youtube" if self._comparison_config.input_mode == "youtube" else "transcript"
+            )
+
+    @pyqtSlot(str, str, object)
+    def _on_compare_analysis(self, step: str, text: str, response) -> None:
+        """Loggt den Abschluss einer Einzelanalyse."""
+        logger.info(
+            f"Vergleich: Analyse {step.upper()} fertig "
+            f"({len(text)} Zeichen, {getattr(response, 'tokens_used', 0)} Tokens)"
+        )
+
+    @pyqtSlot(str)
+    def _on_compare_synth(self, summary: str) -> None:
+        """Loggt den Abschluss der Synthese."""
+        logger.info(f"Vergleich: Kurzbeschreibung erstellt ({len(summary)} Zeichen)")
+
+    @pyqtSlot(str)
+    def _on_compare_finished(self, markdown: str) -> None:
+        """Zeigt das fertige Vergleichsdokument im Ergebnisbereich."""
+        self.result_text.setPlainText(markdown)
+        self._is_comparison_result = True
+        self.compare_section.set_summary(
+            "Fertig ✓ — als Markdown exportierbar", color="#2E7D32"
+        )
+        self._set_comparison_running(False)
+        logger.info(f"Modellvergleich abgeschlossen ({len(markdown)} Zeichen)")
+
+    @pyqtSlot(str, str)
+    def _on_compare_error(self, step: str, message: str) -> None:
+        """Behandelt Fehler im Vergleichslauf (Synthese-Fehler nicht fatal)."""
+        if step == "synth":
+            QMessageBox.warning(
+                self, "Synthese-Hinweis",
+                f"Die Kurzbeschreibung konnte nicht erzeugt werden:\n{message}\n\n"
+                "Das Dokument wird mit einem Platzhalter erstellt.",
+            )
+            return  # comparison_finished folgt trotzdem
+        QMessageBox.warning(
+            self, "Vergleich fehlgeschlagen", f"Schritt '{step}': {message}"
+        )
+        self.compare_section.set_summary(f"Fehler in Schritt '{step}'", color="#C62828")
+        self._set_comparison_running(False)
+
+    @pyqtSlot()
+    def _on_compare_cancel(self) -> None:
+        """Bricht einen laufenden Vergleich ab."""
+        if self._comparison_worker and self._comparison_worker.isRunning():
+            self._comparison_worker.cancel()
+            self.compare_section.set_summary("Abgebrochen", color="#C62828")
+            self.btn_compare_cancel.setEnabled(False)
 
     # ── Custom Prompt Editor ──────────────────────────────────────────
 

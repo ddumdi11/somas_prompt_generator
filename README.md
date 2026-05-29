@@ -14,7 +14,16 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuell (v0.8.0) — Custom Prompt Editor
+### Aktuell (v0.9.0) — Modellvergleich
+
+- **Zwei Analysen, ein Video** – Dasselbe YouTube-Video (oder Transkript) von zwei frei wählbaren Modellen nach dem SOMAS-Schema analysieren lassen. Gleiches Preset, gleiche Perspektive, gleiche Tiefe für beide – nur das Modell variiert (fairer Vergleich)
+- **Automatische Synthese** – Ein drittes Modell erzeugt aus beiden Analysen eine neutrale Kurzbeschreibung (ein Absatz). Eingabe sind die vollständigen Analysetexte, nicht das Transkript
+- **Provider-übergreifend** – Analyse-Modelle A/B und Synthese-Modell frei aus allen 4 Providern wählbar (Perplexity, OpenRouter, Anthropic, OpenAI)
+- **Deterministisches Layout** – Die App baut das fertige Markdown-Dokument selbst (Jinja2): Titel + YouTube-Thumbnail, verwendete Modelle, Kurzbeschreibung, beide Analysen untereinander. Kein Format-Glücksspiel
+- **Robuster Ablauf** – Sequenziell (Metadaten → Analyse A → Analyse B → Synthese → Render) mit Fortschrittsanzeige und Abbrechen. Synthese-Fehler ist nicht fatal (Platzhalter)
+- **Export ohne Doppel-Header** – Das fertige Dokument wird direkt nach `exports/…_Modellvergleich.md` gespeichert (UTF-8-BOM, Pandoc-kompatibel) – ideal für die anschließende PDF-Erzeugung
+
+### Seit v0.8.0 — Custom Prompt Editor
 
 - **Prompt-Anpassung** – System-Prompt und Modul vor der Generierung anpassen ("Anpassen…"-Button). Benutzerdefinierte Anweisungen werden dem Template vorangestellt
 - **Modul-Fixierung** – Eines der 6 Module fest wählen (PFLICHT-MODUL), Anti-Monotonie wird automatisch unterdrückt
@@ -104,7 +113,8 @@ somas_prompt_generator/
 │   │   ├── settings_dialog.py  # Einstellungsdialog (API-Keys, CSV-Export)
 │   │   ├── transcript_widget.py # Transkript-Eingabewidget
 │   │   ├── batch_dialog.py     # Batch-Verarbeitung (2-5 URLs, non-modaler Dialog)
-│   │   └── prompt_edit_dialog.py # Prompt-Anpassungsdialog (System-Prompt + Modul)
+│   │   ├── prompt_edit_dialog.py # Prompt-Anpassungsdialog (System-Prompt + Modul)
+│   │   └── provider_model_picker.py # Provider+Modell-Auswahl (3× im Modellvergleich)
 │   │
 │   ├── core/
 │   │   ├── youtube_client.py   # YouTube-Metadaten via yt-dlp
@@ -122,6 +132,8 @@ somas_prompt_generator/
 │   │   ├── batch_persistence.py # Crash-resistente Batch-Persistenz (JSON)
 │   │   ├── rating_store.py     # SQLite-Bewertungsspeicher (Schema-Versionierung, Kanal-DB)
 │   │   ├── user_preset_store.py # Benutzerdefinierte Presets (JSON-Persistenz)
+│   │   ├── comparison_item.py  # ModelChoice/ComparisonConfig/ComparisonResult
+│   │   ├── comparison_worker.py # QThread: 2 Analysen + Synthese + Layout-Render
 │   │   └── debug_logger.py     # Debug-Logging
 │   │
 │   └── config/
@@ -141,7 +153,8 @@ somas_prompt_generator/
 │   ├── somas_academia.txt      # Academia-Preset
 │   ├── somas_research.txt      # Research-Preset
 │   ├── somas_music.txt         # Musik-Preset (Songtext-Analyse)
-│   └── somas_songstruktur.txt  # Songstruktur-Preset (Formanalyse)
+│   ├── somas_songstruktur.txt  # Songstruktur-Preset (Formanalyse)
+│   └── somas_comparison.txt    # Modellvergleich-Dokumentlayout (Jinja2)
 │
 ├── docs/                   # GitHub Pages Landing Page
 │   ├── index.html
@@ -227,6 +240,14 @@ python main.py
 3. **Preset und Provider** wählen → Alle Videos werden sequenziell analysiert
 4. **Ergebnisse** in Tabs anzeigen, einzeln bewerten und exportieren
 
+### Modellvergleich-Modus
+
+1. Im API-Bereich **"Zwei Modell-Analysen vergleichen"** aktivieren → Bereich "Modellvergleich" klappt auf
+2. Für **Modell A, Modell B** und **Modell C (Zusammenfassung)** je Provider + Modell wählen
+3. **YouTube-URL** eingeben (oder Tab "Transkript" nutzen), Preset/Perspektive wie gewohnt setzen
+4. **"Modellvergleich starten"** → beide Analysen + Synthese laufen sequenziell, Fortschritt im Bereichs-Header
+5. Das fertige Markdown erscheint im Ergebnisfeld → **"Export: Markdown"** speichert nach `exports/…_Modellvergleich.md`
+
 ### API-Integration
 
 - API-Keys werden sicher im System-Keyring gespeichert
@@ -276,6 +297,7 @@ Die App implementiert das SOMAS-Framework mit Content-Type-spezifischen Analyse-
 
 | Version | Datum | Änderungen |
 | --------- | ------- | ------------ |
+| 0.9.0 | 2026-05-29 | Modellvergleich: zwei SOMAS-Analysen eines Videos + automatische Synthese-Kurzbeschreibung, deterministisches Markdown-Layout (Thumbnail), ProviderModelPicker, Export nach exports/ |
 | 0.8.0 | 2026-03-30 | Custom Prompt Editor (System-Prompt + Modul anpassen), Benutzerdefinierte Presets (Auto-Save, Rename, Delete), Export-Branding "Analyse · SOMAS" |
 | 0.7.0 | 2026-03-08 | Batch-Verarbeitung (2-5 URLs), Anthropic API direkt, OpenAI API direkt, 4 Provider |
 | 0.6.0 | 2026-03-01 | Schema-Erweiterung: Perspektive-Parameter (3 Haltungen), Modulpool 4→6 (SUBTEXT, FAKTENCHECK), Modul-Statistik, Anti-Monotonie |

@@ -7,7 +7,7 @@
 ## 🎯 Projektkontext
 
 **Name:** SOMAS Prompt Generator
-**Version:** 0.8.0
+**Version:** 0.9.0
 **Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
 **Sprache:** Python 3.11+
 **GUI-Framework:** PyQt6
@@ -34,7 +34,8 @@ somas_prompt_generator/
 │   │   ├── settings_dialog.py  # Einstellungsdialog (API-Keys, CSV-Export)
 │   │   ├── transcript_widget.py # Transkript-Eingabewidget
 │   │   ├── batch_dialog.py     # Batch-Verarbeitung (2-5 URLs, non-modaler Dialog)
-│   │   └── prompt_edit_dialog.py # Prompt-Anpassungsdialog (System-Prompt + Modul)
+│   │   ├── prompt_edit_dialog.py # Prompt-Anpassungsdialog (System-Prompt + Modul)
+│   │   └── provider_model_picker.py # Provider+Modell-Auswahl (3× im Modellvergleich)
 │   │
 │   ├── core/               # Business-Logik
 │   │   ├── youtube_client.py   # Metadaten via yt-dlp
@@ -52,6 +53,8 @@ somas_prompt_generator/
 │   │   ├── batch_persistence.py # Crash-resistente Batch-Session-Persistenz (JSON)
 │   │   ├── rating_store.py     # SQLite-Bewertungsspeicher (Schema-Versionierung, Kanal-DB)
 │   │   ├── user_preset_store.py # Benutzerdefinierte Presets (JSON-CRUD)
+│   │   ├── comparison_item.py  # ModelChoice/ComparisonConfig/ComparisonResult (Modellvergleich)
+│   │   ├── comparison_worker.py # QThread-Worker: 2 Analysen + Synthese + Layout-Render
 │   │   └── debug_logger.py     # Debug-Logging mit Version/Session-Info
 │   │
 │   └── config/             # Konfiguration
@@ -71,12 +74,14 @@ somas_prompt_generator/
 │   ├── somas_academia.txt      # Academia-Preset (3.000 Zeichen)
 │   ├── somas_research.txt      # Research-Preset (unbegrenzt)
 │   ├── somas_music.txt         # Musik-Preset (2.400 Zeichen, Songtext-Analyse)
-│   └── somas_songstruktur.txt  # Songstruktur-Preset (Formanalyse)
+│   ├── somas_songstruktur.txt  # Songstruktur-Preset (Formanalyse)
+│   └── somas_comparison.txt    # Modellvergleich-Layout (Jinja2-Dokumentlayout)
 │
 ├── specs/                  # Entwicklungs-Spezifikationen
 │   ├── API_INTEGRATION_SPEC.md
 │   ├── api_providers.json
-│   └── SOMAS_v0.6.0_SPEC.md
+│   ├── SOMAS_v0.6.0_SPEC.md
+│   └── SOMAS_v0.9.0_SPEC_modellvergleich.md
 │
 ├── docs/                   # GitHub Pages Landing Page
 │   ├── index.html
@@ -282,11 +287,27 @@ TEST_URLS = [
 - [x] Rechtsklick-Kontextmenü: Umbenennen/Löschen von User-Presets
 - [x] Export-Branding: "Analyse · SOMAS" in LinkedIn- und Markdown-Export
 
+### Phase 11: Modellvergleich ✅ (v0.9.0)
+
+- [x] Datenmodelle ModelChoice/ComparisonConfig/ComparisonResult (`comparison_item.py`)
+- [x] Client-Factory `create_client()` aus batch_worker nach `api_client.py` extrahiert
+- [x] Thumbnail-Helfer (`build_thumbnail_urls`) + Synthese-Prompt (`build_synthesis_prompt`/`clean_synthesis_output`)
+- [x] Deterministisches Jinja2-Layout `somas_comparison.txt` (YouTube + Transkript)
+- [x] `ComparisonWorker` (QThread): Metadaten → Analyse A → Analyse B → Synthese → Render
+- [x] YouTube-Transkript wird (wie Batch) eingebettet, wenn vorhanden (PO-Entscheidung)
+- [x] Synthese-Fehler nicht fatal (Platzhalter + Warnung)
+- [x] `ProviderModelPicker`-Widget (3× im Vergleichsbereich)
+- [x] GUI: Toggle "Zwei Modell-Analysen vergleichen" + CollapsibleSection, Abbrechen, Fortschritt
+- [x] Export ohne Header via `export.save_markdown()` → `exports/…_Modellvergleich.md`
+- [x] Spec dokumentiert (SOMAS_v0.9.0_SPEC_modellvergleich.md)
+
 ### Backlog
 
 - [ ] Wochentags-basierte Perspektive-Defaults (nach Recherche)
 - [ ] Englisch-Support
-- [ ] PDF-Export
+- [ ] PDF-Export (auch für Modellvergleich)
+- [ ] Crash-Recovery-Persistenz für Modellvergleich (analog Batch)
+- [ ] N-Wege-Vergleich (mehr als zwei Analyse-Modelle)
 
 ---
 
@@ -306,4 +327,4 @@ Bei Unklarheiten: Frag nach! Lieber einmal zu viel als eine falsche Annahme tref
 
 ---
 
-Letzte Aktualisierung: 2026-03-30
+Letzte Aktualisierung: 2026-05-29
