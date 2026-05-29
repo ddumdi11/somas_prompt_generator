@@ -465,6 +465,93 @@ def build_prompt_with_preset(
     )
 
 
+# --- Modellvergleich (v0.9.0): Synthese-Prompt + Output-Säuberung ---
+
+def build_synthesis_prompt(
+    analysis_a: str,
+    analysis_b: str,
+    title: str,
+    channel: str,
+    duration_formatted: str,
+    model_a_name: str,
+    model_b_name: str,
+    language: str = "Deutsch",
+) -> str:
+    """Baut den Synthese-Prompt für die Vergleichs-Kurzbeschreibung.
+
+    Eingabe sind die VOLLSTÄNDIGEN Analysetexte A und B (alle Module),
+    bewusst OHNE Transkript (PO-Entscheidung): Die Analysen sind bereits
+    das verdichtete Produkt; das Transkript würde Tokens aufblähen und das
+    Modell zum Neu-Analysieren statt Zusammenfassen verleiten.
+
+    Das Modell soll AUSSCHLIESSLICH einen Fließtext (ein Absatz, ~4-6 Sätze)
+    zurückgeben — keine Überschriften, Listen oder Modell-Meta. Die Ausgabe
+    wird zusätzlich durch clean_synthesis_output() nachbereinigt.
+
+    Args:
+        analysis_a: Vollständiger SOMAS-Analysetext von Modell A.
+        analysis_b: Vollständiger SOMAS-Analysetext von Modell B.
+        title: Videotitel.
+        channel: Kanal/Autor.
+        duration_formatted: Formatierte Dauer (z.B. "12:34").
+        model_a_name: Anzeigename von Modell A.
+        model_b_name: Anzeigename von Modell B.
+        language: Sprache der Kurzbeschreibung (Default: Deutsch).
+
+    Returns:
+        Der fertige Synthese-Prompt als String.
+    """
+    return (
+        f"Du erhältst zwei unabhängige SOMAS-Analysen DESSELBEN Videos, erstellt von zwei\n"
+        f"verschiedenen KI-Modellen. Schreibe eine neutrale, zusammenfassende Kurzbeschreibung\n"
+        f"des Videos in {language} (ein zusammenhängender Absatz, 4-6 Sätze).\n\n"
+        f"Regeln:\n"
+        f"- Gib AUSSCHLIESSLICH den Absatz aus - keine Überschrift, keine Liste, keine Meta-Hinweise.\n"
+        f"- Stütze dich nur auf die Inhalte beider Analysen; erfinde nichts hinzu.\n"
+        f"- Wo sich die Analysen einig sind, formuliere bestätigend; wo sie abweichen, formuliere\n"
+        f"  vorsichtig (\"das Video legt nahe\", \"dargestellt wird\").\n"
+        f"- Neutraler, sachlicher Ton. Keine Wertung der Modelle.\n\n"
+        f"VIDEO: {title} - {channel} ({duration_formatted})\n\n"
+        f"ANALYSE A ({model_a_name}):\n{analysis_a}\n\n"
+        f"ANALYSE B ({model_b_name}):\n{analysis_b}\n"
+    )
+
+
+def clean_synthesis_output(text: str) -> str:
+    """Bereinigt die Synthese-Ausgabe für die saubere Einbettung ins Layout.
+
+    Entfernt umschließende Code-Fences (```...```), führende
+    Überschriften-Zeilen (z.B. "# Kurzbeschreibung") und führende Leerzeilen.
+    Der Rest bleibt unverändert, damit das deterministische Jinja2-Layout
+    nicht durch Modell-Formatierung gestört wird.
+
+    Args:
+        text: Roh-Ausgabe des Synthese-Modells.
+
+    Returns:
+        Bereinigter Fließtext (kann leer sein, falls Eingabe leer war).
+    """
+    if not text:
+        return ""
+
+    s = text.strip()
+
+    # Umschließende Code-Fences entfernen (```markdown ... ```)
+    if s.startswith("```"):
+        lines = s.splitlines()
+        lines = lines[1:]  # öffnende Fence-Zeile weg
+        if lines and lines[-1].strip().startswith("```"):
+            lines = lines[:-1]  # schließende Fence-Zeile weg
+        s = "\n".join(lines).strip()
+
+    # Führende Überschriften- und Leerzeilen entfernen
+    lines = s.splitlines()
+    while lines and (not lines[0].strip() or lines[0].lstrip().startswith("#")):
+        lines.pop(0)
+
+    return "\n".join(lines).strip()
+
+
 def get_preset_info_for_display(preset: PromptPreset) -> str:
     """Erstellt einen Info-String für die GUI-Anzeige.
     
