@@ -131,13 +131,28 @@ class ComparisonWorker(QThread):
             # Analyse-Prompt einmal bauen (identisch für A und B → fairer Vergleich)
             somas = SomasConfig(depth=cfg.depth, language=cfg.language)
             if cfg.input_mode == "youtube":
-                analysis_prompt = build_prompt(
-                    video_info=video_info,
-                    config=somas,
-                    questions=cfg.questions,
-                    preset_name=cfg.preset_name,
-                    perspective=cfg.perspective,
-                )
+                # Wie BatchWorker: vorhandenes YouTube-Transkript einbetten, damit
+                # auch Modelle ohne Web-Suche den Inhalt analysieren können.
+                if video_info.transcript:
+                    analysis_prompt = build_prompt_from_transcript(
+                        title=video_info.title,
+                        author=video_info.channel,
+                        transcript=video_info.transcript,
+                        config=somas,
+                        url=video_info.url,
+                        questions=cfg.questions,
+                        preset_name=cfg.preset_name,
+                        is_auto_transcript=True,
+                        perspective=cfg.perspective,
+                    )
+                else:
+                    analysis_prompt = build_prompt(
+                        video_info=video_info,
+                        config=somas,
+                        questions=cfg.questions,
+                        preset_name=cfg.preset_name,
+                        perspective=cfg.perspective,
+                    )
             else:
                 analysis_prompt = build_prompt_from_transcript(
                     title=video_info.title,
