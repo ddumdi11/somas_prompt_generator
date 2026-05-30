@@ -83,6 +83,22 @@ class OpenAIClient(LLMClient):
             response = client.chat.completions.create(**params)
 
             content = response.choices[0].message.content or ""
+            finish_reason = getattr(response.choices[0], "finish_reason", None)
+
+            # Leerer Inhalt: sauber als Fehler melden (im Vergleich nicht
+            # weiterverarbeiten, statt ein leeres "Erfolgs"-Ergebnis zu liefern).
+            if not content.strip():
+                logger.error(
+                    f"OpenAI: leerer Inhalt (finish_reason={finish_reason})"
+                )
+                return APIResponse(
+                    status=APIStatus.ERROR,
+                    error_message=(
+                        f"Modell lieferte leeren Inhalt "
+                        f"(finish_reason={finish_reason})"
+                    ),
+                )
+
             tokens_used = response.usage.total_tokens if response.usage else 0
 
             logger.info(
