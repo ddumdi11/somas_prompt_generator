@@ -7,7 +7,7 @@
 ## 🎯 Projektkontext
 
 **Name:** SOMAS Prompt Generator
-**Version:** 0.9.0
+**Version:** 0.9.1
 **Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
 **Sprache:** Python 3.11+
 **GUI-Framework:** PyQt6
@@ -301,6 +301,17 @@ TEST_URLS = [
 - [x] Export ohne Header via `export.save_markdown()` → `exports/…_Modellvergleich.md`
 - [x] Spec dokumentiert (SOMAS_v0.9.0_SPEC_modellvergleich.md)
 
+### Phase 11b: Hotfix leerer Modell-Content ✅ (v0.9.1)
+
+- [x] OpenRouter/Perplexity: `content == None` (HTTP 200) führte zu `len(None)`-Crash
+  („object of type 'NoneType' has no len()") → jetzt sauberer `APIResponse(ERROR,
+  "Modell lieferte leeren Inhalt (finish_reason=…)")` statt Absturz
+- [x] `reasoning`-Fallback für Reasoning-Modelle; Leer-Guard auch in OpenAI/Anthropic
+  (Anthropic filtert zusätzlich `None`-Text-Blocks)
+- [x] Regressionstest `tests/test_empty_content.py` (None/reasoning/Whitespace/Normalfall/
+  fehlende `message`) — grün
+- [x] Versionskonstante + README-Changelog auf 0.9.1 (PR #38)
+
 ### Backlog
 
 - [ ] Wochentags-basierte Perspektive-Defaults (nach Recherche)
@@ -327,4 +338,4 @@ Bei Unklarheiten: Frag nach! Lieber einmal zu viel als eine falsche Annahme tref
 
 ---
 
-Letzte Aktualisierung: 2026-05-29
+Letzte Aktualisierung: 2026-05-30
