@@ -75,9 +75,25 @@ class AnthropicClient(LLMClient):
             if message.content:
                 text_parts = [
                     block.text for block in message.content
-                    if hasattr(block, "text")
+                    if hasattr(block, "text") and block.text
                 ]
                 content = "\n".join(text_parts)
+
+            stop_reason = getattr(message, "stop_reason", None)
+
+            # Leerer Inhalt: sauber als Fehler melden (im Vergleich nicht
+            # weiterverarbeiten, statt ein leeres "Erfolgs"-Ergebnis zu liefern).
+            if not content.strip():
+                logger.error(
+                    f"Anthropic: leerer Inhalt (stop_reason={stop_reason})"
+                )
+                return APIResponse(
+                    status=APIStatus.ERROR,
+                    error_message=(
+                        f"Modell lieferte leeren Inhalt "
+                        f"(stop_reason={stop_reason})"
+                    ),
+                )
 
             tokens_used = 0
             if message.usage:

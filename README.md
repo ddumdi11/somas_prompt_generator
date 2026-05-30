@@ -297,6 +297,7 @@ Die App implementiert das SOMAS-Framework mit Content-Type-spezifischen Analyse-
 
 | Version | Datum | Änderungen |
 | --------- | ------- | ------------ |
+| 0.9.1 | 2026-05-30 | Fix: leeren/None-Content der Provider (z.B. OpenRouter `tencent/hy3-preview`) sauber als Fehler behandeln statt Crash; `reasoning`-Fallback + `finish_reason`-Diagnose; alle 4 Clients abgesichert; Regressionstest |
 | 0.9.0 | 2026-05-29 | Modellvergleich: zwei SOMAS-Analysen eines Videos + automatische Synthese-Kurzbeschreibung, deterministisches Markdown-Layout (Thumbnail), ProviderModelPicker, Export nach exports/ |
 | 0.8.0 | 2026-03-30 | Custom Prompt Editor (System-Prompt + Modul anpassen), Benutzerdefinierte Presets (Auto-Save, Rename, Delete), Export-Branding "Analyse · SOMAS" |
 | 0.7.0 | 2026-03-08 | Batch-Verarbeitung (2-5 URLs), Anthropic API direkt, OpenAI API direkt, 4 Provider |

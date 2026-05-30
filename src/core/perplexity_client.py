@@ -85,13 +85,34 @@ class PerplexityClient(LLMClient):
             if response.status_code == 200:
                 data = response.json()
                 try:
-                    content = data["choices"][0]["message"]["content"]
+                    choice = data["choices"][0]
+                    message = choice.get("message", {}) or {}
+                    finish_reason = choice.get("finish_reason")
                 except (KeyError, IndexError, TypeError) as e:
                     logger.error(f"Unerwartete API-Antwort-Struktur: {e}")
                     return APIResponse(
                         status=APIStatus.ERROR,
                         error_message=f"Unerwartete API-Antwort: {e}",
                     )
+
+                # content kann fehlen oder None sein; Reasoning-Modelle liefern den
+                # Text ggf. im Feld 'reasoning'.
+                content = message.get("content") or message.get("reasoning")
+
+                # Leerer/fehlender Inhalt: sauber als Fehler melden statt bei
+                # len(content) zu crashen (NoneType has no len()).
+                if not content or not content.strip():
+                    logger.error(
+                        f"Perplexity: leerer Inhalt (finish_reason={finish_reason})"
+                    )
+                    return APIResponse(
+                        status=APIStatus.ERROR,
+                        error_message=(
+                            f"Modell lieferte leeren Inhalt "
+                            f"(finish_reason={finish_reason})"
+                        ),
+                    )
+
                 tokens = data.get("usage", {}).get("total_tokens", 0)
                 citations = data.get("citations", [])
 
