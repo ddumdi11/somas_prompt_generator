@@ -86,7 +86,9 @@ def test_anthropic():
         return
     from src.core.anthropic_client import AnthropicClient
     def block(text):
-        b = MagicMock(); b.text = text; return b
+        b = MagicMock()
+        b.text = text
+        return b
     def fake_message(blocks):
         msg = MagicMock()
         msg.content = blocks
