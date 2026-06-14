@@ -718,3 +718,13 @@ hoch/runter beide funktionsfähig, in der Verifikations- UND der Vergleichs-Sect
 - **Debug-Logging nach Schritt/Feature benennen** (= Backlog #8, präzisiert): Logs trennen pro
   Call bereits in eigene Ordner (kein Datenverlust); sie sind nur nach Modell+Zeitstempel
   benannt. Nice-to-have: zusätzlich `feature`/`step` im Ordnernamen für leichtere Zuordnung.
+- **Einzelanalyse-Export an Modellvergleich-Kopf angleichen (PO-Wunsch).** `export.get_markdown_content`
+  hat aktuell nur „# Analyse · SOMAS: {Titel}" + Metazeilen. Es fehlen ggü. `somas_comparison.txt`:
+  der große Videotitel als H1, der Untertitel „**{Kanal}, YT**" und der Thumbnail-Link. Umsetzung:
+  in `get_markdown_content` bei YouTube-`video_info` einen Kopfblock voranstellen —
+  `# {title}` / `**{channel}, YT**` / `![Thumbnail zum Video „{title}"]({maxres})` — via bestehendem
+  `extract_video_id` + `build_thumbnail_urls` (YouTube-only; im Transkript-Modus kein Thumbnail/kein
+  „YT"). **Design-Entscheidung (PO):** neuer Titel-Block **ersetzt** das bisherige
+  „# Analyse · SOMAS: {Titel}" (Empfehlung, kein doppelter Titel bei Einzelanalyse) — Metazeilen
+  (Kanal/Dauer/URL/Modell) bleiben darunter. Optional analog der Fallback-Blockquote (sd/hq) wie im
+  Vergleich. Naheliegend zusammen mit dem Retry-Button als v0.10.1.
