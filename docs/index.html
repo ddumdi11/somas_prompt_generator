@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="SOMAS Prompt Generator v0.9.1 – Strukturierte YouTube-Analysen mit KI-Power. Modellvergleich (2 Analysen + Synthese), Custom Prompt Editor, 4 API-Provider, Batch-Modus, 200+ Modelle.">
+    <meta name="description" content="SOMAS Prompt Generator v0.10.0 – Strukturierte YouTube-Analysen mit KI-Power. Faktencheck-Verifikation (Verdikt + Quelle), Modellvergleich, Custom Prompt Editor, 4 API-Provider, Batch-Modus, 200+ Modelle.">
     <title>SOMAS Prompt Generator – KI-gestützte Video-Analysen</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -13,7 +13,7 @@
         <div class="container">
             <h1>🎯 SOMAS Prompt Generator</h1>
             <p class="tagline">Strukturierte YouTube-Analysen mit KI-Power.<br>200+ Modelle · Ein Klick · LinkedIn-ready.</p>
-            <p class="version-badge">✨ v0.9.1: Modellvergleich · Custom Prompt Editor · 4 API-Provider · Batch-Modus · 200+ Modelle</p>
+            <p class="version-badge">✨ v0.10.0: Faktencheck-Verifikation · Modellvergleich · 4 API-Provider · Batch-Modus · 200+ Modelle</p>
             <div class="cta-buttons">
                 <a href="https://github.com/ddumdi11/somas_prompt_generator" class="btn btn-primary">GitHub Repo</a>
                 <a href="https://github.com/ddumdi11/somas_prompt_generator/releases" class="btn btn-secondary">Download</a>
@@ -29,10 +29,44 @@
         </div>
     </section>
 
-    <!-- NEU in v0.9.0 -->
+    <!-- NEU in v0.10.0 -->
     <section class="whats-new">
         <div class="container">
-            <h2>🆕 Neu in v0.9.0 – Modellvergleich</h2>
+            <h2>🆕 Neu in v0.10.0 – Faktencheck-Verifikation</h2>
+            <p class="section-intro">Von der rhetorischen Analyse zur harten Faktenprüfung – in zwei Stufen, mit Halluzinations-Schutz.</p>
+            <div class="new-features-grid">
+                <div class="new-feature-card new-feature-card-highlight">
+                    <span class="new-feature-icon">🔎</span>
+                    <h3>Zwei Stufen</h3>
+                    <p>Stufe 1 trennt <strong>Meinungen</strong>, <strong>Interpretationen</strong> und <strong>überprüfbare Behauptungen</strong>. Stufe 2 prüft optional nur die Behauptungen per web-fähigem Modell.</p>
+                    <span class="new-feature-detail">Dekonstruktion → Verifikation</span>
+                </div>
+                <div class="new-feature-card new-feature-card-highlight">
+                    <span class="new-feature-icon">🛡️</span>
+                    <h3>Halluzinations-Schutz</h3>
+                    <p>In Stufe 2 stehen <strong>keine Meinungen</strong> im Prompt – das Modell lässt sich nicht durch Rhetorik verführen. Riegel gegen erfundene Quellen: kein Beleg → „nicht überprüfbar / —".</p>
+                    <span class="new-feature-detail">Nur nackte Behauptungen</span>
+                </div>
+                <div class="new-feature-card">
+                    <span class="new-feature-icon">⚖️</span>
+                    <h3>Verdikt + Quelle</h3>
+                    <p>Pro Behauptung ein Verdikt (bestätigt · teilweise bestätigt · widerlegt · nicht überprüfbar) plus Quelle – angehängt an die Analyse, mitexportiert.</p>
+                    <span class="new-feature-detail">4-stufige Skala</span>
+                </div>
+                <div class="new-feature-card">
+                    <span class="new-feature-icon">🌐</span>
+                    <h3>Echter Web-Zugriff</h3>
+                    <p>Verifikationsmodell frei wählbar; <code>:online</code>-Schalter für OpenRouter, Web-Disclaimer ohne bestätigten Zugriff. Top-N-Kappung (Default 10) gegen Kosten.</p>
+                    <span class="new-feature-detail">Perplexity Sonar &amp; OpenRouter :online</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- v0.9.0 -->
+    <section class="whats-new whats-new-v07">
+        <div class="container">
+            <h2>⚖️ v0.9.0 – Modellvergleich</h2>
             <p class="section-intro">Ein Video, zwei Modelle, eine Synthese – vollautomatisch als fertiges Dokument.</p>
             <div class="new-features-grid">
                 <div class="new-feature-card new-feature-card-highlight">
