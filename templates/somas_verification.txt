@@ -5,6 +5,10 @@
 {% if claims_capped %}
 *Geprüft: die {{ checked_count }} von {{ total_count }} nach Relevanz priorisierten Behauptungen.*
 {% endif %}
+{% if web_unverified %}
+
+> ⚠️ Verifikationsmodell ohne bestätigten Web-Zugriff — Quellen ungeprüft, können unzuverlässig oder erfunden sein.
+{% endif %}
 
 {{ verification_body }}
 {% if citations %}

@@ -555,6 +555,12 @@ keine Meinungen in den Stufe-2-Prompt gelangen (Debug-Log des Verifikations-Requ
    regelbar) — vom PO gewünscht, aber bewusst später (~1 Monat). Backlog.
 7. **Academia-Zeichenlimit entfernen/lockern** — vom PO angedacht, aber unabhängig vom
    Verifikations-Feature; nicht mitten in v0.10.0 anfassen. Separater kleiner Backlog-Punkt.
+8. **Debug-Logging für zweistufige Läufe** — aktuell überschreibt im Einzelanalyse-Pfad der
+   Stufe-2-Call (Verifikation) das Stufe-1-Log (Analyse), bzw. pro Lauf bleibt nur der letzte
+   Request/Response erhalten (im PO-Test beobachtet). Wünschenswert: beide Schritte je Lauf
+   behalten und klar nach `feature`/`step` benennen (analog ComparisonWorker-Meta), damit ein
+   Verifikationslauf Analyse + Verifikation nebeneinander dokumentiert. Vom PO vorgemerkt,
+   Backlog (nicht v0.10.0).
 
 ---
 
@@ -586,3 +592,81 @@ keine Meinungen in den Stufe-2-Prompt gelangen (Debug-Log des Verifikations-Requ
 ## Offene Detailfragen für die Umsetzung (Kurt → ggf. PO)
 
 - Derzeit keine offenen Punkte. Alle Designentscheidungen sind getroffen (s. o.).
+
+---
+
+## Nachbesserungen nach PO-Test (Runde 2)
+
+> Kontext: Der PO-Test (PR 1–5) lief mechanisch korrekt, deckte aber einen **Parser-Bug**
+> (inline-nummerierte Behauptungen) und Schwächen rund um No-Web-Modelle auf. Befund:
+> - Lauf Claude Sonnet 4.6 (kein Web): Quellen-URLs **erfunden** (Story real, Links nicht
+>   auffindbar) — bestätigt die Halluzinationsgefahr.
+> - Lauf DeepSeek V4 via OpenRouter (ohne `:online` → ebenfalls kein Web): Stufe 2 meldete
+>   „keine Behauptungen". Ursache war NICHT Web, sondern der Parser: DeepSeek schrieb den
+>   FAKTENCHECK inline (`**Behauptungen (überprüfbar):** 1. … 2. …` in EINER Zeile);
+>   `extract_claims_from_faktencheck` sucht nur in Folgezeilen → `[]`. Headless reproduziert.
+
+**N1 — Parser-Robustheit (Pflicht, kritisch).** `extract_claims_from_faktencheck` muss
+Behauptungen erkennen, egal ob (a) je Punkt auf eigener Zeile, (b) inline hinter dem
+Sub-Header, (c) inline auf einer Folgezeile. Ansatz: Claim-Region = Resttext der
+Sub-Header-Zeile **nach** dem Marker + Folgezeilen bis zum nächsten `**…:**`-Sub-Header /
+`###` / Blockende, zusammengefügt; dann an **fortlaufenden** Nummern-Grenzen splitten (nach
+Item *n* folgt Grenze *n+1*), **nicht** an beliebigen Zahlen — sonst zerreißt „am 7. Oktober
+2023" einen Claim. Tests ergänzen: Inline-Block (echte DeepSeek-Fixture, s. u.),
+Claim mit interner Datums-Zahl, gemischt zeilen-/inline.
+
+**Reale Fixture (aus PO-Debug-Log, DeepSeek V4 Pro — als Test-Input verwenden):** Der
+FAKTENCHECK kam komplett inline (jeder Block in EINER Zeile, Punkte mit „ N. " getrennt):
+
+```text
+### FAKTENCHECK
+**Meinungen:** 1. Sanders pro-israelische Positionen sind nicht radikal. 2. Der Ausschluss aus dem Film ist eine himmelschreiende Ungerechtigkeit. 3. Die Branche war links, weil es in Mode war, nicht aus politischer Überzeugung. 4. Der moralische Kompass vieler Künstler ist verbogen. 5. Die Gesellschaft verroht zunehmend.
+**Interpretationen:** 1. Sanders Ausschluss zeigt ein strukturelles Problem der Filmbranche. 2. Anti-israelische Propaganda hat breite Gesellschaftsschichten erfasst. 3. Die Dominanz anti-israelischer Erzählungen schüchtert Politiker ein. 4. Antisemitismus stammt vor allem aus arabisch-muslimischen und linken Milieus. 5. Die deutsche Erinnerungskultur ist unzureichend.
+**Behauptungen (überprüfbar):** 1. Sander wurde wegen ihrer pro-israelischen Haltung aus dem Film „Die Todessehnsucht der Maria Om" ausgeschlossen. 2. Sie verfasste das Drehbuch mit einem Co-Autor. 3. Sie führt seit Ende 2024 einen Rechtsstreit gegen die Produktionsfirma. 4. Das Kammergericht Berlin entschied in der Berufung zugunsten der Produktionsfirma. 5. Auf dem Campus der Burg Giebichenstein Kunsthochschule Halle wurden Flugblätter verteilt, die die jüdische Gemeinde als rassistisch und zionistisch bezeichnen und ihre Ausladung fordern. 6. Die Hochschulleitung entfernte diese Plakate. 7. Sander gibt an, täglich hunderte Hassnachrichten mit Holocaust-Bezug zu erhalten. 8. Sie steht eigenen Angaben zufolge in Kontakt mit dem LKA. 9. Auf Berliner Free-Palestine-Demos riefen Teilnehmer arabischsprachig „Tod den Juden". 10. Auf der Sonnenallee in Berlin-Neukölln hängen Palästina-Flaggen. 11. Sander veröffentlichte im August 2025 ein kritisches Video über Teile der Schauspielbranche. 12. Die jüdische Gemeinde Halle organisierte Synagogenbesuche für Studierende.
+```
+
+Erwartung: `extract_claims_from_faktencheck(...)` liefert **genau 12** Behauptungen (1–12),
+Meinungen/Interpretationen tauchen NICHT auf. Zusätzlich ein **synthetischer** Test mit interner
+Datums-Zahl, z. B. inline `… 1. Sie reiste am 7. Oktober 2023 nach Israel. 2. Das Gesetz gilt
+seit 2021.` → muss **2** Claims liefern (nicht an „7." zerteilen).
+
+> **Clean-Handoff verifiziert (PO-Debug-Log):** Der reale Stufe-2-Request (Claude-Lauf) enthält
+> `Faktenprüfer` + `ZU PRÜFENDE BEHAUPTUNGEN`, aber KEINE Meinungs-/Interpretations-Inhalte und
+> nicht die Marker „Meinungen"/„Interpretationen". Das Design (nur Behauptungen in Stufe 2) ist
+> damit am echten Lauf bestätigt.
+
+**N2 — Format schärfen (Pflicht).** In `FAKTENCHECK_FORMAT` + den 2 beschreibenden Templates
+ergänzen: „Schreibe jeden nummerierten Punkt auf eine EIGENE Zeile (Zeilenumbruch nach jedem
+Punkt); keine Inline-Aufzählung." Belt-and-suspenders zum robusteren Parser (N1).
+
+**N3 — Prompt-Riegel gegen erfundene Quellen (Pflicht).** In `build_verification_prompt`
+ergänzen: „Gib nur Quellen an, die du tatsächlich abgerufen/verifiziert hast. Erfinde keine
+URLs. Kannst du eine Behauptung nicht mit einer belastbaren Quelle verifizieren, nutze Verdikt
+‚nicht überprüfbar' und Quelle ‚—'." Die bisherige Pflicht-Quelle-Regel entsprechend lockern
+(Quelle nur verpflichtend, wenn tatsächlich verifiziert).
+
+**N4 — Dialog mit Abbrechen / Trotzdem fortfahren.** `_verification_preflight`: bei
+No-Web-Modell statt `QMessageBox.information` ein `QMessageBox.question` mit Buttons
+**„Abbrechen"** (→ `return False`, Section bleibt offen zum Modellwechsel) und **„Trotzdem
+fortfahren"** (→ `return True`).
+
+**N5 — Web-Disclaimer im Output.** Wenn `_looks_web_capable(model)` False ist, `VerificationConfig`
+ein Flag mitgeben (z. B. `web_unverified: bool = False`); `somas_verification.txt` rendert dann
+eine sichtbare Zeile, z. B.: „⚠️ Verifikationsmodell ohne bestätigten Web-Zugriff — Quellen
+ungeprüft, können unzuverlässig oder erfunden sein." Bleibt dauerhaft im Dokument (anders als
+die Vorab-Warnung).
+
+**N6 — `:online`-Schalter für OpenRouter.** Eine Checkbox „Web-Suche (:online)" am
+Verifikations-Picker, die bei OpenRouter-Modellen das Suffix `:online` an die `model_id` anhängt
+(falls nicht schon vorhanden). Damit ist echter Web-Zugriff aktivierbar; `_looks_web_capable`
+greift dann automatisch (→ keine Warnung, kein Disclaimer). Hinweis: `ProviderModelPicker` wird
+auch 3× im Modellvergleich genutzt — die Checkbox so kapseln, dass sie die bestehende
+Vergleichs-Nutzung nicht stört (nur bei OpenRouter-Auswahl wirksam/sichtbar).
+
+**Nicht in dieser Runde:** breitere Web-Erkennungs-Heuristik (PO-Entscheidung — der
+`:online`-Schalter macht den Fall explizit; pauschale Modelllisten sind unzuverlässig und
+wartungsintensiv). Backlog.
+
+> **Reihenfolge:** Diese Nachbesserungen vor PR 6 (Doku/Version), damit die Doku den finalen
+> Stand abbildet. Danach erneuter PO-Test (idealerweise: ein web-fähiges Modell via `:online`
+> oder Perplexity → Stufe 2 liefert echte, klickbare Quellen).

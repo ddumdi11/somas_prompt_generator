@@ -89,6 +89,56 @@ def test_extract_headings_without_space():
     print("  extract_headings_without_space: ###ohne-Space normalisiert, Block endet korrekt OK")
 
 
+# Reale Fixture aus dem PO-Debug-Log (DeepSeek V4 Pro): FAKTENCHECK komplett inline.
+ANALYSE_INLINE_DEEPSEEK = (
+    "### FAKTENCHECK\n"
+    "**Meinungen:** 1. Sanders pro-israelische Positionen sind nicht radikal. 2. Der Ausschluss aus dem Film ist eine himmelschreiende Ungerechtigkeit. 3. Die Branche war links, weil es in Mode war.\n"
+    "**Interpretationen:** 1. Sanders Ausschluss zeigt ein strukturelles Problem der Filmbranche. 2. Anti-israelische Propaganda hat breite Gesellschaftsschichten erfasst.\n"
+    "**Behauptungen (überprüfbar):** 1. Sander wurde wegen ihrer pro-israelischen Haltung aus dem Film „Die Todessehnsucht der Maria Om\" ausgeschlossen. 2. Sie verfasste das Drehbuch mit einem Co-Autor. 3. Sie führt seit Ende 2024 einen Rechtsstreit gegen die Produktionsfirma. 4. Das Kammergericht Berlin entschied in der Berufung zugunsten der Produktionsfirma. 5. Auf dem Campus der Burg Giebichenstein Kunsthochschule Halle wurden Flugblätter verteilt, die die jüdische Gemeinde als rassistisch und zionistisch bezeichnen und ihre Ausladung fordern. 6. Die Hochschulleitung entfernte diese Plakate. 7. Sander gibt an, täglich hunderte Hassnachrichten mit Holocaust-Bezug zu erhalten. 8. Sie steht eigenen Angaben zufolge in Kontakt mit dem LKA. 9. Auf Berliner Free-Palestine-Demos riefen Teilnehmer arabischsprachig „Tod den Juden\". 10. Auf der Sonnenallee in Berlin-Neukölln hängen Palästina-Flaggen. 11. Sander veröffentlichte im August 2025 ein kritisches Video über Teile der Schauspielbranche. 12. Die jüdische Gemeinde Halle organisierte Synagogenbesuche für Studierende.\n"
+)
+
+
+def test_extract_inline_deepseek():
+    claims = extract_claims_from_faktencheck(ANALYSE_INLINE_DEEPSEEK)
+    assert len(claims) == 12, f"erwartet 12, bekam {len(claims)}: {claims}"
+    assert claims[0].startswith("Sander wurde wegen ihrer pro-israelischen Haltung")
+    assert claims[11].startswith("Die jüdische Gemeinde Halle organisierte")
+    # Meinungen/Interpretationen tauchen NICHT auf
+    joined = " ".join(claims)
+    assert "himmelschreiende" not in joined and "strukturelles Problem" not in joined
+    print("  extract_inline_deepseek: 12 Behauptungen aus Inline-Block OK")
+
+
+def test_extract_internal_numbers():
+    # Interne Datums-/Jahreszahl darf einen Claim NICHT zerteilen.
+    inline = (
+        "### FAKTENCHECK\n"
+        "**Behauptungen (überprüfbar):** 1. Sie reiste am 7. Oktober 2023 nach Israel. "
+        "2. Das Gesetz gilt seit 2021.\n"
+    )
+    claims = extract_claims_from_faktencheck(inline)
+    assert claims == [
+        "Sie reiste am 7. Oktober 2023 nach Israel.",
+        "Das Gesetz gilt seit 2021.",
+    ], claims
+    print("  extract_internal_numbers: '7. Oktober' zerreißt Claim nicht -> 2 Claims OK")
+
+
+def test_extract_mixed_and_quelle_terminator():
+    # Mehrzeilig + abschließender QUELLE-Abschnitt darf nicht in den letzten Claim lecken.
+    txt = (
+        "### FAKTENCHECK\n"
+        "**Behauptungen (überprüfbar):**\n"
+        "1. Erste Behauptung.\n"
+        "2. Zweite Behauptung mit Datum am 3. März 2020.\n"
+        "QUELLE:\n"
+        'YouTube-Video: "Titel"\n'
+    )
+    claims = extract_claims_from_faktencheck(txt)
+    assert claims == ["Erste Behauptung.", "Zweite Behauptung mit Datum am 3. März 2020."], claims
+    print("  extract_mixed_and_quelle: mehrzeilig + QUELLE-Terminator OK")
+
+
 def test_extract_edge_cases():
     assert extract_claims_from_faktencheck("") == []
     assert extract_claims_from_faktencheck("### FRAMING\nKein Faktencheck hier.") == []
@@ -155,6 +205,9 @@ def main():
     test_extract_standard()
     test_extract_robust()
     test_extract_headings_without_space()
+    test_extract_inline_deepseek()
+    test_extract_internal_numbers()
+    test_extract_mixed_and_quelle_terminator()
     test_extract_edge_cases()
     test_cap_claims()
     test_build_verification_prompt()

@@ -23,6 +23,8 @@ class VerificationConfig:
             (für die Transparenzzeile).
         source_title: Optionaler Quellentitel (Anzeige/Debug).
         source_url: Optionale Quellen-URL (Anzeige/Debug).
+        web_unverified: True, wenn das Modell keinen bestätigten Web-Zugriff hat
+            (rendert einen dauerhaften Disclaimer im Verifikationsabschnitt).
     """
 
     claims: list[str]
@@ -31,6 +33,7 @@ class VerificationConfig:
     total_claims: int = 0
     source_title: str = ""
     source_url: str = ""
+    web_unverified: bool = False
 
 
 @dataclass

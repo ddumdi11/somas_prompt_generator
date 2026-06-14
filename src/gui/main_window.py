@@ -33,7 +33,7 @@ from src.gui.collapsible_section import CollapsibleSection
 from src.gui.model_selector import FilterableModelSelector, ModelData, extract_provider
 from src.gui.transcript_widget import TranscriptInputWidget
 from src.gui.provider_model_picker import ProviderModelPicker
-from src.core.comparison_item import ComparisonConfig
+from src.core.comparison_item import ComparisonConfig, ModelChoice
 from src.core.comparison_worker import ComparisonWorker
 from src.core.verification_item import VerificationConfig
 from src.core.verification_worker import VerificationWorker
@@ -567,6 +567,14 @@ class MainWindow(QMainWindow):
         verify_hint = QLabel("Empfohlen: web-fähiges Modell (z. B. Perplexity Sonar).")
         verify_hint.setStyleSheet("color: gray; font-style: italic; font-size: 11px;")
         verify_layout.addWidget(verify_hint)
+
+        # Web-Suche (:online) — nur für OpenRouter-Modelle wirksam
+        self.verify_online_checkbox = QCheckBox("Web-Suche aktivieren (:online, nur OpenRouter)")
+        self.verify_online_checkbox.setToolTip(
+            "Hängt bei OpenRouter-Modellen das Suffix ':online' an die Modell-ID an, "
+            "um echten Web-Zugriff zu aktivieren."
+        )
+        verify_layout.addWidget(self.verify_online_checkbox)
 
         verify_opts = QHBoxLayout()
         verify_opts.addWidget(QLabel("Max. zu prüfende Behauptungen:"))
@@ -2157,13 +2165,31 @@ class MainWindow(QMainWindow):
             return True
         return False
 
+    def _effective_verify_choice(self) -> ModelChoice | None:
+        """Liefert die Verifikations-Auswahl inkl. ':online'-Suffix (falls aktiv).
+
+        Der ':online'-Schalter wirkt nur bei OpenRouter-Modellen; so bleibt die
+        Wiederverwendung des ProviderModelPicker im Modellvergleich unberührt.
+        """
+        sel = self.verify_picker.get_selection()
+        if not sel:
+            return None
+        if (self.verify_online_checkbox.isChecked()
+                and sel.provider_id == "openrouter"
+                and not sel.model_id.endswith(":online")):
+            return ModelChoice(
+                sel.provider_id, f"{sel.model_id}:online",
+                sel.model_name, sel.provider_name,
+            )
+        return sel
+
     def _verification_preflight(self) -> bool:
         """Validiert das Verifikations-Setup vor dem Analysestart.
 
         Returns:
             True, wenn gestartet werden darf; False bricht den Lauf ab.
         """
-        sel = self.verify_picker.get_selection()
+        sel = self._effective_verify_choice()
         if not sel:
             QMessageBox.warning(
                 self, "Verifikationsmodell fehlt",
@@ -2179,13 +2205,22 @@ class MainWindow(QMainWindow):
         # Verifikation braucht die API-Automatik (Auto-Stufe-2 nach der Analyse)
         if not self.api_checkbox.isChecked():
             self.api_checkbox.setChecked(True)
-        # Soft-Warnung Web-Fähigkeit (nicht blockierend)
+        # Web-Fähigkeit: bei Unsicherheit Nachfrage mit Abbrechen / Trotzdem fortfahren
         if not self._looks_web_capable(sel):
-            QMessageBox.information(
-                self, "Hinweis: Web-Zugriff",
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Icon.Warning)
+            box.setWindowTitle("Kein bestätigter Web-Zugriff")
+            box.setText(
                 "Das gewählte Verifikationsmodell hat evtl. keinen Web-Zugriff; "
-                "die Verifikation kann ungenau sein.",
+                "Quellen können unzuverlässig oder erfunden sein."
             )
+            proceed_btn = box.addButton(
+                "Trotzdem fortfahren", QMessageBox.ButtonRole.AcceptRole
+            )
+            box.addButton("Abbrechen", QMessageBox.ButtonRole.RejectRole)
+            box.exec()
+            if box.clickedButton() is not proceed_btn:
+                return False
         return True
 
     def _set_verification_running(self, running: bool) -> None:
@@ -2202,7 +2237,7 @@ class MainWindow(QMainWindow):
         """Startet Stufe 2, wenn die Verifikation aktiv ist."""
         if not self.verify_checkbox.isChecked():
             return
-        sel = self.verify_picker.get_selection()
+        sel = self._effective_verify_choice()
         if not sel:
             return  # Preflight hätte das abgefangen — defensiv überspringen
 
@@ -2215,6 +2250,7 @@ class MainWindow(QMainWindow):
             total_claims=total,
             source_title=self.video_info.title if self.video_info else "",
             source_url=self.video_info.url if self.video_info else "",
+            web_unverified=not self._looks_web_capable(sel),
         )
 
         worker = VerificationWorker(config, debug_logger=self._debug_logger)

@@ -205,6 +205,7 @@ class VerificationWorker(QThread):
             claims_capped=claims_capped,
             checked_count=len(cfg.claims),
             total_count=cfg.total_claims,
+            web_unverified=cfg.web_unverified,
             verification_body=body,
             citations=citations,
         )

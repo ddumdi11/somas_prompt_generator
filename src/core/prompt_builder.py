@@ -247,7 +247,9 @@ FAKTENCHECK_FORMAT = (
     "Meinungswörter); KEIN Urteil über Wahr/Falsch.\n"
     "Ordne JEDEN Block nach Relevanz absteigend (wichtigste zuerst): zentral für Kernthese/\n"
     "Hauptthema und/oder strittig bzw. folgenreich im Diskurs. Triviale Selbstverständlichkeiten\n"
-    "NICHT auflisten bzw. ans Ende stellen."
+    "NICHT auflisten bzw. ans Ende stellen.\n"
+    "Schreibe JEDEN nummerierten Punkt auf eine EIGENE Zeile (Zeilenumbruch nach jedem Punkt); "
+    "KEINE Inline-Aufzählung mehrerer Punkte in einer Zeile."
 )
 
 # Hebt das Antwort-Zeichenlimit NUR für den erzwungenen FAKTENCHECK-Lauf (Verifikation) auf,
@@ -616,14 +618,60 @@ VERDICT_VALUES = (
 )
 
 
+def _split_consecutive_claims(region: str) -> list[str]:
+    """Zerlegt eine Behauptungs-Region an FORTLAUFENDEN Nummern-Grenzen.
+
+    Funktioniert für zeilen- UND inline-nummerierte Listen. Getrennt wird nur an
+    der jeweils nächsten erwarteten Nummer (n → n+1), damit interne Zahlen wie
+    'am 7. Oktober 2023' einen Claim nicht zerreißen.
+
+    Args:
+        region: Der zusammengefügte Behauptungs-Text (eine oder mehrere Zeilen).
+
+    Returns:
+        Liste der Behauptungs-Strings in Reihenfolge.
+    """
+    # Eine Nummer ist nur dann eine echte Claim-Grenze, wenn sie (a) fortlaufend
+    # ist (n -> n+1) UND (b) am Zeilenanfang oder nach satzbeendender Interpunktion
+    # steht. So zerreißt eine interne Zahl wie 'am 3. März 2020' den Claim nicht,
+    # selbst wenn sie zufällig der nächsten erwarteten Nummer entspricht.
+    chosen: list[tuple[int, int]] = []
+    expected = None
+    for m in re.finditer(r"(\d+)[\.\)]\s+", region):
+        pos, num = m.start(), int(m.group(1))
+        before = region[:pos].rstrip()
+        boundary_ctx = (
+            pos == 0
+            or region[pos - 1] == "\n"
+            or (before != "" and before[-1] in ".!?:)")
+        )
+        if not boundary_ctx:
+            continue
+        if expected is None:
+            expected = num
+        if num == expected:
+            chosen.append((pos, m.end()))
+            expected += 1
+
+    claims: list[str] = []
+    for i, (_pos, end) in enumerate(chosen):
+        stop = chosen[i + 1][0] if i + 1 < len(chosen) else len(region)
+        text = region[end:stop].strip().strip('*"„“”').strip()
+        text = re.sub(r"\s+", " ", text).strip()
+        if text:
+            claims.append(text)
+    return claims
+
+
 def extract_claims_from_faktencheck(analysis_text: str) -> list[str]:
     """Extrahiert NUR die nummerierten Behauptungen aus dem FAKTENCHECK-Block.
 
     Sucht den Stufe-1-Block ``### FAKTENCHECK`` (Dekonstruktion, NICHT
     ``### FAKTENCHECK · VERIFIKATION``) bis zur nächsten ``### ``-Überschrift
-    bzw. EOF. Innerhalb des Blocks werden ab dem Sub-Header ``Behauptungen``
-    die nummerierten Zeilen (``1.`` oder ``1)``) bis zum nächsten
-    ``**…:**``-Sub-Header bzw. Blockende eingesammelt.
+    bzw. EOF. Ab dem Sub-Header ``Behauptungen`` wird die Claim-Region (Resttext
+    der Header-Zeile + Folgezeilen bis zum nächsten Sub-Header/Terminator)
+    eingesammelt und an fortlaufenden Nummern getrennt — robust gegen
+    zeilen- UND inline-nummerierte Listen.
 
     Die Reihenfolge bleibt erhalten (Stufe 1 ordnet bereits nach Relevanz
     absteigend). Es findet KEINE Kappung statt — die Liste ist vollständig.
@@ -661,30 +709,37 @@ def extract_claims_from_faktencheck(analysis_text: str) -> list[str]:
             break
     block = lines[start + 1:end]
 
-    # 3) Sub-Header 'Behauptungen' finden (Zeilenanfang, optional fett)
-    behaupt_re = re.compile(r"^\s*\*{0,2}\s*Behauptungen", re.IGNORECASE)
-    claim_start = None
+    # 3) Sub-Header 'Behauptungen' finden; er kann die Behauptungen bereits
+    #    inline enthalten (z.B. DeepSeek: '**Behauptungen (überprüfbar):** 1. … 2. …').
+    behaupt_re = re.compile(
+        r"^\s*\*{0,2}\s*Behauptungen[^:]*:\s*\*{0,2}\s*(.*)$", re.IGNORECASE
+    )
+    next_subheader_re = re.compile(r"^\s*\*\*[^*]+:\*\*")
+    stop_re = re.compile(
+        r'^\s*(QUELLE|ANSCHLUSSFRAGE|WICHTIG|HINWEIS|TRANSKRIPT|---|""")',
+        re.IGNORECASE,
+    )
+    header_idx = None
+    inline_rest = ""
     for k, line in enumerate(block):
-        if behaupt_re.match(line):
-            claim_start = k + 1
+        m = behaupt_re.match(line)
+        if m:
+            header_idx = k
+            inline_rest = m.group(1)
             break
-    if claim_start is None:
+    if header_idx is None:
         return []
 
-    # 4) Nummerierte Zeilen bis zum nächsten '**…:**'-Sub-Header bzw. Blockende
-    num_re = re.compile(r"^\s*\d+[\.\)]\s+(.*\S)\s*$")
-    next_subheader_re = re.compile(r"^\s*\*\*[^*]+:\*\*")
-    claims: list[str] = []
-    for line in block[claim_start:]:
-        if next_subheader_re.match(line):
+    # 4) Claim-Region = Resttext der Header-Zeile + Folgezeilen bis zum nächsten
+    #    Sub-Header / Abschnitts-Terminator / Blockende; dann an Nummern splitten.
+    region_parts = [inline_rest]
+    for line in block[header_idx + 1:]:
+        if next_subheader_re.match(line) or stop_re.match(line):
             break
-        m = num_re.match(line)
-        if not m:
-            continue
-        text = m.group(1).strip().strip('*"„“”').strip()
-        if text:
-            claims.append(text)
-    return claims
+        region_parts.append(line)
+    region = "\n".join(region_parts)
+
+    return _split_consecutive_claims(region)
 
 
 def cap_claims(claims: list[str], max_claims: int) -> tuple[list[str], int]:
@@ -742,8 +797,11 @@ def build_verification_prompt(
         f"- **Begründung:** <1–2 Sätze>\n"
         f"- **Quelle:** <URL oder Titel; bei 'nicht überprüfbar' ein Gedankenstrich: —>\n"
         f"\n"
-        f"- Bei Verdikt 'bestätigt', 'teilweise bestätigt' oder 'widerlegt' ist "
-        f"mindestens EINE belastbare Quelle (URL/Titel) verpflichtend.\n"
+        f"- Gib NUR Quellen an, die du tatsächlich abgerufen/verifiziert hast. "
+        f"Erfinde KEINE URLs. Kannst du eine Behauptung nicht mit einer belastbaren "
+        f"Quelle belegen, nutze Verdikt 'nicht überprüfbar' und Quelle '—'.\n"
+        f"- Eine Quelle ist nur dann verpflichtend, wenn die Behauptung tatsächlich "
+        f"verifiziert wurde (bestätigt / teilweise bestätigt / widerlegt).\n"
         f"- Verwende ausschließlich die vier genannten Verdikt-Werte, exakt geschrieben.\n"
         f"\n"
         f"ZU PRÜFENDE BEHAUPTUNGEN:\n"
