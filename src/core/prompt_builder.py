@@ -637,6 +637,10 @@ def extract_claims_from_faktencheck(analysis_text: str) -> list[str]:
     if not analysis_text:
         return []
 
+    # Überschriften normalisieren ('###FAKTENCHECK' -> '### FAKTENCHECK'), damit die
+    # Block-Ende-Erkennung (^\s*###\s) auch bei fehlendem Leerzeichen greift.
+    analysis_text = normalize_markdown_headings(analysis_text)
+
     lines = analysis_text.splitlines()
 
     # 1) FAKTENCHECK-Header der Dekonstruktion finden (nicht den VERIFIKATION-Header)

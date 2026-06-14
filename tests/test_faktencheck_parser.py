@@ -73,6 +73,22 @@ def test_extract_robust():
     print("  extract_robust: fehlende Blöcke, 1)-Nummerierung, GROSS-Marker, Folge-### OK")
 
 
+def test_extract_headings_without_space():
+    # Header/Folge-Überschrift OHNE Leerzeichen nach ### -> normalize greift,
+    # Block endet korrekt vor '###IMPLIKATION'.
+    txt = (
+        "###FAKTENCHECK\n"
+        "**Behauptungen (überprüfbar):**\n"
+        "1. Behauptung eins.\n"
+        "2. Behauptung zwei.\n"
+        "###IMPLIKATION\n"
+        "3. Das ist KEINE Behauptung mehr.\n"
+    )
+    claims = extract_claims_from_faktencheck(txt)
+    assert claims == ["Behauptung eins.", "Behauptung zwei."], claims
+    print("  extract_headings_without_space: ###ohne-Space normalisiert, Block endet korrekt OK")
+
+
 def test_extract_edge_cases():
     assert extract_claims_from_faktencheck("") == []
     assert extract_claims_from_faktencheck("### FRAMING\nKein Faktencheck hier.") == []
@@ -138,6 +154,7 @@ def main():
     print("Faktencheck-Parser-Tests:")
     test_extract_standard()
     test_extract_robust()
+    test_extract_headings_without_space()
     test_extract_edge_cases()
     test_cap_claims()
     test_build_verification_prompt()
