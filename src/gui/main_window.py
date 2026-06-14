@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QTextEdit, QMessageBox,
     QFrame, QApplication, QComboBox, QCheckBox, QTabWidget,
-    QScrollArea, QMenu, QInputDialog,
+    QScrollArea, QMenu, QInputDialog, QSpinBox,
 )
 from PyQt6.QtCore import Qt, pyqtSlot, QEvent, QPoint
 from PyQt6.QtGui import QFont
@@ -17,6 +17,7 @@ from src.core.prompt_builder import (
     build_prompt, build_prompt_from_transcript,
     load_presets, get_preset_by_name, get_preset_by_id, PromptPreset,
     get_anti_monotony_hint,
+    extract_claims_from_faktencheck, cap_claims,
 )
 from src.core.linkedin_formatter import format_for_linkedin
 from src.core.export import export_to_markdown, get_suggested_filename, save_markdown
@@ -32,12 +33,14 @@ from src.gui.collapsible_section import CollapsibleSection
 from src.gui.model_selector import FilterableModelSelector, ModelData, extract_provider
 from src.gui.transcript_widget import TranscriptInputWidget
 from src.gui.provider_model_picker import ProviderModelPicker
-from src.core.comparison_item import ComparisonConfig
+from src.core.comparison_item import ComparisonConfig, ModelChoice
 from src.core.comparison_worker import ComparisonWorker
+from src.core.verification_item import VerificationConfig, VerificationResult
+from src.core.verification_worker import VerificationWorker
 from src.config.api_config import (
     load_providers, get_api_key, has_api_key,
     get_last_provider, get_last_model, save_last_selection,
-    load_preferences,
+    load_preferences, save_preferences,
 )
 
 
@@ -155,6 +158,10 @@ class MainWindow(QMainWindow):
         # Debug-Logger (Preference-gesteuert)
         prefs = load_preferences()
         self._debug_logger = DebugLogger(enabled=prefs.get("debug_logging", False))
+
+        # Faktencheck-Verifikation-State (v0.10.0)
+        self._verification_worker: VerificationWorker | None = None
+        self._verification_max_claims: int = prefs.get("verification_max_claims", 10)
 
         # Lade Presets mit Fehlerbehandlung
         try:
@@ -540,6 +547,53 @@ class MainWindow(QMainWindow):
         self.compare_section.setVisible(False)
         layout.addWidget(self.compare_section)
 
+        # --- Faktencheck-Verifikation (v0.10.0) ---
+        self.verify_checkbox = QCheckBox("Behauptungen verifizieren (Faktencheck Stufe 2)")
+        self.verify_checkbox.setToolTip(
+            "Nach der Analyse die überprüfbaren Behauptungen automatisch von einem "
+            "web-fähigen Modell prüfen lassen (Verdikt + Quelle pro Behauptung)."
+        )
+        layout.addWidget(self.verify_checkbox)
+
+        self.verify_section = CollapsibleSection("Faktencheck-Verifikation")
+        verify_content = QWidget()
+        verify_layout = QVBoxLayout(verify_content)
+        verify_layout.setContentsMargins(0, 0, 0, 0)
+        verify_layout.setSpacing(6)
+
+        self.verify_picker = ProviderModelPicker("Verifikationsmodell:", self._api_providers)
+        verify_layout.addWidget(self.verify_picker)
+
+        verify_hint = QLabel("Empfohlen: web-fähiges Modell (z. B. Perplexity Sonar).")
+        verify_hint.setStyleSheet("color: gray; font-style: italic; font-size: 11px;")
+        verify_layout.addWidget(verify_hint)
+
+        # Web-Suche (:online) — nur für OpenRouter-Modelle wirksam
+        self.verify_online_checkbox = QCheckBox("Web-Suche aktivieren (:online, nur OpenRouter)")
+        self.verify_online_checkbox.setToolTip(
+            "Hängt bei OpenRouter-Modellen das Suffix ':online' an die Modell-ID an, "
+            "um echten Web-Zugriff zu aktivieren."
+        )
+        verify_layout.addWidget(self.verify_online_checkbox)
+
+        verify_opts = QHBoxLayout()
+        verify_opts.addWidget(QLabel("Max. zu prüfende Behauptungen:"))
+        self.verify_max_spin = QSpinBox()
+        self.verify_max_spin.setRange(0, 100)
+        self.verify_max_spin.setValue(self._verification_max_claims)
+        self.verify_max_spin.setToolTip("0 = unbegrenzt (alle Behauptungen prüfen).")
+        verify_opts.addWidget(self.verify_max_spin)
+        verify_opts.addStretch()
+        self.btn_verify_cancel = QPushButton("Abbrechen")
+        self.btn_verify_cancel.setEnabled(False)
+        self.btn_verify_cancel.clicked.connect(self._on_verify_cancel)
+        verify_opts.addWidget(self.btn_verify_cancel)
+        verify_layout.addLayout(verify_opts)
+
+        self.verify_section.set_content_widget(verify_content)
+        self.verify_section.setVisible(False)
+        layout.addWidget(self.verify_section)
+
         # Initial: Controls deaktiviert bis Checkbox aktiv
         self._set_api_controls_enabled(False)
 
@@ -700,6 +754,8 @@ class MainWindow(QMainWindow):
         # API-Controls
         self.api_checkbox.toggled.connect(self._on_api_toggle)
         self.compare_checkbox.toggled.connect(self._on_compare_toggled)
+        self.verify_checkbox.toggled.connect(self._on_verify_toggled)
+        self.verify_max_spin.valueChanged.connect(self._on_verify_max_changed)
         self.provider_combo.currentIndexChanged.connect(self._on_provider_changed)
         self.model_combo.currentIndexChanged.connect(self._on_model_changed)
         self.model_selector.model_selected.connect(self._on_openrouter_model_selected)
@@ -901,6 +957,12 @@ class MainWindow(QMainWindow):
     @pyqtSlot()
     def _on_get_meta(self):
         """Handler für 'Get Meta' Button."""
+        # Defensiv: laufende Verifikation abbrechen, damit ihr Callback nicht
+        # in die neue Analyse hineinschreibt (Stale-State / Race-Condition).
+        if self._verification_worker and self._verification_worker.isRunning():
+            self._verification_worker.cancel()
+            self._verification_worker.wait(2000)
+
         url = self.url_input.text().strip()
         if not url:
             QMessageBox.warning(self, "Fehler", "Bitte eine YouTube-URL eingeben.")
@@ -1030,6 +1092,10 @@ class MainWindow(QMainWindow):
             self._start_comparison()
             return
 
+        # Verifikation aktiv → Vorab-Validierung (Modell/Key/Web-Hinweis)
+        if self.verify_checkbox.isChecked() and not self._verification_preflight():
+            return
+
         # Transcript-Tab aktiv → eigene Generierungslogik
         if self.input_tabs.currentIndex() == 1:
             self._generate_from_transcript()
@@ -1107,6 +1173,11 @@ class MainWindow(QMainWindow):
         recent_modules = self._rating_store.get_recent_modules(3)
         anti_monotony_hint = get_anti_monotony_hint(recent_modules)
 
+        # Verifikation erzwingt das FAKTENCHECK-Modul (liefert die Behauptungsliste)
+        effective_module = (
+            "FAKTENCHECK" if self.verify_checkbox.isChecked() else self._custom_module
+        )
+
         # Wenn Transkript vorhanden → transkript-aware Prompt bauen
         if self.video_info.transcript:
             # Transkript aus dem Transcript-Widget holen (könnte editiert worden sein)
@@ -1129,7 +1200,7 @@ class MainWindow(QMainWindow):
                 perspective=perspective,
                 anti_monotony_hint=anti_monotony_hint,
                 custom_system_prompt=self._custom_system_prompt,
-                custom_module=self._custom_module,
+                custom_module=effective_module,
             )
         else:
             # Kein Transkript → nur URL/Metadaten (bisheriges Verhalten)
@@ -1138,7 +1209,7 @@ class MainWindow(QMainWindow):
                 perspective=perspective,
                 anti_monotony_hint=anti_monotony_hint,
                 custom_system_prompt=self._custom_system_prompt,
-                custom_module=self._custom_module,
+                custom_module=effective_module,
             )
 
         self.prompt_text.setText(prompt)
@@ -1188,6 +1259,11 @@ class MainWindow(QMainWindow):
         recent_modules = self._rating_store.get_recent_modules(3)
         anti_monotony_hint = get_anti_monotony_hint(recent_modules)
 
+        # Verifikation erzwingt das FAKTENCHECK-Modul (liefert die Behauptungsliste)
+        effective_module = (
+            "FAKTENCHECK" if self.verify_checkbox.isChecked() else self._custom_module
+        )
+
         prompt = build_prompt_from_transcript(
             title=data["title"],
             author=data["author"],
@@ -1200,7 +1276,7 @@ class MainWindow(QMainWindow):
             perspective=perspective,
             anti_monotony_hint=anti_monotony_hint,
             custom_system_prompt=self._custom_system_prompt,
-            custom_module=self._custom_module,
+            custom_module=effective_module,
         )
         self.prompt_text.setText(prompt)
 
@@ -1806,11 +1882,16 @@ class MainWindow(QMainWindow):
         if has_custom and not self._is_rework:
             self._autosave_user_preset()
 
+        was_rework = self._is_rework
         self._is_rework = False
 
         # UI entsperren
         self._update_generate_enabled()
         self.btn_generate.setText("Generate Prompt")
+
+        # Faktencheck-Verifikation (Stufe 2): nach echter Analyse automatisch starten
+        if not was_rework:
+            self._maybe_start_verification(response)
 
         # Rework-Button zurücksetzen
         self.btn_rework.setText("\u2702 Kürzen lassen")
@@ -1845,9 +1926,14 @@ class MainWindow(QMainWindow):
             if self.api_checkbox.isChecked():
                 self.api_checkbox.setChecked(False)
             self.api_checkbox.setEnabled(False)
+            # Gegenseitiger Ausschluss mit der Faktencheck-Verifikation
+            if self.verify_checkbox.isChecked():
+                self.verify_checkbox.setChecked(False)
+            self.verify_checkbox.setEnabled(False)
             self.btn_generate.setText("Modellvergleich starten")
         else:
             self.api_checkbox.setEnabled(True)
+            self.verify_checkbox.setEnabled(True)
             self.btn_generate.setText("Generate Prompt")
 
     def _set_comparison_running(self, running: bool) -> None:
@@ -2050,6 +2136,187 @@ class MainWindow(QMainWindow):
             self._comparison_worker.cancel()
             self.compare_section.set_summary("Abgebrochen", color="#C62828")
             self.btn_compare_cancel.setEnabled(False)
+
+    # ── Faktencheck-Verifikation (v0.10.0) ────────────────────────────
+
+    @pyqtSlot(bool)
+    def _on_verify_toggled(self, checked: bool) -> None:
+        """Blendet die Verifikation ein/aus (Ausschluss mit Modellvergleich)."""
+        self.verify_section.setVisible(checked)
+        if checked:
+            self.verify_section.expand()
+            # Gegenseitiger Ausschluss mit dem Modellvergleich
+            if self.compare_checkbox.isChecked():
+                self.compare_checkbox.setChecked(False)
+            self.compare_checkbox.setEnabled(False)
+            # Verifikation braucht die API-Automatik (Auto-Stufe-2 nach der Analyse)
+            self.api_checkbox.setChecked(True)
+        else:
+            self.compare_checkbox.setEnabled(True)
+
+    @pyqtSlot(int)
+    def _on_verify_max_changed(self, value: int) -> None:
+        """Persistiert die Obergrenze der zu prüfenden Behauptungen."""
+        self._verification_max_claims = value
+        prefs = load_preferences()
+        prefs["verification_max_claims"] = value
+        save_preferences(prefs)
+
+    @staticmethod
+    def _looks_web_capable(choice: ModelChoice) -> bool:
+        """Heuristik: Hat das gewählte Modell vermutlich Web-Zugriff?"""
+        if choice.provider_id == "perplexity":
+            return True
+        if choice.provider_id == "openrouter" and ":online" in (choice.model_id or ""):
+            return True
+        return False
+
+    def _effective_verify_choice(self) -> ModelChoice | None:
+        """Liefert die Verifikations-Auswahl inkl. ':online'-Suffix (falls aktiv).
+
+        Der ':online'-Schalter wirkt nur bei OpenRouter-Modellen; so bleibt die
+        Wiederverwendung des ProviderModelPicker im Modellvergleich unberührt.
+        """
+        sel = self.verify_picker.get_selection()
+        if not sel:
+            return None
+        if (self.verify_online_checkbox.isChecked()
+                and sel.provider_id == "openrouter"
+                and not sel.model_id.endswith(":online")):
+            return ModelChoice(
+                sel.provider_id, f"{sel.model_id}:online",
+                sel.model_name, sel.provider_name,
+            )
+        return sel
+
+    def _verification_preflight(self) -> bool:
+        """Validiert das Verifikations-Setup vor dem Analysestart.
+
+        Returns:
+            True, wenn gestartet werden darf; False bricht den Lauf ab.
+        """
+        sel = self._effective_verify_choice()
+        if not sel:
+            QMessageBox.warning(
+                self, "Verifikationsmodell fehlt",
+                "Bitte ein Verifikationsmodell wählen (oder die Verifikation deaktivieren).",
+            )
+            return False
+        if not get_api_key(sel.provider_id):
+            QMessageBox.warning(
+                self, "API-Key fehlt",
+                f"Kein API-Key für {sel.provider_name or sel.provider_id} konfiguriert.",
+            )
+            return False
+        # Verifikation braucht die API-Automatik (Auto-Stufe-2 nach der Analyse)
+        if not self.api_checkbox.isChecked():
+            self.api_checkbox.setChecked(True)
+        # Web-Fähigkeit: bei Unsicherheit Nachfrage mit Abbrechen / Trotzdem fortfahren
+        if not self._looks_web_capable(sel):
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Icon.Warning)
+            box.setWindowTitle("Kein bestätigter Web-Zugriff")
+            box.setText(
+                "Das gewählte Verifikationsmodell hat evtl. keinen Web-Zugriff; "
+                "Quellen können unzuverlässig oder erfunden sein."
+            )
+            proceed_btn = box.addButton(
+                "Trotzdem fortfahren", QMessageBox.ButtonRole.AcceptRole
+            )
+            box.addButton("Abbrechen", QMessageBox.ButtonRole.RejectRole)
+            box.exec()
+            if box.clickedButton() is not proceed_btn:
+                return False
+        return True
+
+    def _set_verification_running(self, running: bool) -> None:
+        """Sperrt/entsperrt Controls während eines Verifikationslaufs."""
+        self.btn_generate.setEnabled(not running)
+        self.btn_verify_cancel.setEnabled(running)
+        self.verify_checkbox.setEnabled(not running)
+        self.verify_picker.set_enabled(not running)
+        self.verify_max_spin.setEnabled(not running)
+        self.btn_batch.setEnabled(not running)
+        # Quelle sperren: verhindert, dass ein neues Video das Ergebnis leert,
+        # während die Stufe-2-Sektion noch angehängt wird (Stale-State / Race).
+        self.btn_get_meta.setEnabled(not running)
+        self.url_input.setEnabled(not running)
+        self.btn_generate.setText("Verifikation läuft…" if running else "Generate Prompt")
+
+    def _maybe_start_verification(self, response: APIResponse) -> None:
+        """Startet Stufe 2, wenn die Verifikation aktiv ist."""
+        if not self.verify_checkbox.isChecked():
+            return
+        sel = self._effective_verify_choice()
+        if not sel:
+            return  # Preflight hätte das abgefangen — defensiv überspringen
+
+        all_claims = extract_claims_from_faktencheck(response.content)
+        claims, total = cap_claims(all_claims, self._verification_max_claims)
+        config = VerificationConfig(
+            claims=claims,
+            model=sel,
+            language=self.config.language,
+            total_claims=total,
+            source_title=self.video_info.title if self.video_info else "",
+            source_url=self.video_info.url if self.video_info else "",
+            web_unverified=not self._looks_web_capable(sel),
+        )
+
+        worker = VerificationWorker(config, debug_logger=self._debug_logger)
+        worker.status_changed.connect(self._on_verify_status)
+        worker.finished_ok.connect(self._on_verify_finished)
+        worker.error_occurred.connect(self._on_verify_error)
+        worker.finished.connect(lambda: self._set_verification_running(False))
+
+        self._verification_worker = worker
+        self._set_verification_running(True)
+        self.verify_section.set_summary(
+            f"Verifikation läuft … ({sel.model_name or sel.model_id})", color="#1565C0"
+        )
+        worker.start()
+
+    def _append_to_result(self, section: str) -> None:
+        """Hängt einen Markdown-Abschnitt an das bestehende Ergebnis an."""
+        current = self.result_text.toPlainText().rstrip()
+        self.result_text.setPlainText(f"{current}\n\n{section.strip()}\n")
+
+    @pyqtSlot(str)
+    def _on_verify_status(self, status: str) -> None:
+        """Loggt den Verifikations-Status."""
+        logger.info(f"Verifikation Status: {status}")
+
+    @pyqtSlot(str, object)
+    def _on_verify_finished(self, section: str, result: VerificationResult) -> None:
+        """Hängt den Verifikationsabschnitt an die Analyse an."""
+        self._append_to_result(section)
+        if getattr(result, "status", "") == "skipped":
+            self.verify_section.set_summary(
+                "Keine überprüfbaren Behauptungen", color="#888888"
+            )
+        else:
+            self.verify_section.set_summary("Verifikation fertig ✓", color="#2E7D32")
+        logger.info("Verifikationsabschnitt angehängt")
+
+    @pyqtSlot(str)
+    def _on_verify_error(self, message: str) -> None:
+        """Hängt einen Platzhalter an (Analyse bleibt erhalten) + Warnung."""
+        placeholder = (
+            "---\n\n### FAKTENCHECK · VERIFIKATION\n"
+            f"_Verifikation fehlgeschlagen: {message}. "
+            "Behauptungen siehe FAKTENCHECK-Block oben._\n"
+        )
+        self._append_to_result(placeholder)
+        self.verify_section.set_summary("Verifikation fehlgeschlagen", color="#C62828")
+        QMessageBox.warning(self, "Verifikation fehlgeschlagen", message)
+
+    @pyqtSlot()
+    def _on_verify_cancel(self) -> None:
+        """Bricht einen laufenden Verifikationslauf ab."""
+        if self._verification_worker and self._verification_worker.isRunning():
+            self._verification_worker.cancel()
+            self.verify_section.set_summary("Abgebrochen", color="#C62828")
+            self.btn_verify_cancel.setEnabled(False)
 
     # ── Custom Prompt Editor ──────────────────────────────────────────
 

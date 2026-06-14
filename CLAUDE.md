@@ -7,7 +7,7 @@
 ## 🎯 Projektkontext
 
 **Name:** SOMAS Prompt Generator
-**Version:** 0.9.1
+**Version:** 0.10.0
 **Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
 **Sprache:** Python 3.11+
 **GUI-Framework:** PyQt6
@@ -55,6 +55,8 @@ somas_prompt_generator/
 │   │   ├── user_preset_store.py # Benutzerdefinierte Presets (JSON-CRUD)
 │   │   ├── comparison_item.py  # ModelChoice/ComparisonConfig/ComparisonResult (Modellvergleich)
 │   │   ├── comparison_worker.py # QThread-Worker: 2 Analysen + Synthese + Layout-Render
+│   │   ├── verification_item.py # VerificationConfig/VerificationResult (Faktencheck Stufe 2)
+│   │   ├── verification_worker.py # QThread-Worker: Behauptungen verifizieren (Verdikt + Quelle)
 │   │   └── debug_logger.py     # Debug-Logging mit Version/Session-Info
 │   │
 │   └── config/             # Konfiguration
@@ -75,13 +77,15 @@ somas_prompt_generator/
 │   ├── somas_research.txt      # Research-Preset (unbegrenzt)
 │   ├── somas_music.txt         # Musik-Preset (2.400 Zeichen, Songtext-Analyse)
 │   ├── somas_songstruktur.txt  # Songstruktur-Preset (Formanalyse)
-│   └── somas_comparison.txt    # Modellvergleich-Layout (Jinja2-Dokumentlayout)
+│   ├── somas_comparison.txt    # Modellvergleich-Layout (Jinja2-Dokumentlayout)
+│   └── somas_verification.txt  # Faktencheck-Verifikation-Abschnitt (Stufe 2)
 │
 ├── specs/                  # Entwicklungs-Spezifikationen
 │   ├── API_INTEGRATION_SPEC.md
 │   ├── api_providers.json
 │   ├── SOMAS_v0.6.0_SPEC.md
-│   └── SOMAS_v0.9.0_SPEC_modellvergleich.md
+│   ├── SOMAS_v0.9.0_SPEC_modellvergleich.md
+│   └── SOMAS_v0.10.0_SPEC_faktencheck_verifikation.md
 │
 ├── docs/                   # GitHub Pages Landing Page
 │   ├── index.html
@@ -312,8 +316,26 @@ TEST_URLS = [
   fehlende `message`) — grün
 - [x] Versionskonstante + README-Changelog auf 0.9.1 (PR #38)
 
+### Phase 12: Faktencheck-Verifikation ✅ (v0.10.0)
+
+- [x] Stufe 1 (Dekonstruktion): FAKTENCHECK trennt Meinungen/Interpretationen/Behauptungen,
+  relevanz-sortiert. `FAKTENCHECK_FORMAT`-Konstante + Injektion via `_apply_custom_overrides`
+  (deckt alle Presets ab, Header bleibt exakt `### FAKTENCHECK`)
+- [x] Parser `extract_claims_from_faktencheck` (zeilen- UND inline-nummeriert, robust gegen
+  interne Zahlen), `cap_claims` (Top-N, Default 10, 0=unbegrenzt), `build_verification_prompt`
+  (nur Behauptungen, Riegel gegen erfundene Quellen), `clean_verification_output`
+- [x] Stufe 2 (Verifikation, optional): `verification_item.py`, `VerificationWorker`,
+  `somas_verification.txt` (Verdikt + Quelle pro Behauptung, 4-stufige Skala)
+- [x] GUI: Toggle + Verifikationsmodell-Picker + Max-Behauptungen-SpinBox + `:online`-Schalter
+  (OpenRouter) + Web-Disclaimer; Auto-Anhang an die Analyse; Ausschluss mit Modellvergleich
+- [x] Race-Fix (Quelle während Verifikation gesperrt) + CollapsibleSection-Stylesheet gescoped
+- [x] Tests `tests/test_faktencheck_parser.py`; headless + real-web getestet
+- [x] Spec dokumentiert (SOMAS_v0.10.0_SPEC_faktencheck_verifikation.md)
+
 ### Backlog
 
+- [ ] „Verifikation erneut versuchen"-Button (nur Stufe 2 wiederholen) — v0.10.1, hohe Priorität
+- [ ] Einheitlicher Export-Kopf (Einzelanalyse wie Modellvergleich: Titel-Block + Thumbnail) — v0.10.1
 - [ ] Wochentags-basierte Perspektive-Defaults (nach Recherche)
 - [ ] Englisch-Support
 - [ ] PDF-Export (auch für Modellvergleich)
@@ -338,4 +360,4 @@ Bei Unklarheiten: Frag nach! Lieber einmal zu viel als eine falsche Annahme tref
 
 ---
 
-Letzte Aktualisierung: 2026-05-30
+Letzte Aktualisierung: 2026-06-14

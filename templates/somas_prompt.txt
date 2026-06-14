@@ -16,7 +16,7 @@ Wähle genau eines der folgenden Module als 5. Abschnitt:
 - OFFENE_FRAGEN: Benenne, was ungeklärt bleibt oder bewusst ausgelassen wird.
 - VERBINDUNGEN: Ordne den Inhalt in einen größeren historischen oder gesellschaftlichen Kontext ein.
 - SUBTEXT: Dekodiere die impliziten Botschaften. Was wird zwischen den Zeilen gesagt? Welche Annahmen setzt der Sprecher als selbstverständlich voraus? Nicht bewerten – nur sichtbar machen. Verzichte auf wertende Adjektive.
-- FAKTENCHECK: Identifiziere die 3–4 überprüfungsbedürftigsten Aussagen. Nenne pro Aussage: Was wurde behauptet, warum prüfen, wonach suchen. Stelle keine eigenen Faktenbehauptungen auf und urteile nicht über Wahr oder Falsch.
+- FAKTENCHECK: Trenne die Aussagen strikt in drei nummerierte Blöcke mit EXAKT diesen Sub-Headern: **Meinungen:** (subjektive Wertungen, nicht prüfbar), **Interpretationen:** (Deutungen/Schlussfolgerungen, nicht direkt prüfbar), **Behauptungen (überprüfbar):** (je eine einzelne, in sich abgeschlossene, falsifizierbare Tatsachenaussage pro Punkt, neutral und kontextfrei formuliert, ohne Meinungswörter). Fälle KEIN Urteil über Wahr/Falsch. Ordne jeden Block nach Relevanz absteigend (wichtigste zuerst); triviale Selbstverständlichkeiten ans Ende. Schreibe jeden nummerierten Punkt auf eine eigene Zeile (keine Inline-Aufzählung).
 {% if anti_monotony_hint %}{{ anti_monotony_hint }}
 {% endif %}
 OUTPUT-FORMAT:

@@ -231,6 +231,36 @@ def load_template(template_name: str = "somas_prompt.txt") -> str:
         return f.read()
 
 
+# --- Faktencheck-Verifikation (v0.10.0) ---
+
+# Single Source of Truth für das parsbare Stufe-1-Format. Enthält die exakten
+# Vertrags-Marker (**Meinungen:** / **Interpretationen:** / **Behauptungen
+# (überprüfbar):**), auf die der Claim-Parser (extract_claims_from_faktencheck)
+# angewiesen ist. Wird bei erzwungenem FAKTENCHECK injiziert (s. _apply_custom_overrides),
+# damit das Format in JEDEM Preset garantiert ist – auch in den namens-only-Templates.
+FAKTENCHECK_FORMAT = (
+    "FAKTENCHECK-FORMAT — gib den Abschnitt GENAU so aus (Header exakt '### FAKTENCHECK'):\n"
+    "**Meinungen:** subjektive Wertungen (nicht prüfbar), nummeriert.\n"
+    "**Interpretationen:** Deutungen/Schlussfolgerungen (nicht direkt prüfbar), nummeriert.\n"
+    "**Behauptungen (überprüfbar):** je eine einzelne, in sich abgeschlossene, falsifizierbare\n"
+    "Tatsachenaussage pro Punkt, nummeriert; neutral und kontextfrei formuliert (ohne\n"
+    "Meinungswörter); KEIN Urteil über Wahr/Falsch.\n"
+    "Ordne JEDEN Block nach Relevanz absteigend (wichtigste zuerst): zentral für Kernthese/\n"
+    "Hauptthema und/oder strittig bzw. folgenreich im Diskurs. Triviale Selbstverständlichkeiten\n"
+    "NICHT auflisten bzw. ans Ende stellen.\n"
+    "Schreibe JEDEN nummerierten Punkt auf eine EIGENE Zeile (Zeilenumbruch nach jedem Punkt); "
+    "KEINE Inline-Aufzählung mehrerer Punkte in einer Zeile."
+)
+
+# Hebt das Antwort-Zeichenlimit NUR für den erzwungenen FAKTENCHECK-Lauf (Verifikation) auf,
+# damit die vollständige, relevanz-sortierte Behauptungsliste für das Top-N-Capping entsteht.
+# Steht vor dem (im Template späteren) GESAMTZEICHENLIMIT-Text und überschreibt es so.
+FAKTENCHECK_NO_LIMIT_HINT = (
+    "HINWEIS: Für diesen Lauf ist ein etwaiges Gesamtzeichenlimit AUFGEHOBEN. Die "
+    "Vollständigkeit der relevanz-sortierten Behauptungsliste hat Vorrang vor Kürze."
+)
+
+
 def _apply_custom_overrides(
     rendered: str,
     custom_system_prompt: Optional[str] = None,
@@ -256,6 +286,11 @@ def _apply_custom_overrides(
             f"PFLICHT-MODUL: Verwende ausschließlich das Modul '{custom_module}'. "
             f"Keine andere Wahl ist erlaubt."
         )
+        # v0.10.0: Bei erzwungenem FAKTENCHECK zusätzlich das parsbare 3-Block-Format
+        # und die Limit-Aufhebung injizieren (deckt alle Presets ab, auch namens-only).
+        if custom_module.strip().upper() == "FAKTENCHECK":
+            parts.append(FAKTENCHECK_NO_LIMIT_HINT)
+            parts.append(FAKTENCHECK_FORMAT)
 
     if parts:
         parts.append(rendered)
@@ -573,6 +608,221 @@ def clean_synthesis_output(text: str) -> str:
         lines.pop(0)
 
     return "\n".join(lines).strip()
+
+
+# --- Faktencheck-Verifikation: Parser / Prompt / Cleaner (v0.10.0) ---
+
+# Verdikt-Skala (exakt) für die Stufe-2-Ausgabe.
+VERDICT_VALUES = (
+    "bestätigt", "teilweise bestätigt", "widerlegt", "nicht überprüfbar",
+)
+
+
+def _split_consecutive_claims(region: str) -> list[str]:
+    """Zerlegt eine Behauptungs-Region an FORTLAUFENDEN Nummern-Grenzen.
+
+    Funktioniert für zeilen- UND inline-nummerierte Listen. Getrennt wird nur an
+    der jeweils nächsten erwarteten Nummer (n → n+1), damit interne Zahlen wie
+    'am 7. Oktober 2023' einen Claim nicht zerreißen.
+
+    Args:
+        region: Der zusammengefügte Behauptungs-Text (eine oder mehrere Zeilen).
+
+    Returns:
+        Liste der Behauptungs-Strings in Reihenfolge.
+    """
+    # Eine Nummer ist nur dann eine echte Claim-Grenze, wenn sie (a) fortlaufend
+    # ist (n -> n+1) UND (b) am Zeilenanfang oder nach satzbeendender Interpunktion
+    # steht. So zerreißt eine interne Zahl wie 'am 3. März 2020' den Claim nicht,
+    # selbst wenn sie zufällig der nächsten erwarteten Nummer entspricht.
+    chosen: list[tuple[int, int]] = []
+    expected = None
+    for m in re.finditer(r"(\d+)[\.\)]\s+", region):
+        pos, num = m.start(), int(m.group(1))
+        before = region[:pos].rstrip()
+        boundary_ctx = (
+            pos == 0
+            or region[pos - 1] == "\n"
+            or (before != "" and before[-1] in ".!?:)")
+        )
+        if not boundary_ctx:
+            continue
+        if expected is None:
+            expected = num
+        if num == expected:
+            chosen.append((pos, m.end()))
+            expected += 1
+
+    claims: list[str] = []
+    for i, (_pos, end) in enumerate(chosen):
+        stop = chosen[i + 1][0] if i + 1 < len(chosen) else len(region)
+        text = region[end:stop].strip().strip('*"„“”').strip()
+        text = re.sub(r"\s+", " ", text).strip()
+        if text:
+            claims.append(text)
+    return claims
+
+
+def extract_claims_from_faktencheck(analysis_text: str) -> list[str]:
+    """Extrahiert NUR die nummerierten Behauptungen aus dem FAKTENCHECK-Block.
+
+    Sucht den Stufe-1-Block ``### FAKTENCHECK`` (Dekonstruktion, NICHT
+    ``### FAKTENCHECK · VERIFIKATION``) bis zur nächsten ``### ``-Überschrift
+    bzw. EOF. Ab dem Sub-Header ``Behauptungen`` wird die Claim-Region (Resttext
+    der Header-Zeile + Folgezeilen bis zum nächsten Sub-Header/Terminator)
+    eingesammelt und an fortlaufenden Nummern getrennt — robust gegen
+    zeilen- UND inline-nummerierte Listen.
+
+    Die Reihenfolge bleibt erhalten (Stufe 1 ordnet bereits nach Relevanz
+    absteigend). Es findet KEINE Kappung statt — die Liste ist vollständig.
+
+    Args:
+        analysis_text: Der vollständige SOMAS-Analysetext.
+
+    Returns:
+        Liste aller Behauptungs-Strings in Relevanz-Reihenfolge (kann leer sein).
+    """
+    if not analysis_text:
+        return []
+
+    # Überschriften normalisieren ('###FAKTENCHECK' -> '### FAKTENCHECK'), damit die
+    # Block-Ende-Erkennung (^\s*###\s) auch bei fehlendem Leerzeichen greift.
+    analysis_text = normalize_markdown_headings(analysis_text)
+
+    lines = analysis_text.splitlines()
+
+    # 1) FAKTENCHECK-Header der Dekonstruktion finden (nicht den VERIFIKATION-Header)
+    header_re = re.compile(r"^\s*###\s*FAKTENCHECK\b", re.IGNORECASE)
+    start = None
+    for i, line in enumerate(lines):
+        if header_re.match(line) and "VERIFIKATION" not in line.upper():
+            start = i
+            break
+    if start is None:
+        return []
+
+    # 2) Blockende = nächste '### '-Überschrift oder EOF
+    end = len(lines)
+    for j in range(start + 1, len(lines)):
+        if re.match(r"^\s*###\s", lines[j]):
+            end = j
+            break
+    block = lines[start + 1:end]
+
+    # 3) Sub-Header 'Behauptungen' finden; er kann die Behauptungen bereits
+    #    inline enthalten (z.B. DeepSeek: '**Behauptungen (überprüfbar):** 1. … 2. …').
+    behaupt_re = re.compile(
+        r"^\s*\*{0,2}\s*Behauptungen[^:]*:\s*\*{0,2}\s*(.*)$", re.IGNORECASE
+    )
+    next_subheader_re = re.compile(r"^\s*\*\*[^*]+:\*\*")
+    stop_re = re.compile(
+        r'^\s*(QUELLE|ANSCHLUSSFRAGE|WICHTIG|HINWEIS|TRANSKRIPT|---|""")',
+        re.IGNORECASE,
+    )
+    header_idx = None
+    inline_rest = ""
+    for k, line in enumerate(block):
+        m = behaupt_re.match(line)
+        if m:
+            header_idx = k
+            inline_rest = m.group(1)
+            break
+    if header_idx is None:
+        return []
+
+    # 4) Claim-Region = Resttext der Header-Zeile + Folgezeilen bis zum nächsten
+    #    Sub-Header / Abschnitts-Terminator / Blockende; dann an Nummern splitten.
+    region_parts = [inline_rest]
+    for line in block[header_idx + 1:]:
+        if next_subheader_re.match(line) or stop_re.match(line):
+            break
+        region_parts.append(line)
+    region = "\n".join(region_parts)
+
+    return _split_consecutive_claims(region)
+
+
+def cap_claims(claims: list[str], max_claims: int) -> tuple[list[str], int]:
+    """Wendet die konfigurierbare Obergrenze deterministisch an.
+
+    Args:
+        claims: Vollständige, relevanz-sortierte Behauptungsliste.
+        max_claims: Obergrenze (0 = unbegrenzt).
+
+    Returns:
+        Tupel ``(gekappte_liste, total_count)``. Bei ``max_claims == 0`` oder
+        ``len(claims) <= max_claims`` bleibt die Liste unverändert (Kopie). Die
+        App entscheidet anhand ``len(capped) < total``, ob gekappt wurde.
+    """
+    total = len(claims)
+    if max_claims and max_claims > 0 and total > max_claims:
+        return list(claims[:max_claims]), total
+    return list(claims), total
+
+
+def build_verification_prompt(
+    claims: list[str],
+    language: str = "Deutsch",
+    source_hint: str = "",
+) -> str:
+    """Baut den Stufe-2-Verifikations-Prompt.
+
+    Enthält AUSSCHLIESSLICH die Behauptungen (keine Meinungen, kein Transkript)
+    → sauberer Handoff an das web-fähige Modell.
+
+    Args:
+        claims: Die (bereits gekappte) Liste der zu prüfenden Behauptungen.
+        language: Sprache der Ausgabe (Default Deutsch).
+        source_hint: Optionaler Kontext (z.B. Titel/URL) — nur als Orientierung.
+
+    Returns:
+        Der fertige Prompt-String.
+    """
+    numbered = "\n".join(f"{i}. {c}" for i, c in enumerate(claims, 1))
+    verdicts = " | ".join(VERDICT_VALUES)
+    hint = f"\nKONTEXT (nur zur Orientierung): {source_hint}\n" if source_hint else ""
+
+    return (
+        f"Du bist ein sorgfältiger Faktenprüfer. Prüfe die folgenden Behauptungen "
+        f"einzeln per Websuche bzw. aktuellem Wissen. Antworte in {language}.\n"
+        f"{hint}\n"
+        f"REGELN:\n"
+        f"- Prüfe AUSSCHLIESSLICH die vorgelegten Behauptungen, in gegebener "
+        f"Reihenfolge. Erfinde keine neuen Behauptungen.\n"
+        f"- Gib pro Behauptung EXAKT dieses Markdown-Format aus (kein Vorspann, "
+        f"keine Meta, keine Einleitung):\n"
+        f"\n"
+        f"**<Nr>. „<Behauptung>\"**\n"
+        f"- **Verdikt:** <eines von: {verdicts}>\n"
+        f"- **Begründung:** <1–2 Sätze>\n"
+        f"- **Quelle:** <URL oder Titel; bei 'nicht überprüfbar' ein Gedankenstrich: —>\n"
+        f"\n"
+        f"- Gib NUR Quellen an, die du tatsächlich abgerufen/verifiziert hast. "
+        f"Erfinde KEINE URLs. Kannst du eine Behauptung nicht mit einer belastbaren "
+        f"Quelle belegen, nutze Verdikt 'nicht überprüfbar' und Quelle '—'.\n"
+        f"- Eine Quelle ist nur dann verpflichtend, wenn die Behauptung tatsächlich "
+        f"verifiziert wurde (bestätigt / teilweise bestätigt / widerlegt).\n"
+        f"- Verwende ausschließlich die vier genannten Verdikt-Werte, exakt geschrieben.\n"
+        f"\n"
+        f"ZU PRÜFENDE BEHAUPTUNGEN:\n"
+        f"{numbered}\n"
+    )
+
+
+def clean_verification_output(text: str) -> str:
+    """Bereinigt die Stufe-2-Ausgabe für das saubere Anhängen.
+
+    Analog zu :func:`clean_synthesis_output`: entfernt umschließende Code-Fences
+    sowie führende Leer-/Überschriftenzeilen, damit der Verifikationsabschnitt
+    sauber unter den deterministischen Header gerendert werden kann.
+
+    Args:
+        text: Roh-Ausgabe des Verifikationsmodells.
+
+    Returns:
+        Bereinigter Markdown-Text (kann leer sein).
+    """
+    return clean_synthesis_output(text)
 
 
 def get_preset_info_for_display(preset: PromptPreset) -> str:

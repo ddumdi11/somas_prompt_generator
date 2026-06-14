@@ -94,10 +94,15 @@ class CollapsibleSection(QWidget):
         self._body.setSizePolicy(
             QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
         )
+        # ID-Selektor: begrenzt die Regel auf das Body-Widget selbst, damit sie
+        # NICHT auf Kind-Widgets kaskadiert. Sonst schaltet eine geerbte border-
+        # Regel QCheckBox/QSpinBox-Subcontrols von nativ auf QSS (unsichtbarer
+        # Checkbox-Haken, tote SpinBox-Taste).
+        self._body.setObjectName("collapsibleBody")
         self._body.setStyleSheet(
-            "background-color: white; "
+            "#collapsibleBody { background-color: white; "
             "border: 1px solid #C0C0C0; border-top: none; "
-            "border-bottom-left-radius: 4px; border-bottom-right-radius: 4px;"
+            "border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; }"
         )
         self._body_layout = QVBoxLayout(self._body)
         self._body_layout.setContentsMargins(10, 8, 10, 8)

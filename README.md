@@ -14,7 +14,16 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuell (v0.9.0) — Modellvergleich
+### Aktuell (v0.10.0) — Faktencheck-Verifikation
+
+- **Zweistufige Faktenprüfung** – Das FAKTENCHECK-Modul trennt jetzt strikt **Meinungen**, **Interpretationen** und **überprüfbare Behauptungen** (relevanz-sortiert). Optional prüft danach ein web-fähiges Modell **nur die nackten Behauptungen** und liefert pro Behauptung **Verdikt + Quelle**
+- **Halluzinations-Schutz** – In der Verifikation stehen **keine Meinungen** im Prompt – das Modell kann nicht durch rhetorische Sprache „verführt" werden. Zusätzlicher Riegel gegen erfundene Quellen (kann nicht belegt werden → Verdikt „nicht überprüfbar", Quelle „—")
+- **4-stufige Verdikt-Skala** – bestätigt · teilweise bestätigt · widerlegt · nicht überprüfbar
+- **Frei wählbares Verifikationsmodell** – ProviderModelPicker über alle 4 Provider; `:online`-Schalter für echten Web-Zugriff (OpenRouter); Web-Disclaimer, wenn kein bestätigter Web-Zugriff
+- **Konfigurierbare Obergrenze** – Default 10 zu prüfende Behauptungen (app-seitig, deterministisch gekappt; `0 = unbegrenzt`); Meinungen/Interpretationen werden vollständig angezeigt
+- **Sauberer Anhang** – Der Verifikationsabschnitt wird an die Analyse angehängt (Export enthält beide Teile); Stufe-2-Fehler ist nicht fatal (Analyse bleibt erhalten)
+
+### Seit v0.9.0 — Modellvergleich
 
 - **Zwei Analysen, ein Video** – Dasselbe YouTube-Video (oder Transkript) von zwei frei wählbaren Modellen nach dem SOMAS-Schema analysieren lassen. Gleiches Preset, gleiche Perspektive, gleiche Tiefe für beide – nur das Modell variiert (fairer Vergleich)
 - **Automatische Synthese** – Ein drittes Modell erzeugt aus beiden Analysen eine neutrale Kurzbeschreibung (ein Absatz). Eingabe sind die vollständigen Analysetexte, nicht das Transkript
@@ -88,6 +97,8 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ### Nächste Schritte
 
+- „Verifikation erneut versuchen"-Button (nur Stufe 2 wiederholen) — v0.10.1
+- Einheitlicher Export-Kopf (Einzelanalyse mit Titel-Block + Thumbnail) — v0.10.1
 - Wochentags-basierte Perspektive-Defaults (nach Recherche)
 - Englisch-Support
 - PDF-Export
@@ -134,6 +145,8 @@ somas_prompt_generator/
 │   │   ├── user_preset_store.py # Benutzerdefinierte Presets (JSON-Persistenz)
 │   │   ├── comparison_item.py  # ModelChoice/ComparisonConfig/ComparisonResult
 │   │   ├── comparison_worker.py # QThread: 2 Analysen + Synthese + Layout-Render
+│   │   ├── verification_item.py # VerificationConfig/VerificationResult (Faktencheck Stufe 2)
+│   │   ├── verification_worker.py # QThread: Behauptungen verifizieren (Verdikt + Quelle)
 │   │   └── debug_logger.py     # Debug-Logging
 │   │
 │   └── config/
@@ -154,7 +167,8 @@ somas_prompt_generator/
 │   ├── somas_research.txt      # Research-Preset
 │   ├── somas_music.txt         # Musik-Preset (Songtext-Analyse)
 │   ├── somas_songstruktur.txt  # Songstruktur-Preset (Formanalyse)
-│   └── somas_comparison.txt    # Modellvergleich-Dokumentlayout (Jinja2)
+│   ├── somas_comparison.txt    # Modellvergleich-Dokumentlayout (Jinja2)
+│   └── somas_verification.txt  # Faktencheck-Verifikation-Abschnitt (Stufe 2)
 │
 ├── docs/                   # GitHub Pages Landing Page
 │   ├── index.html
@@ -248,6 +262,14 @@ python main.py
 4. **"Modellvergleich starten"** → beide Analysen + Synthese laufen sequenziell, Fortschritt im Bereichs-Header
 5. Das fertige Markdown erscheint im Ergebnisfeld → **"Export: Markdown"** speichert nach `exports/…_Modellvergleich.md`
 
+### Faktencheck-Verifikation-Modus
+
+1. Im API-Bereich **"Behauptungen verifizieren (Faktencheck Stufe 2)"** aktivieren → Bereich "Faktencheck-Verifikation" klappt auf
+2. **Verifikationsmodell** wählen (web-fähig empfohlen, z. B. Perplexity Sonar; für OpenRouter das **`:online`-Häkchen** setzen)
+3. Optional **Max. zu prüfende Behauptungen** anpassen (Default 10, `0 = unbegrenzt`)
+4. **"Generate Prompt"** → die Analyse erzwingt das FAKTENCHECK-Modul; danach läuft **automatisch** die Verifikation
+5. Der Abschnitt `### FAKTENCHECK · VERIFIKATION` (Verdikt + Quelle pro Behauptung) wird an die Analyse angehängt und mitexportiert
+
 ### API-Integration
 
 - API-Keys werden sicher im System-Keyring gespeichert
@@ -283,6 +305,7 @@ Die App implementiert das SOMAS-Framework mit Content-Type-spezifischen Analyse-
 3. **ELABORATION** – Vertiefung, Belege, Details
 4. **IMPLIKATION** – Fazit, Empfehlung, Bedeutung
 5. **[MODUL]** – Automatisch gewählt: Kritik · Zitate · Offene Fragen · Verbindungen · Subtext · Faktencheck
+   - **FAKTENCHECK** trennt seit v0.10.0 Meinungen / Interpretationen / überprüfbare Behauptungen; die Behauptungen können optional in einer zweiten Stufe web-verifiziert werden (Verdikt + Quelle)
 
 ### Musik-Schema (Songtexte, Musikvideos)
 
@@ -297,6 +320,7 @@ Die App implementiert das SOMAS-Framework mit Content-Type-spezifischen Analyse-
 
 | Version | Datum | Änderungen |
 | --------- | ------- | ------------ |
+| 0.10.0 | 2026-06-14 | Faktencheck-Verifikation (Hybrid): Stufe 1 trennt Meinungen/Interpretationen/Behauptungen; optionale Stufe 2 verifiziert Behauptungen per web-fähigem Modell (Verdikt + Quelle, 4-stufige Skala), Halluzinations-Schutz + Riegel gegen erfundene Quellen, `:online`-Schalter, Top-N-Kappung, Auto-Anhang |
 | 0.9.1 | 2026-05-30 | Fix: leeren/None-Content der Provider (z.B. OpenRouter `tencent/hy3-preview`) sauber als Fehler behandeln statt Crash; `reasoning`-Fallback + `finish_reason`-Diagnose; alle 4 Clients abgesichert; Regressionstest |
 | 0.9.0 | 2026-05-29 | Modellvergleich: zwei SOMAS-Analysen eines Videos + automatische Synthese-Kurzbeschreibung, deterministisches Markdown-Layout (Thumbnail), ProviderModelPicker, Export nach exports/ |
 | 0.8.0 | 2026-03-30 | Custom Prompt Editor (System-Prompt + Modul anpassen), Benutzerdefinierte Presets (Auto-Save, Rename, Delete), Export-Branding "Analyse · SOMAS" |
