@@ -231,6 +231,34 @@ def load_template(template_name: str = "somas_prompt.txt") -> str:
         return f.read()
 
 
+# --- Faktencheck-Verifikation (v0.10.0) ---
+
+# Single Source of Truth für das parsbare Stufe-1-Format. Enthält die exakten
+# Vertrags-Marker (**Meinungen:** / **Interpretationen:** / **Behauptungen
+# (überprüfbar):**), auf die der Claim-Parser (extract_claims_from_faktencheck)
+# angewiesen ist. Wird bei erzwungenem FAKTENCHECK injiziert (s. _apply_custom_overrides),
+# damit das Format in JEDEM Preset garantiert ist – auch in den namens-only-Templates.
+FAKTENCHECK_FORMAT = (
+    "FAKTENCHECK-FORMAT — gib den Abschnitt GENAU so aus (Header exakt '### FAKTENCHECK'):\n"
+    "**Meinungen:** subjektive Wertungen (nicht prüfbar), nummeriert.\n"
+    "**Interpretationen:** Deutungen/Schlussfolgerungen (nicht direkt prüfbar), nummeriert.\n"
+    "**Behauptungen (überprüfbar):** je eine einzelne, in sich abgeschlossene, falsifizierbare\n"
+    "Tatsachenaussage pro Punkt, nummeriert; neutral und kontextfrei formuliert (ohne\n"
+    "Meinungswörter); KEIN Urteil über Wahr/Falsch.\n"
+    "Ordne JEDEN Block nach Relevanz absteigend (wichtigste zuerst): zentral für Kernthese/\n"
+    "Hauptthema und/oder strittig bzw. folgenreich im Diskurs. Triviale Selbstverständlichkeiten\n"
+    "NICHT auflisten bzw. ans Ende stellen."
+)
+
+# Hebt das Antwort-Zeichenlimit NUR für den erzwungenen FAKTENCHECK-Lauf (Verifikation) auf,
+# damit die vollständige, relevanz-sortierte Behauptungsliste für das Top-N-Capping entsteht.
+# Steht vor dem (im Template späteren) GESAMTZEICHENLIMIT-Text und überschreibt es so.
+FAKTENCHECK_NO_LIMIT_HINT = (
+    "HINWEIS: Für diesen Lauf ist ein etwaiges Gesamtzeichenlimit AUFGEHOBEN. Die "
+    "Vollständigkeit der relevanz-sortierten Behauptungsliste hat Vorrang vor Kürze."
+)
+
+
 def _apply_custom_overrides(
     rendered: str,
     custom_system_prompt: Optional[str] = None,
@@ -256,6 +284,11 @@ def _apply_custom_overrides(
             f"PFLICHT-MODUL: Verwende ausschließlich das Modul '{custom_module}'. "
             f"Keine andere Wahl ist erlaubt."
         )
+        # v0.10.0: Bei erzwungenem FAKTENCHECK zusätzlich das parsbare 3-Block-Format
+        # und die Limit-Aufhebung injizieren (deckt alle Presets ab, auch namens-only).
+        if custom_module.strip().upper() == "FAKTENCHECK":
+            parts.append(FAKTENCHECK_NO_LIMIT_HINT)
+            parts.append(FAKTENCHECK_FORMAT)
 
     if parts:
         parts.append(rendered)
