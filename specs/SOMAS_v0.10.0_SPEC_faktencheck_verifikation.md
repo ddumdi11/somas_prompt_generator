@@ -670,3 +670,51 @@ wartungsintensiv). Backlog.
 > **Reihenfolge:** Diese Nachbesserungen vor PR 6 (Doku/Version), damit die Doku den finalen
 > Stand abbildet. Danach erneuter PO-Test (idealerweise: ein web-fähiges Modell via `:online`
 > oder Perplexity → Stufe 2 liefert echte, klickbare Quellen).
+
+---
+
+## Nachbesserungen Runde 3 (GUI-Bugs aus PO-Test 2)
+
+> Kontext: Erfolgreicher Web-Lauf (OpenRouter DeepSeek V4 Pro + `:online`) — Stufe 2 lieferte
+> echte, klickbare Quellen und angemessen skeptische Verdikte (mehrfach „nicht überprüfbar/—",
+> ein „widerlegt", ein „teilweise bestätigt"); der N3-Riegel wirkt sichtbar. Zwei GUI-Bugs:
+
+**G1 — `:online`-Checkbox unsichtbar im checked-Zustand UND QSpinBox-Buttons defekt
+(gemeinsame Ursache, Pflicht).** Beide Widgets (`verify_online_checkbox`, `verify_max_spin`)
+sind schmucklos. Ursache liegt in der geteilten `CollapsibleSection`: `_body.setStyleSheet(...)`
+setzt `background-color`/`border` **ohne Selektor** → kaskadiert auf alle Kind-Widgets. Geerbte
+`border`-Regeln schalten bei QCheckBox/QSpinBox die Compound-Subcontrols von nativ auf QSS:
+Checkbox-`::indicator` im checked-Zustand ohne Aussehen → unsichtbar; QSpinBox `::up-/down-button`
+→ eine Taste tot. (Der Autor hat das für die Header-Labels bereits mit
+`border:none;background:transparent` umgangen — bestätigt die Kaskade. Betrifft latent auch den
+Modellvergleich.) **Zentraler Fix in `collapsible_section.py` (~3 Zeilen, behebt es überall):**
+
+```python
+self._body.setObjectName("collapsibleBody")
+self._body.setStyleSheet(
+    "#collapsibleBody { background-color: white; border: 1px solid #C0C0C0; "
+    "border-top: none; border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; }"
+)
+```
+
+Der ID-Selektor begrenzt die Regel auf das Body-Widget; Kinder rendern wieder nativ (SpinBox:
+vertikale Pfeile, beide funktionsfähig). Analog auch in `_update_arrow()` (dort wird der Header
+neu gestylt — Body bleibt unberührt, kein Eingriff nötig). Ein horizontales −/+ am SpinBox wäre
+rein optional/kosmetisch.
+
+**Verifikation: kurzer Re-Test nach dem Fix** — Checkbox sichtbar im checked-Zustand, SpinBox
+hoch/runter beide funktionsfähig, in der Verifikations- UND der Vergleichs-Section.
+
+---
+
+## Backlog / Folge-Version (v0.10.1+)
+
+- **„Verifikation erneut versuchen"-Button (hohe Priorität, PO-Wunsch).** Bei
+  fehlgeschlagener/abgebrochener Stufe 2 nur die Verifikation wiederholen — Claims via
+  `extract_claims_from_faktencheck(result_text)` aus dem vorhandenen Ergebnis ziehen und einen
+  neuen `VerificationWorker` starten, **ohne** die komplette Analyse erneut zu fahren. Spart
+  Kosten/Zeit und ist genau der ausfallanfällige Teil. Naheliegend kombiniert mit der
+  Fehler-Anzeige (`_on_verify_error` setzt einen Retry-Button aktiv).
+- **Debug-Logging nach Schritt/Feature benennen** (= Backlog #8, präzisiert): Logs trennen pro
+  Call bereits in eigene Ordner (kein Datenverlust); sie sind nur nach Modell+Zeitstempel
+  benannt. Nice-to-have: zusätzlich `feature`/`step` im Ordnernamen für leichtere Zuordnung.
