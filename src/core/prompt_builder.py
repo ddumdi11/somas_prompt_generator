@@ -608,6 +608,161 @@ def clean_synthesis_output(text: str) -> str:
     return "\n".join(lines).strip()
 
 
+# --- Faktencheck-Verifikation: Parser / Prompt / Cleaner (v0.10.0) ---
+
+# Verdikt-Skala (exakt) für die Stufe-2-Ausgabe.
+VERDICT_VALUES = (
+    "bestätigt", "teilweise bestätigt", "widerlegt", "nicht überprüfbar",
+)
+
+
+def extract_claims_from_faktencheck(analysis_text: str) -> list[str]:
+    """Extrahiert NUR die nummerierten Behauptungen aus dem FAKTENCHECK-Block.
+
+    Sucht den Stufe-1-Block ``### FAKTENCHECK`` (Dekonstruktion, NICHT
+    ``### FAKTENCHECK · VERIFIKATION``) bis zur nächsten ``### ``-Überschrift
+    bzw. EOF. Innerhalb des Blocks werden ab dem Sub-Header ``Behauptungen``
+    die nummerierten Zeilen (``1.`` oder ``1)``) bis zum nächsten
+    ``**…:**``-Sub-Header bzw. Blockende eingesammelt.
+
+    Die Reihenfolge bleibt erhalten (Stufe 1 ordnet bereits nach Relevanz
+    absteigend). Es findet KEINE Kappung statt — die Liste ist vollständig.
+
+    Args:
+        analysis_text: Der vollständige SOMAS-Analysetext.
+
+    Returns:
+        Liste aller Behauptungs-Strings in Relevanz-Reihenfolge (kann leer sein).
+    """
+    if not analysis_text:
+        return []
+
+    lines = analysis_text.splitlines()
+
+    # 1) FAKTENCHECK-Header der Dekonstruktion finden (nicht den VERIFIKATION-Header)
+    header_re = re.compile(r"^\s*###\s*FAKTENCHECK\b", re.IGNORECASE)
+    start = None
+    for i, line in enumerate(lines):
+        if header_re.match(line) and "VERIFIKATION" not in line.upper():
+            start = i
+            break
+    if start is None:
+        return []
+
+    # 2) Blockende = nächste '### '-Überschrift oder EOF
+    end = len(lines)
+    for j in range(start + 1, len(lines)):
+        if re.match(r"^\s*###\s", lines[j]):
+            end = j
+            break
+    block = lines[start + 1:end]
+
+    # 3) Sub-Header 'Behauptungen' finden (Zeilenanfang, optional fett)
+    behaupt_re = re.compile(r"^\s*\*{0,2}\s*Behauptungen", re.IGNORECASE)
+    claim_start = None
+    for k, line in enumerate(block):
+        if behaupt_re.match(line):
+            claim_start = k + 1
+            break
+    if claim_start is None:
+        return []
+
+    # 4) Nummerierte Zeilen bis zum nächsten '**…:**'-Sub-Header bzw. Blockende
+    num_re = re.compile(r"^\s*\d+[\.\)]\s+(.*\S)\s*$")
+    next_subheader_re = re.compile(r"^\s*\*\*[^*]+:\*\*")
+    claims: list[str] = []
+    for line in block[claim_start:]:
+        if next_subheader_re.match(line):
+            break
+        m = num_re.match(line)
+        if not m:
+            continue
+        text = m.group(1).strip().strip('*"„“”').strip()
+        if text:
+            claims.append(text)
+    return claims
+
+
+def cap_claims(claims: list[str], max_claims: int) -> tuple[list[str], int]:
+    """Wendet die konfigurierbare Obergrenze deterministisch an.
+
+    Args:
+        claims: Vollständige, relevanz-sortierte Behauptungsliste.
+        max_claims: Obergrenze (0 = unbegrenzt).
+
+    Returns:
+        Tupel ``(gekappte_liste, total_count)``. Bei ``max_claims == 0`` oder
+        ``len(claims) <= max_claims`` bleibt die Liste unverändert (Kopie). Die
+        App entscheidet anhand ``len(capped) < total``, ob gekappt wurde.
+    """
+    total = len(claims)
+    if max_claims and max_claims > 0 and total > max_claims:
+        return list(claims[:max_claims]), total
+    return list(claims), total
+
+
+def build_verification_prompt(
+    claims: list[str],
+    language: str = "Deutsch",
+    source_hint: str = "",
+) -> str:
+    """Baut den Stufe-2-Verifikations-Prompt.
+
+    Enthält AUSSCHLIESSLICH die Behauptungen (keine Meinungen, kein Transkript)
+    → sauberer Handoff an das web-fähige Modell.
+
+    Args:
+        claims: Die (bereits gekappte) Liste der zu prüfenden Behauptungen.
+        language: Sprache der Ausgabe (Default Deutsch).
+        source_hint: Optionaler Kontext (z.B. Titel/URL) — nur als Orientierung.
+
+    Returns:
+        Der fertige Prompt-String.
+    """
+    numbered = "\n".join(f"{i}. {c}" for i, c in enumerate(claims, 1))
+    verdicts = " | ".join(VERDICT_VALUES)
+    hint = f"\nKONTEXT (nur zur Orientierung): {source_hint}\n" if source_hint else ""
+
+    return (
+        f"Du bist ein sorgfältiger Faktenprüfer. Prüfe die folgenden Behauptungen "
+        f"einzeln per Websuche bzw. aktuellem Wissen. Antworte in {language}.\n"
+        f"{hint}\n"
+        f"REGELN:\n"
+        f"- Prüfe AUSSCHLIESSLICH die vorgelegten Behauptungen, in gegebener "
+        f"Reihenfolge. Erfinde keine neuen Behauptungen.\n"
+        f"- Gib pro Behauptung EXAKT dieses Markdown-Format aus (kein Vorspann, "
+        f"keine Meta, keine Einleitung):\n"
+        f"\n"
+        f"**<Nr>. „<Behauptung>\"**\n"
+        f"- **Verdikt:** <eines von: {verdicts}>\n"
+        f"- **Begründung:** <1–2 Sätze>\n"
+        f"- **Quelle:** <URL oder Titel; bei 'nicht überprüfbar' ein Gedankenstrich: —>\n"
+        f"\n"
+        f"- Bei Verdikt 'bestätigt', 'teilweise bestätigt' oder 'widerlegt' ist "
+        f"mindestens EINE belastbare Quelle (URL/Titel) verpflichtend.\n"
+        f"- Verwende ausschließlich die vier genannten Verdikt-Werte, exakt geschrieben.\n"
+        f"\n"
+        f"ZU PRÜFENDE BEHAUPTUNGEN:\n"
+        f"{numbered}\n"
+    )
+
+
+def clean_verification_output(text: str) -> str:
+    """Bereinigt die Stufe-2-Ausgabe für das saubere Anhängen.
+
+    Analog zu :func:`clean_synthesis_output`: entfernt umschließende Code-Fences
+    sowie führende Leer-/Überschriftenzeilen, damit der Verifikationsabschnitt
+    sauber unter den deterministischen Header gerendert werden kann.
+
+    Args:
+        text: Roh-Ausgabe des Verifikationsmodells.
+
+    Returns:
+        Bereinigter Markdown-Text (kann leer sein).
+    """
+    return clean_synthesis_output(text)
+
+
 def get_preset_info_for_display(preset: PromptPreset) -> str:
     """Erstellt einen Info-String für die GUI-Anzeige.
     
