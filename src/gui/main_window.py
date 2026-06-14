@@ -35,7 +35,7 @@ from src.gui.transcript_widget import TranscriptInputWidget
 from src.gui.provider_model_picker import ProviderModelPicker
 from src.core.comparison_item import ComparisonConfig, ModelChoice
 from src.core.comparison_worker import ComparisonWorker
-from src.core.verification_item import VerificationConfig
+from src.core.verification_item import VerificationConfig, VerificationResult
 from src.core.verification_worker import VerificationWorker
 from src.config.api_config import (
     load_providers, get_api_key, has_api_key,
@@ -957,6 +957,12 @@ class MainWindow(QMainWindow):
     @pyqtSlot()
     def _on_get_meta(self):
         """Handler für 'Get Meta' Button."""
+        # Defensiv: laufende Verifikation abbrechen, damit ihr Callback nicht
+        # in die neue Analyse hineinschreibt (Stale-State / Race-Condition).
+        if self._verification_worker and self._verification_worker.isRunning():
+            self._verification_worker.cancel()
+            self._verification_worker.wait(2000)
+
         url = self.url_input.text().strip()
         if not url:
             QMessageBox.warning(self, "Fehler", "Bitte eine YouTube-URL eingeben.")
@@ -2157,7 +2163,7 @@ class MainWindow(QMainWindow):
         save_preferences(prefs)
 
     @staticmethod
-    def _looks_web_capable(choice) -> bool:
+    def _looks_web_capable(choice: ModelChoice) -> bool:
         """Heuristik: Hat das gewählte Modell vermutlich Web-Zugriff?"""
         if choice.provider_id == "perplexity":
             return True
@@ -2231,6 +2237,10 @@ class MainWindow(QMainWindow):
         self.verify_picker.set_enabled(not running)
         self.verify_max_spin.setEnabled(not running)
         self.btn_batch.setEnabled(not running)
+        # Quelle sperren: verhindert, dass ein neues Video das Ergebnis leert,
+        # während die Stufe-2-Sektion noch angehängt wird (Stale-State / Race).
+        self.btn_get_meta.setEnabled(not running)
+        self.url_input.setEnabled(not running)
         self.btn_generate.setText("Verifikation läuft…" if running else "Generate Prompt")
 
     def _maybe_start_verification(self, response: APIResponse) -> None:
@@ -2277,7 +2287,7 @@ class MainWindow(QMainWindow):
         logger.info(f"Verifikation Status: {status}")
 
     @pyqtSlot(str, object)
-    def _on_verify_finished(self, section: str, result) -> None:
+    def _on_verify_finished(self, section: str, result: VerificationResult) -> None:
         """Hängt den Verifikationsabschnitt an die Analyse an."""
         self._append_to_result(section)
         if getattr(result, "status", "") == "skipped":

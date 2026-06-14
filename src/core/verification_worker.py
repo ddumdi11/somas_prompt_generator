@@ -16,7 +16,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 from src.config.api_config import get_api_key
 
-from .api_client import APIStatus, create_client
+from .api_client import APIResponse, APIStatus, LLMClient, create_client
 from .debug_logger import APP_VERSION, DebugLogger
 from .prompt_builder import (
     build_verification_prompt,
@@ -139,7 +139,7 @@ class VerificationWorker(QThread):
         self.status_changed.emit("error")
         self.error_occurred.emit(message)
 
-    def _send(self, client, prompt: str, model_id: str):
+    def _send(self, client: LLMClient, prompt: str, model_id: str) -> APIResponse:
         """Sendet den Prompt, misst die Dauer und loggt optional (Debug)."""
         log_dir = None
         if self._debug_logger:
@@ -178,7 +178,7 @@ class VerificationWorker(QThread):
         return response
 
     @staticmethod
-    def _dedup(citations) -> list[str]:
+    def _dedup(citations: list[str] | None) -> list[str]:
         """Dedupliziert Quellen unter Erhalt der Reihenfolge."""
         seen: set[str] = set()
         result: list[str] = []
