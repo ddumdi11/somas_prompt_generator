@@ -12,8 +12,10 @@ from src.core.prompt_builder import (
     cap_claims,
     build_verification_prompt,
     clean_verification_output,
+    build_prompt,
     VERDICT_VALUES,
 )
+from src.config.defaults import VideoInfo, SomasConfig
 
 
 # --- Beispiel-Analysen ----------------------------------------------------
@@ -200,6 +202,19 @@ def test_clean_verification_output():
     print("  clean_verification_output: Fences/Vorspann entfernt OK")
 
 
+def test_charlimit_removed_for_faktencheck():
+    # A2: Bei erzwungenem FAKTENCHECK dürfen KEINE Zeichenlimit-Zeilen mehr im
+    # Prompt stehen (Widerspruch zur vollständigen Behauptungsliste).
+    vi = VideoInfo(title="T", channel="C", duration=600, url="https://youtu.be/x")
+    cfg = SomasConfig(depth=2, language="Deutsch")
+    forced = build_prompt(vi, cfg, preset_name="Standard", custom_module="FAKTENCHECK")
+    assert "ZEICHENLIMIT" not in forced and "Maximale Ausgabelänge" not in forced, forced
+    # Ohne Erzwingung bleibt das Preset-Limit erhalten.
+    normal = build_prompt(vi, cfg, preset_name="Standard")
+    assert "ZEICHENLIMIT" in normal
+    print("  charlimit_removed_for_faktencheck: Limit weg bei FAKTENCHECK, sonst da OK")
+
+
 def main():
     print("Faktencheck-Parser-Tests:")
     test_extract_standard()
@@ -212,6 +227,7 @@ def main():
     test_cap_claims()
     test_build_verification_prompt()
     test_clean_verification_output()
+    test_charlimit_removed_for_faktencheck()
     print("ALLE TESTS OK")
 
 

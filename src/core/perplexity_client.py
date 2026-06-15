@@ -78,6 +78,9 @@ class PerplexityClient(LLMClient):
                 json={
                     "model": model,
                     "messages": [{"role": "user", "content": prompt}],
+                    # max_tokens explizit setzen (analog OpenRouter/Anthropic/OpenAI),
+                    # um Worst-Case-Pre-Auth zu vermeiden. 4096 genügt.
+                    "max_tokens": 4096,
                 },
                 timeout=120,
             )

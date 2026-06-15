@@ -142,6 +142,10 @@ class OpenRouterClient(LLMClient):
                 json={
                     "model": model,
                     "messages": [{"role": "user", "content": prompt}],
+                    # max_tokens setzen, sonst rechnet OpenRouter mit dem vollen
+                    # Context-Window als Worst-Case und blockt bei moderatem
+                    # Guthaben mit HTTP 402. 4096 reicht für Analyse/Verifikation.
+                    "max_tokens": 4096,
                 },
                 timeout=120,
             )
