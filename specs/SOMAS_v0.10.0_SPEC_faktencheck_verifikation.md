@@ -707,14 +707,96 @@ hoch/runter beide funktionsfähig, in der Verifikations- UND der Vergleichs-Sect
 
 ---
 
+## Bugfix-Runde 4 (v0.10.1) — A1/A2 aus PO-Beobachtungen
+
+> Zwei nach dem v0.10.0-Merge gefundene Bugs. Beide klein und klar umrissen. Quelle:
+> PO-Test-Beobachtungen + externes Review. Verifiziert am Code.
+
+**A1 — `max_tokens` fehlt im Request → HTTP 402 bei OpenRouter (HOCH, verifiziert).**
+`openrouter_client.py` (Payload bei ~Z. 142) sendet nur `model` + `messages`, **kein**
+`max_tokens`. Folge: OpenRouter rechnet mit dem vollen Context-Window (z. B. 65.536 Output-Token)
+als Worst-Case und blockt bei moderatem Guthaben mit **HTTP 402** („requires more credits, or
+fewer max_tokens"). Das war die wahre Ursache des 402 — nicht zu wenig Guthaben.
+Fix:
+
+```python
+json={
+    "model": model,
+    "messages": [{"role": "user", "content": prompt}],
+    "max_tokens": 4096,
+},
+```
+
+- Wert **4096** (konsistent mit `anthropic_client.py`/`openai_client.py`, die ihn bereits setzen).
+  Reicht für die kurzen Analyse- und Verifikations-Antworten locker; verhindert das Worst-Case-
+  Pre-Auth. **`perplexity_client.py`** hat ebenfalls kein `max_tokens` → gleich mitziehen.
+- Hinweis: Reasoning-Modelle verbrauchen zusätzlich „Denk-Token". Falls dort später Abschneiden
+  auffällt, Wert erhöhen oder konfigurierbar machen (Backlog) — für jetzt genügt 4096.
+- **Verify:** OpenRouter-Lauf mit knappem Guthaben kein 402 mehr; Verifikation mit vielen Claims
+  wird nicht abgeschnitten.
+
+**A2 — Prompt-Widerspruch beim Zeichenlimit bei erzwungenem FAKTENCHECK (MITTEL–HOCH, verifiziert).**
+N2b stellt „Limit AUFGEHOBEN" voran, aber die Template-Zeilen zum Zeichenlimit bleiben im Prompt
+→ das Modell folgt evtl. der Grenze und **kürzt die Behauptungsliste**. Das Limit steht pro
+Template an bis zu **drei** Stellen (verifiziert):
+1. Kopf: `⚠ ZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter … Zeichen bleiben. Zähle mit.`
+2. Regeln: `N. GESAMTZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter … Zeichen bleiben.`
+3. (Transkript/Musik) `⚠ ERINNERUNG: Maximale Ausgabelänge = … Zeichen. …`
+
+Ein Gegen-Hinweis reicht also nicht. Fix **zentral in `_apply_custom_overrides`** (gleiche Stelle
+wie die FAKTENCHECK-Injektion): wenn `custom_module == "FAKTENCHECK"`, die Zeichenlimit-Zeilen aus
+dem gerenderten Prompt **entfernen**, bevor er zurückgegeben wird:
+
+```python
+if custom_module and custom_module.strip().upper() == "FAKTENCHECK":
+    rendered = re.sub(
+        r"(?im)^.*(?:ZEICHENLIMIT|Maximale Ausgabelänge).*\n?", "", rendered
+    )
+```
+
+- Damit verschwindet der Widerspruch komplett (alle drei Varianten). `FAKTENCHECK_NO_LIMIT_HINT`
+  kann dann entfallen **oder** zu einer rein positiven Zeile vereinfacht werden
+  („Liste die Behauptungen vollständig; Vollständigkeit vor Kürze.") — kein „aufgehoben"-Framing
+  mehr nötig, da real entfernt.
+- Greift nur bei erzwungenem FAKTENCHECK (Verifikation an bzw. manuell erzwungen). **Normale
+  Analysen (Verifikation aus) behalten ihr Preset-Limit unverändert** — konsistent mit
+  Entscheidung #9.
+- **Tests** (`tests/test_faktencheck_parser.py` o. ä.): `build_prompt(..., custom_module="FAKTENCHECK")`
+  enthält **kein** `ZEICHENLIMIT`/`Maximale Ausgabelänge` mehr (für ein Limit-Preset wie Standard);
+  ohne `custom_module` ist die Limit-Zeile weiterhin vorhanden.
+
+> **Reihenfolge:** A1 zuerst (entblockt OpenRouter), dann A2. Beide vor den C-Backlog-Punkten.
+> Können zusammen als v0.10.1-Hotfix laufen.
+
+---
+
 ## Backlog / Folge-Version (v0.10.1+)
 
-- **„Verifikation erneut versuchen"-Button (hohe Priorität, PO-Wunsch).** Bei
-  fehlgeschlagener/abgebrochener Stufe 2 nur die Verifikation wiederholen — Claims via
-  `extract_claims_from_faktencheck(result_text)` aus dem vorhandenen Ergebnis ziehen und einen
-  neuen `VerificationWorker` starten, **ohne** die komplette Analyse erneut zu fahren. Spart
-  Kosten/Zeit und ist genau der ausfallanfällige Teil. Naheliegend kombiniert mit der
-  Fehler-Anzeige (`_on_verify_error` setzt einen Retry-Button aktiv).
+- **„Verifikation erneut versuchen"-Button (HOCH, PO-Wunsch; vom Review ausdrücklich bestätigt).**
+  Nach jedem Verifikationslauf (Erfolg, „skipped", Fehler/Abbruch) im `verify_section` einen Button
+  „Verifikation erneut versuchen" aktivieren. Klick:
+  1. **Verifikationsmodell darf vorher gewechselt werden** — Auswahl frisch über
+     `_effective_verify_choice()` lesen (Picker + `:online`). Kernnutzen (Review-Szenario):
+     DeepSeek:online liefert viele „nicht überprüfbar" → Nutzer stellt auf Perplexity Sonar um und
+     fährt **nur Stufe 2** neu.
+  2. Claims via `extract_claims_from_faktencheck(result_text)` aus dem **vorhandenen** Ergebnis
+     ziehen (Stufe 1 bleibt unberührt — kein ~80-s-Re-Run, keine Doppelkosten), `cap_claims` mit
+     aktuellem SpinBox-Wert; neuen `VerificationWorker` starten (bestehendes
+     `_set_verification_running`/Abbrechen wiederverwenden).
+  3. **Vorhandenen Verifikationsabschnitt ERSETZEN, nicht stapeln:** vor dem Anhängen den alten
+     Block ab `### FAKTENCHECK · VERIFIKATION` (inkl. vorangehendem `---`) bis Ende abschneiden,
+     dann neu anhängen — sonst sammeln sich Duplikate bei mehrfachem Retry.
+  Button während eines laufenden Verifikationslaufs deaktivieren.
+- **`:online`-Checkbox-Tooltip präzisieren (NIEDRIG, Review-Anregung).** Tooltip ergänzen/ersetzen:
+  „Das ':online'-Suffix aktiviert die modellspezifische Internetsuche; die Recherche-Qualität hängt
+  stark vom Modell ab." Lernpunkt **„Webzugriff ≠ Webzugriff"**: DeepSeek:online fand real
+  verifizierbare, top-aktuelle News nicht, dedizierte Such-Modelle (Perplexity Sonar) mühelos.
+  Kurz auch in README/Docs als Empfehlung „für Stufe 2 ein dediziertes Such-Modell (z. B. Perplexity
+  Sonar) wählen".
+- **Optional: Perplexity-Modellliste ergänzen (NIEDRIG).** `api_providers.json` führt aktuell
+  `sonar`, `sonar-pro`, `sonar-reasoning` — alle gültig (Stand Juni 2026, offizielle Doku). Nice-to-have:
+  `sonar-reasoning-pro` (DeepSeek-R1-basiert, zeigt Reasoning) und `sonar-deep-research` aufnehmen.
+  Kein Stale-ID-Problem vorhanden.
 - **Debug-Logging nach Schritt/Feature benennen** (= Backlog #8, präzisiert): Logs trennen pro
   Call bereits in eigene Ordner (kein Datenverlust); sie sind nur nach Modell+Zeitstempel
   benannt. Nice-to-have: zusätzlich `feature`/`step` im Ordnernamen für leichtere Zuordnung.
