@@ -252,12 +252,21 @@ FAKTENCHECK_FORMAT = (
     "KEINE Inline-Aufzählung mehrerer Punkte in einer Zeile."
 )
 
-# Hebt das Antwort-Zeichenlimit NUR für den erzwungenen FAKTENCHECK-Lauf (Verifikation) auf,
-# damit die vollständige, relevanz-sortierte Behauptungsliste für das Top-N-Capping entsteht.
-# Steht vor dem (im Template späteren) GESAMTZEICHENLIMIT-Text und überschreibt es so.
+# Positiver Vollständigkeits-Hinweis für den erzwungenen FAKTENCHECK-Lauf. Die
+# eigentlichen Zeichenlimit-Zeilen werden bei FAKTENCHECK aus dem Prompt ENTFERNT
+# (s. _apply_custom_overrides), daher kein "aufgehoben"-Framing mehr nötig.
 FAKTENCHECK_NO_LIMIT_HINT = (
-    "HINWEIS: Für diesen Lauf ist ein etwaiges Gesamtzeichenlimit AUFGEHOBEN. Die "
-    "Vollständigkeit der relevanz-sortierten Behauptungsliste hat Vorrang vor Kürze."
+    "Liste die Behauptungen VOLLSTÄNDIG auf — Vollständigkeit hat Vorrang vor Kürze."
+)
+
+# Entfernt die Zeichenlimit-Kontrollzeilen aus einem gerenderten Prompt (Kopf-
+# Warnung, Regel-Zeile, Erinnerung). An den tatsächlichen Template-Wortlaut
+# angeankert, damit eingebettete Transkript-Zeilen mit "Zeichenlimit"/"maximale
+# Ausgabelänge" NICHT versehentlich entfernt werden (der Prompt enthält im
+# Transkript-Modus das volle Transkript).
+_CHARLIMIT_LINE_RE = re.compile(
+    r"(?im)^.*(?:ZEICHENLIMIT:\s*Deine GESAMTE Antwort MUSS unter"
+    r"|Maximale Ausgabelänge\s*=).*\n?"
 )
 
 
@@ -286,11 +295,14 @@ def _apply_custom_overrides(
             f"PFLICHT-MODUL: Verwende ausschließlich das Modul '{custom_module}'. "
             f"Keine andere Wahl ist erlaubt."
         )
-        # v0.10.0: Bei erzwungenem FAKTENCHECK zusätzlich das parsbare 3-Block-Format
-        # und die Limit-Aufhebung injizieren (deckt alle Presets ab, auch namens-only).
+        # v0.10.0/v0.10.1: Bei erzwungenem FAKTENCHECK das parsbare 3-Block-Format
+        # injizieren (deckt alle Presets ab, auch namens-only) UND die
+        # Zeichenlimit-Zeilen aus dem Template entfernen, damit kein Widerspruch
+        # zur vollständigen Behauptungsliste entsteht (A2).
         if custom_module.strip().upper() == "FAKTENCHECK":
             parts.append(FAKTENCHECK_NO_LIMIT_HINT)
             parts.append(FAKTENCHECK_FORMAT)
+            rendered = _CHARLIMIT_LINE_RE.sub("", rendered)
 
     if parts:
         parts.append(rendered)
