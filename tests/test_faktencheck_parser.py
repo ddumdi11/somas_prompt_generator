@@ -13,6 +13,7 @@ from src.core.prompt_builder import (
     build_verification_prompt,
     clean_verification_output,
     build_prompt,
+    build_prompt_from_transcript,
     VERDICT_VALUES,
 )
 from src.config.defaults import VideoInfo, SomasConfig
@@ -202,9 +203,9 @@ def test_clean_verification_output():
     print("  clean_verification_output: Fences/Vorspann entfernt OK")
 
 
-def test_charlimit_removed_for_faktencheck():
-    # A2: Bei erzwungenem FAKTENCHECK dürfen KEINE Zeichenlimit-Zeilen mehr im
-    # Prompt stehen (Widerspruch zur vollständigen Behauptungsliste).
+def test_charlimit_removed_for_faktencheck() -> None:
+    """A2: Zeichenlimit-Kontrollzeilen werden bei erzwungenem FAKTENCHECK aus dem
+    Prompt entfernt, bleiben aber bei normaler Analyse (Standard-Preset) erhalten."""
     vi = VideoInfo(title="T", channel="C", duration=600, url="https://youtu.be/x")
     cfg = SomasConfig(depth=2, language="Deutsch")
     forced = build_prompt(vi, cfg, preset_name="Standard", custom_module="FAKTENCHECK")
@@ -213,6 +214,23 @@ def test_charlimit_removed_for_faktencheck():
     normal = build_prompt(vi, cfg, preset_name="Standard")
     assert "ZEICHENLIMIT" in normal
     print("  charlimit_removed_for_faktencheck: Limit weg bei FAKTENCHECK, sonst da OK")
+
+
+def test_charlimit_strip_preserves_transcript() -> None:
+    """Die Limit-Entfernung darf eingebettete Transkript-Zeilen mit 'Zeichenlimit'/
+    'maximale Ausgabelänge' NICHT löschen — nur die echten Kontrollzeilen."""
+    trap = "Sie sprach über das Zeichenlimit und die maximale Ausgabelänge der KI."
+    cfg = SomasConfig(depth=2, language="Deutsch")
+    prompt = build_prompt_from_transcript(
+        title="T", author="A", transcript=trap, config=cfg,
+        preset_name="Standard", custom_module="FAKTENCHECK",
+    )
+    # Trap-Zeile (Transkript) bleibt erhalten ...
+    assert trap in prompt, "Transkript-Zeile wurde fälschlich entfernt"
+    # ... die echte Kontroll-Zeile ist weg.
+    assert "Deine GESAMTE Antwort MUSS unter" not in prompt
+    assert "Maximale Ausgabelänge =" not in prompt
+    print("  charlimit_strip_preserves_transcript: Transkript-Zeile bleibt, Kontrollzeilen weg OK")
 
 
 def main():
@@ -228,6 +246,7 @@ def main():
     test_build_verification_prompt()
     test_clean_verification_output()
     test_charlimit_removed_for_faktencheck()
+    test_charlimit_strip_preserves_transcript()
     print("ALLE TESTS OK")
 
 

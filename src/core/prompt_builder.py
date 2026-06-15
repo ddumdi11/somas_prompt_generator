@@ -259,11 +259,14 @@ FAKTENCHECK_NO_LIMIT_HINT = (
     "Liste die Behauptungen VOLLSTÄNDIG auf — Vollständigkeit hat Vorrang vor Kürze."
 )
 
-# Entfernt alle Zeichenlimit-Zeilen aus einem gerenderten Prompt (Kopf-Warnung,
-# Regel-Zeile, Erinnerung). Verhindert den Widerspruch zur vollständigen
-# Behauptungsliste bei erzwungenem FAKTENCHECK.
+# Entfernt die Zeichenlimit-Kontrollzeilen aus einem gerenderten Prompt (Kopf-
+# Warnung, Regel-Zeile, Erinnerung). An den tatsächlichen Template-Wortlaut
+# angeankert, damit eingebettete Transkript-Zeilen mit "Zeichenlimit"/"maximale
+# Ausgabelänge" NICHT versehentlich entfernt werden (der Prompt enthält im
+# Transkript-Modus das volle Transkript).
 _CHARLIMIT_LINE_RE = re.compile(
-    r"(?im)^.*(?:ZEICHENLIMIT|Maximale Ausgabelänge).*\n?"
+    r"(?im)^.*(?:ZEICHENLIMIT:\s*Deine GESAMTE Antwort MUSS unter"
+    r"|Maximale Ausgabelänge\s*=).*\n?"
 )
 
 
