@@ -571,8 +571,10 @@ class MainWindow(QMainWindow):
         # Web-Suche (:online) — nur für OpenRouter-Modelle wirksam
         self.verify_online_checkbox = QCheckBox("Web-Suche aktivieren (:online, nur OpenRouter)")
         self.verify_online_checkbox.setToolTip(
-            "Hängt bei OpenRouter-Modellen das Suffix ':online' an die Modell-ID an, "
-            "um echten Web-Zugriff zu aktivieren."
+            "Das ':online'-Suffix aktiviert die modellspezifische Internetsuche "
+            "(nur OpenRouter). Die Recherche-Qualität hängt stark vom Modell ab — "
+            "dedizierte Such-Modelle (z. B. Perplexity Sonar) liefern oft bessere "
+            "Quellen als allgemeine Modelle mit ':online'."
         )
         verify_layout.addWidget(self.verify_online_checkbox)
 
