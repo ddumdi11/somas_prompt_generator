@@ -794,10 +794,15 @@ def build_verification_prompt(
     """
     numbered = "\n".join(f"{i}. {c}" for i, c in enumerate(claims, 1))
     verdicts = " | ".join(VERDICT_VALUES)
+    # source_hint stammt aus externer Metadatenquelle (Videotitel/URL) — also aus
+    # genau dem geprüften (potenziell gegnerischen) Inhalt. Vor der Einbettung
+    # Whitespace/Zeilenumbrüche kollabieren und Länge begrenzen, damit kein
+    # Injection-Text die Verifikationsregeln aufweichen kann.
+    safe_source_hint = " ".join(source_hint.split())[:300]
     forbidden = (
         f"- Die GEPRÜFTE Quelle selbst darf NICHT als Beleg dienen (weder in der "
-        f"Begründung noch als Quelle): {source_hint}\n"
-        if source_hint else ""
+        f"Begründung noch als Quelle): {safe_source_hint}\n"
+        if safe_source_hint else ""
     )
 
     return (
