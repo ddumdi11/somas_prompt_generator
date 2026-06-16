@@ -162,6 +162,8 @@ class MainWindow(QMainWindow):
         # Faktencheck-Verifikation-State (v0.10.0)
         self._verification_worker: VerificationWorker | None = None
         self._verification_max_claims: int = prefs.get("verification_max_claims", 10)
+        # Analyse-Text OHNE Verifikationsabschnitt (Basis für Retry, v0.10.1)
+        self._verification_base_text: str = ""
 
         # Lade Presets mit Fehlerbehandlung
         try:
@@ -586,6 +588,16 @@ class MainWindow(QMainWindow):
         self.verify_max_spin.setToolTip("0 = unbegrenzt (alle Behauptungen prüfen).")
         verify_opts.addWidget(self.verify_max_spin)
         verify_opts.addStretch()
+        # Nur Stufe 2 auf den vorhandenen Behauptungen wiederholen (z. B. nach
+        # Modellwechsel) — ohne erneuten Analyse-Lauf. Aktiv erst nach einem Lauf.
+        self.btn_verify_retry = QPushButton("Verifikation erneut versuchen")
+        self.btn_verify_retry.setEnabled(False)
+        self.btn_verify_retry.setToolTip(
+            "Prüft nur die bereits ermittelten Behauptungen erneut (mit dem aktuell "
+            "gewählten Verifikationsmodell) — die Analyse wird nicht neu erstellt."
+        )
+        self.btn_verify_retry.clicked.connect(self._on_verify_retry)
+        verify_opts.addWidget(self.btn_verify_retry)
         self.btn_verify_cancel = QPushButton("Abbrechen")
         self.btn_verify_cancel.setEnabled(False)
         self.btn_verify_cancel.clicked.connect(self._on_verify_cancel)
@@ -998,6 +1010,9 @@ class MainWindow(QMainWindow):
             self.rating_widget.setVisible(False)
             self.btn_channel_rating.setVisible(False)
             self._current_analysis_id = None
+            # Verifikations-Retry für das alte Video verfällt.
+            self._verification_base_text = ""
+            self.btn_verify_retry.setEnabled(False)
         except ValueError as e:
             QMessageBox.critical(self, "Fehler", str(e))
             logger.error(f"Fehler beim Abrufen der Metadaten: {e}")
@@ -1863,6 +1878,9 @@ class MainWindow(QMainWindow):
         """Handler für erfolgreiche API-Antwort."""
         self._last_api_response = response
         self._is_comparison_result = False
+        # Neues Analyse-Ergebnis → alter Retry-Stand ungültig (wird neu gesetzt,
+        # falls die Verifikation für diesen Lauf läuft).
+        self.btn_verify_retry.setEnabled(False)
         self._clear_stale_sources()
         self.result_text.setText(response.content)
         logger.info(
@@ -2243,17 +2261,27 @@ class MainWindow(QMainWindow):
         # während die Stufe-2-Sektion noch angehängt wird (Stale-State / Race).
         self.btn_get_meta.setEnabled(not running)
         self.url_input.setEnabled(not running)
+        # Retry während eines Laufs sperren; das Wieder-Aktivieren übernehmen die
+        # finished/error-Slots (nur wenn ein Basis-Text vorliegt).
+        if running:
+            self.btn_verify_retry.setEnabled(False)
         self.btn_generate.setText("Verifikation läuft…" if running else "Generate Prompt")
 
     def _maybe_start_verification(self, response: APIResponse) -> None:
-        """Startet Stufe 2, wenn die Verifikation aktiv ist."""
+        """Startet Stufe 2 nach einer frischen Analyse, wenn die Verifikation aktiv ist."""
         if not self.verify_checkbox.isChecked():
             return
         sel = self._effective_verify_choice()
         if not sel:
             return  # Preflight hätte das abgefangen — defensiv überspringen
+        # Analyse-Text als Basis merken (ohne Verifikationsabschnitt) — Grundlage
+        # für ein späteres "erneut versuchen".
+        self._verification_base_text = response.content.rstrip()
+        self._start_verification(sel)
 
-        all_claims = extract_claims_from_faktencheck(response.content)
+    def _start_verification(self, sel) -> None:
+        """Baut Config aus dem Basis-Text + Modellauswahl und startet den Worker."""
+        all_claims = extract_claims_from_faktencheck(self._verification_base_text)
         claims, total = cap_claims(all_claims, self._verification_max_claims)
         config = VerificationConfig(
             claims=claims,
@@ -2278,10 +2306,42 @@ class MainWindow(QMainWindow):
         )
         worker.start()
 
-    def _append_to_result(self, section: str) -> None:
-        """Hängt einen Markdown-Abschnitt an das bestehende Ergebnis an."""
-        current = self.result_text.toPlainText().rstrip()
-        self.result_text.setPlainText(f"{current}\n\n{section.strip()}\n")
+    @pyqtSlot()
+    def _on_verify_retry(self) -> None:
+        """Wiederholt NUR Stufe 2 auf den vorhandenen Behauptungen (Modellwechsel ok)."""
+        if self._verification_worker and self._verification_worker.isRunning():
+            return
+        if not self._verification_base_text:
+            # Fallback: aktuellen Ergebnistext als Basis nehmen (z. B. eingefügte Analyse)
+            self._verification_base_text = self.result_text.toPlainText().rstrip()
+        if not extract_claims_from_faktencheck(self._verification_base_text):
+            QMessageBox.information(
+                self, "Keine Behauptungen",
+                "Im Ergebnis sind keine überprüfbaren Behauptungen (FAKTENCHECK-Block) "
+                "vorhanden, die erneut geprüft werden könnten.",
+            )
+            return
+        sel = self._effective_verify_choice()
+        if not sel:
+            QMessageBox.warning(
+                self, "Verifikationsmodell fehlt", "Bitte ein Verifikationsmodell wählen.",
+            )
+            return
+        if not get_api_key(sel.provider_id):
+            QMessageBox.warning(
+                self, "API-Key fehlt",
+                f"Kein API-Key für {sel.provider_name or sel.provider_id} konfiguriert.",
+            )
+            return
+        self._start_verification(sel)
+
+    def _set_result_with_verification(self, section: str) -> None:
+        """Setzt das Ergebnis = Analyse-Basis + Verifikationsabschnitt.
+
+        Ersetzt einen evtl. vorhandenen früheren Abschnitt (Retry hängt nicht an).
+        """
+        base = self._verification_base_text or self.result_text.toPlainText().rstrip()
+        self.result_text.setPlainText(f"{base}\n\n{section.strip()}\n")
 
     @pyqtSlot(str)
     def _on_verify_status(self, status: str) -> None:
@@ -2290,26 +2350,28 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(str, object)
     def _on_verify_finished(self, section: str, result: VerificationResult) -> None:
-        """Hängt den Verifikationsabschnitt an die Analyse an."""
-        self._append_to_result(section)
+        """Setzt den Verifikationsabschnitt unter die Analyse (ersetzend)."""
+        self._set_result_with_verification(section)
         if getattr(result, "status", "") == "skipped":
             self.verify_section.set_summary(
                 "Keine überprüfbaren Behauptungen", color="#888888"
             )
         else:
             self.verify_section.set_summary("Verifikation fertig ✓", color="#2E7D32")
-        logger.info("Verifikationsabschnitt angehängt")
+        self.btn_verify_retry.setEnabled(True)
+        logger.info("Verifikationsabschnitt gesetzt")
 
     @pyqtSlot(str)
     def _on_verify_error(self, message: str) -> None:
-        """Hängt einen Platzhalter an (Analyse bleibt erhalten) + Warnung."""
+        """Setzt einen Platzhalter (Analyse bleibt erhalten) + Warnung + Retry aktiv."""
         placeholder = (
             "---\n\n### FAKTENCHECK · VERIFIKATION\n"
             f"_Verifikation fehlgeschlagen: {message}. "
             "Behauptungen siehe FAKTENCHECK-Block oben._\n"
         )
-        self._append_to_result(placeholder)
+        self._set_result_with_verification(placeholder)
         self.verify_section.set_summary("Verifikation fehlgeschlagen", color="#C62828")
+        self.btn_verify_retry.setEnabled(True)
         QMessageBox.warning(self, "Verifikation fehlgeschlagen", message)
 
     @pyqtSlot()
@@ -2319,6 +2381,9 @@ class MainWindow(QMainWindow):
             self._verification_worker.cancel()
             self.verify_section.set_summary("Abgebrochen", color="#C62828")
             self.btn_verify_cancel.setEnabled(False)
+            # Retry erlauben, falls bereits Behauptungen vorliegen.
+            if self._verification_base_text:
+                self.btn_verify_retry.setEnabled(True)
 
     # ── Custom Prompt Editor ──────────────────────────────────────────
 
