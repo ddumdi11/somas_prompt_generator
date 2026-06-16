@@ -7,7 +7,7 @@ Statische Modellliste, kein Web-Search.
 import logging
 from typing import ClassVar
 
-from .api_client import APIResponse, APIStatus, LLMClient
+from .api_client import DEFAULT_MAX_TOKENS, APIResponse, APIStatus, LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ class AnthropicClient(LLMClient):
             client = anthropic.Anthropic(api_key=self.api_key)
             message = client.messages.create(
                 model=model,
-                max_tokens=4096,
+                max_tokens=DEFAULT_MAX_TOKENS,
                 messages=[{"role": "user", "content": prompt}],
             )
 

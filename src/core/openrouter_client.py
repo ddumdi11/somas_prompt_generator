@@ -10,7 +10,7 @@ from typing import ClassVar, Optional
 
 import requests
 
-from .api_client import APIResponse, APIStatus, LLMClient
+from .api_client import DEFAULT_MAX_TOKENS, APIResponse, APIStatus, LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -144,8 +144,8 @@ class OpenRouterClient(LLMClient):
                     "messages": [{"role": "user", "content": prompt}],
                     # max_tokens setzen, sonst rechnet OpenRouter mit dem vollen
                     # Context-Window als Worst-Case und blockt bei moderatem
-                    # Guthaben mit HTTP 402. 4096 reicht für Analyse/Verifikation.
-                    "max_tokens": 4096,
+                    # Guthaben mit HTTP 402.
+                    "max_tokens": DEFAULT_MAX_TOKENS,
                 },
                 timeout=120,
             )

@@ -9,7 +9,7 @@ from typing import ClassVar
 
 import requests
 
-from .api_client import APIResponse, APIStatus, LLMClient
+from .api_client import DEFAULT_MAX_TOKENS, APIResponse, APIStatus, LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class PerplexityClient(LLMClient):
     PROVIDER_ID = "perplexity"
     PROVIDER_NAME = "Perplexity AI"
 
-    # Aktuelle Modellnamen (Stand Januar 2026)
+    # Aktuelle Modellnamen (Stand Juni 2026, gegen docs.perplexity.ai/docs/sonar/models geprüft)
     MODELS: ClassVar[list[dict[str, str]]] = [
         {
             "id": "sonar",
@@ -34,9 +34,14 @@ class PerplexityClient(LLMClient):
             "description": "Best für komplexe Queries (empfohlen für SOMAS)",
         },
         {
-            "id": "sonar-reasoning",
-            "name": "Sonar Reasoning",
-            "description": "Spezialisiert für Reasoning-Tasks",
+            "id": "sonar-reasoning-pro",
+            "name": "Sonar Reasoning Pro",
+            "description": "Reasoning mit Chain-of-Thought",
+        },
+        {
+            "id": "sonar-deep-research",
+            "name": "Sonar Deep Research",
+            "description": "Tiefenrecherche, umfassende Berichte (langsam/teurer)",
         },
     ]
 
@@ -79,8 +84,8 @@ class PerplexityClient(LLMClient):
                     "model": model,
                     "messages": [{"role": "user", "content": prompt}],
                     # max_tokens explizit setzen (analog OpenRouter/Anthropic/OpenAI),
-                    # um Worst-Case-Pre-Auth zu vermeiden. 4096 genügt.
-                    "max_tokens": 4096,
+                    # um Worst-Case-Pre-Auth zu vermeiden.
+                    "max_tokens": DEFAULT_MAX_TOKENS,
                 },
                 timeout=120,
             )
