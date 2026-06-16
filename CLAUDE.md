@@ -7,7 +7,7 @@
 ## 🎯 Projektkontext
 
 **Name:** SOMAS Prompt Generator
-**Version:** 0.10.0
+**Version:** 0.10.1
 **Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
 **Sprache:** Python 3.11+
 **GUI-Framework:** PyQt6
@@ -332,10 +332,21 @@ TEST_URLS = [
 - [x] Tests `tests/test_faktencheck_parser.py`; headless + real-web getestet
 - [x] Spec dokumentiert (SOMAS_v0.10.0_SPEC_faktencheck_verifikation.md)
 
+### Phase 12b: Faktencheck-Härtung & Fixes ✅ (v0.10.1)
+
+- [x] Unabhängigkeits-Riegel im Verifikations-Prompt: das geprüfte Video zählt nicht als
+  Beleg (nur externe Quellen); `source_hint` als verbotene Eigenquelle + gegen Prompt-
+  Injection saniert
+- [x] Perplexity-Modelle aktualisiert (`sonar-reasoning-pro`, `sonar-deep-research`)
+- [x] `DEFAULT_MAX_TOKENS = 8192` zentral in allen 4 Clients (behebt OpenRouter-HTTP-402)
+- [x] Zeichenlimit-Zeilen bei erzwungenem FAKTENCHECK entfernt (Regex), `:online`-Tooltip präzisiert
+- [x] Einheitlicher Export-Kopf für Einzelanalyse (Titel + „Kanal, YT" + Thumbnail)
+- [x] „Verifikation erneut versuchen"-Button: nur Stufe 2, Modellwechsel möglich, ersetzt Abschnitt
+- [x] Tests `tests/test_export_header.py` + erweiterte Parser-Tests
+
 ### Backlog
 
-- [ ] „Verifikation erneut versuchen"-Button (nur Stufe 2 wiederholen) — v0.10.1, hohe Priorität
-- [ ] Einheitlicher Export-Kopf (Einzelanalyse wie Modellvergleich: Titel-Block + Thumbnail) — v0.10.1
+- [ ] Docstring-Coverage auf ≥80 % (Test-Funktionen) — CodeRabbit-Gate, niedrige Priorität
 - [ ] Wochentags-basierte Perspektive-Defaults (nach Recherche)
 - [ ] Englisch-Support
 - [ ] PDF-Export (auch für Modellvergleich)
