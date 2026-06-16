@@ -202,9 +202,24 @@ def get_markdown_content(
     parts = []
 
     if video_info:
-        # Sanitize den Titel für den Header
+        # Lazy-Import: hält export.py frei von yt-dlp/-transcript-Deps zur Importzeit.
+        from src.core.youtube_client import extract_video_id, build_thumbnail_urls
+
         safe_title = sanitize_unicode_for_export(video_info.title)
-        parts.append(f"# Analyse · SOMAS: {safe_title}\n")
+        video_id = extract_video_id(video_info.url) if video_info.url else None
+        is_youtube = bool(video_id)
+
+        # Titel-Block (wie Modellvergleich): großer Titel + "Kanal, YT" + Thumbnail.
+        parts.append(f"# {safe_title}")
+        parts.append(f"**{video_info.channel}{', YT' if is_youtube else ''}**")
+        parts.append("")
+        if is_youtube:
+            thumb = build_thumbnail_urls(video_id)
+            parts.append(f"![Thumbnail zum Video]({thumb['maxres']})")
+            parts.append("")
+
+        # SOMAS-Block (Titel steht bereits oben → keine Dopplung).
+        parts.append("# Analyse · SOMAS")
         parts.append(f"**Kanal:** {video_info.channel}  ")
         if video_info.duration > 0:
             parts.append(f"**Dauer:** {video_info.duration_formatted}  ")
