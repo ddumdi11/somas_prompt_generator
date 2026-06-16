@@ -785,22 +785,39 @@ def build_verification_prompt(
     Args:
         claims: Die (bereits gekappte) Liste der zu prüfenden Behauptungen.
         language: Sprache der Ausgabe (Default Deutsch).
-        source_hint: Optionaler Kontext (z.B. Titel/URL) — nur als Orientierung.
+        source_hint: Identität der GEPRÜFTEN Quelle (Videotitel/URL). Wird als
+            VERBOTENE Eigenquelle in den Prompt aufgenommen — sie darf nicht als
+            Beleg dienen (Unabhängigkeits-Riegel gegen zirkuläre Verifikation).
 
     Returns:
         Der fertige Prompt-String.
     """
     numbered = "\n".join(f"{i}. {c}" for i, c in enumerate(claims, 1))
     verdicts = " | ".join(VERDICT_VALUES)
-    hint = f"\nKONTEXT (nur zur Orientierung): {source_hint}\n" if source_hint else ""
+    forbidden = (
+        f"- Die GEPRÜFTE Quelle selbst darf NICHT als Beleg dienen (weder in der "
+        f"Begründung noch als Quelle): {source_hint}\n"
+        if source_hint else ""
+    )
 
     return (
         f"Du bist ein sorgfältiger Faktenprüfer. Prüfe die folgenden Behauptungen "
-        f"einzeln per Websuche bzw. aktuellem Wissen. Antworte in {language}.\n"
-        f"{hint}\n"
+        f"einzeln gegen UNABHÄNGIGE, EXTERNE Quellen (Websuche/aktuelles Wissen). "
+        f"Antworte in {language}.\n"
+        f"\n"
         f"REGELN:\n"
         f"- Prüfe AUSSCHLIESSLICH die vorgelegten Behauptungen, in gegebener "
         f"Reihenfolge. Erfinde keine neuen Behauptungen.\n"
+        # --- Unabhängigkeits-Riegel (v0.10.1): kein Eigenbeleg durch das Video ---
+        f"- Das analysierte Video/Transkript zählt NICHT als Beleg. Eine Behauptung "
+        f"gilt nur dann als 'bestätigt', 'teilweise bestätigt' oder 'widerlegt', wenn "
+        f"eine davon UNABHÄNGIGE, EXTERNE Quelle sie stützt bzw. widerlegt.\n"
+        f"- 'Im Video/Transkript wird X gesagt' ist KEIN Verifikationsgrund. Lässt sich "
+        f"eine Behauptung nur aus dem geprüften Inhalt selbst ableiten → Verdikt "
+        f"'nicht überprüfbar', Quelle '—'.\n"
+        f"- Maßgeblich ist die Frage 'Stimmt die Behauptung?', NICHT 'Wurde sie im "
+        f"Video/Transkript gesagt?' (Letzteres ist bereits bekannt).\n"
+        f"{forbidden}"
         f"- Gib pro Behauptung EXAKT dieses Markdown-Format aus (kein Vorspann, "
         f"keine Meta, keine Einleitung):\n"
         f"\n"

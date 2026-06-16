@@ -189,10 +189,26 @@ def test_build_verification_prompt():
     assert "übertrieben" not in prompt and "Schande" not in prompt
     # Sprache durchgereicht
     assert "Antworte in Englisch" in build_verification_prompt(claims, language="Englisch")
-    # source_hint optional
-    assert "KONTEXT" in build_verification_prompt(claims, source_hint="Titel · URL")
-    assert "KONTEXT" not in build_verification_prompt(claims)
-    print("  build_verification_prompt: Behauptungen+Skala+Format+Sprache+Hint OK")
+    print("  build_verification_prompt: Behauptungen+Skala+Format+Sprache OK")
+
+
+def test_verification_independence_guard() -> None:
+    """PR1: Der Unabhängigkeits-Riegel steht im Prompt und die geprüfte Quelle
+    (Videotitel/URL) wird als verbotene Eigenquelle durchgereicht."""
+    src = "Ich habe SIE konfrontiert… https://youtu.be/abc123"
+    prompt = build_verification_prompt(["Behauptung X."], language="Deutsch", source_hint=src)
+    # Unabhängigkeits-Riegel-Text vorhanden
+    assert "zählt NICHT als Beleg" in prompt
+    assert "UNABHÄNGIGE, EXTERNE Quelle" in prompt
+    assert "ist KEIN Verifikationsgrund" in prompt
+    assert "nicht überprüfbar" in prompt
+    # Die geprüfte Quelle wird als verbotene Eigenquelle genannt
+    assert "GEPRÜFTE Quelle selbst darf NICHT als Beleg" in prompt
+    assert src in prompt
+    # Ohne source_hint kein Eigenquellen-Verbotssatz, aber Riegel bleibt
+    no_src = build_verification_prompt(["Behauptung X."])
+    assert "GEPRÜFTE Quelle selbst" not in no_src and "zählt NICHT als Beleg" in no_src
+    print("  verification_independence_guard: Riegel + verbotene Eigenquelle OK")
 
 
 def test_clean_verification_output():
@@ -244,6 +260,7 @@ def main():
     test_extract_edge_cases()
     test_cap_claims()
     test_build_verification_prompt()
+    test_verification_independence_guard()
     test_clean_verification_output()
     test_charlimit_removed_for_faktencheck()
     test_charlimit_strip_preserves_transcript()
