@@ -8,6 +8,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 
+# Standard-Obergrenze für die Antwortlänge aller Provider. Explizit gesetzt, damit
+# OpenRouter/Perplexity nicht das volle Context-Window als Worst-Case reservieren
+# (führte zu HTTP 402). Großzügig genug, dass lange Verifikations-/Analyse-Antworten
+# nicht abgeschnitten werden, aber weit unter dem vollen Window.
+DEFAULT_MAX_TOKENS = 8192
+
 
 class APIStatus(Enum):
     """Status eines API-Aufrufs."""

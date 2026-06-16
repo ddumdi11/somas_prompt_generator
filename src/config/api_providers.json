@@ -22,9 +22,14 @@
           "description": "Best für komplexe Queries (empfohlen für SOMAS)"
         },
         {
-          "id": "sonar-reasoning",
-          "name": "Sonar Reasoning",
-          "description": "Spezialisiert für Reasoning-Tasks"
+          "id": "sonar-reasoning-pro",
+          "name": "Sonar Reasoning Pro",
+          "description": "Reasoning mit Chain-of-Thought"
+        },
+        {
+          "id": "sonar-deep-research",
+          "name": "Sonar Deep Research",
+          "description": "Tiefenrecherche, umfassende Berichte (langsam/teurer)"
         }
       ]
     },

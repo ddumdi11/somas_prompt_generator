@@ -7,7 +7,7 @@ Statische Modellliste, kein Web-Search.
 import logging
 from typing import ClassVar
 
-from .api_client import APIResponse, APIStatus, LLMClient
+from .api_client import DEFAULT_MAX_TOKENS, APIResponse, APIStatus, LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -76,9 +76,9 @@ class OpenAIClient(LLMClient):
                 "messages": [{"role": "user", "content": prompt}],
             }
             if model.startswith("o"):
-                params["max_completion_tokens"] = 4096
+                params["max_completion_tokens"] = DEFAULT_MAX_TOKENS
             else:
-                params["max_tokens"] = 4096
+                params["max_tokens"] = DEFAULT_MAX_TOKENS
 
             response = client.chat.completions.create(**params)
 
