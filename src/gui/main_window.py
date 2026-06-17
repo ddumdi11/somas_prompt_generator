@@ -2279,7 +2279,7 @@ class MainWindow(QMainWindow):
         self._verification_base_text = response.content.rstrip()
         self._start_verification(sel)
 
-    def _start_verification(self, sel) -> None:
+    def _start_verification(self, sel: ModelChoice) -> None:
         """Baut Config aus dem Basis-Text + Modellauswahl und startet den Worker."""
         all_claims = extract_claims_from_faktencheck(self._verification_base_text)
         claims, total = cap_claims(all_claims, self._verification_max_claims)
@@ -2310,6 +2310,10 @@ class MainWindow(QMainWindow):
     def _on_verify_retry(self) -> None:
         """Wiederholt NUR Stufe 2 auf den vorhandenen Behauptungen (Modellwechsel ok)."""
         if self._verification_worker and self._verification_worker.isRunning():
+            return
+        if self._api_worker and self._api_worker.isRunning():
+            # Analyse läuft noch (Auto-Anhang folgt) — kein paralleler Retry,
+            # sonst konkurrieren beide Pfade um result_text/Verifikationsstatus.
             return
         if not self._verification_base_text:
             # Fallback: aktuellen Ergebnistext als Basis nehmen (z. B. eingefügte Analyse)
