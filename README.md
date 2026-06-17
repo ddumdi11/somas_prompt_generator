@@ -14,7 +14,7 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuell (v0.10.0) — Faktencheck-Verifikation
+### Aktuell (v0.10.1) — Faktencheck-Verifikation (gehärtet)
 
 - **Zweistufige Faktenprüfung** – Das FAKTENCHECK-Modul trennt jetzt strikt **Meinungen**, **Interpretationen** und **überprüfbare Behauptungen** (relevanz-sortiert). Optional prüft danach ein web-fähiges Modell **nur die nackten Behauptungen** und liefert pro Behauptung **Verdikt + Quelle**
 - **Halluzinations-Schutz** – In der Verifikation stehen **keine Meinungen** im Prompt – das Modell kann nicht durch rhetorische Sprache „verführt" werden. Zusätzlicher Riegel gegen erfundene Quellen (kann nicht belegt werden → Verdikt „nicht überprüfbar", Quelle „—")
@@ -22,6 +22,7 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 - **Frei wählbares Verifikationsmodell** – ProviderModelPicker über alle 4 Provider; `:online`-Schalter für echten Web-Zugriff (OpenRouter); Web-Disclaimer, wenn kein bestätigter Web-Zugriff
 - **Konfigurierbare Obergrenze** – Default 10 zu prüfende Behauptungen (app-seitig, deterministisch gekappt; `0 = unbegrenzt`); Meinungen/Interpretationen werden vollständig angezeigt
 - **Sauberer Anhang** – Der Verifikationsabschnitt wird an die Analyse angehängt (Export enthält beide Teile); Stufe-2-Fehler ist nicht fatal (Analyse bleibt erhalten)
+- **Unabhängigkeits-Riegel (v0.10.1)** – Das geprüfte Video selbst zählt nicht als Beleg; nur unabhängige externe Quellen bestätigen/widerlegen. „Verifikation erneut versuchen"-Button wiederholt **nur Stufe 2** (z. B. nach Modellwechsel auf ein stärkeres Web-Modell)
 
 ### Seit v0.9.0 — Modellvergleich
 
@@ -320,6 +321,7 @@ Die App implementiert das SOMAS-Framework mit Content-Type-spezifischen Analyse-
 
 | Version | Datum | Änderungen |
 | --------- | ------- | ------------ |
+| 0.10.1 | 2026-06-16 | Faktencheck-Härtung: Unabhängigkeits-Riegel (kein Eigenbeleg durchs Video, `source_hint` injection-sicher), „Verifikation erneut versuchen"-Button (nur Stufe 2, Modellwechsel), Perplexity-Modelle aktualisiert (`sonar-reasoning-pro`/`sonar-deep-research`), `DEFAULT_MAX_TOKENS=8192` (HTTP-402-Fix), einheitlicher Export-Kopf (Titel + Thumbnail), Zeichenlimit-Fix bei FAKTENCHECK |
 | 0.10.0 | 2026-06-14 | Faktencheck-Verifikation (Hybrid): Stufe 1 trennt Meinungen/Interpretationen/Behauptungen; optionale Stufe 2 verifiziert Behauptungen per web-fähigem Modell (Verdikt + Quelle, 4-stufige Skala), Halluzinations-Schutz + Riegel gegen erfundene Quellen, `:online`-Schalter, Top-N-Kappung, Auto-Anhang |
 | 0.9.1 | 2026-05-30 | Fix: leeren/None-Content der Provider (z.B. OpenRouter `tencent/hy3-preview`) sauber als Fehler behandeln statt Crash; `reasoning`-Fallback + `finish_reason`-Diagnose; alle 4 Clients abgesichert; Regressionstest |
 | 0.9.0 | 2026-05-29 | Modellvergleich: zwei SOMAS-Analysen eines Videos + automatische Synthese-Kurzbeschreibung, deterministisches Markdown-Layout (Thumbnail), ProviderModelPicker, Export nach exports/ |
