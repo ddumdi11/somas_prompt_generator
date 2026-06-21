@@ -710,6 +710,10 @@ class MainWindow(QMainWindow):
         self.btn_export_linkedin = QPushButton("Export: LinkedIn")
         self.btn_export_markdown = QPushButton("Export: Markdown")
         self.btn_export_pdf = QPushButton("Export: PDF")
+        self.btn_send_blog = QPushButton("An Blog senden")
+        self.btn_send_blog.setToolTip(
+            "Analyse als WordPress-Beitrag senden (Konfiguration unter Settings)"
+        )
 
         # Quellen-Detail-Button (erscheint nach LinkedIn-Export)
         self.btn_sources_detail = QPushButton("Quellen (Details)")
@@ -722,6 +726,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.btn_export_linkedin)
         layout.addWidget(self.btn_export_markdown)
         layout.addWidget(self.btn_export_pdf)
+        layout.addWidget(self.btn_send_blog)
         layout.addWidget(self.btn_sources_detail)
         layout.addStretch()
 
@@ -745,6 +750,7 @@ class MainWindow(QMainWindow):
         # Export-Buttons
         self.btn_export_linkedin.clicked.connect(self._on_export_linkedin)
         self.btn_export_markdown.clicked.connect(self._on_export_markdown)
+        self.btn_send_blog.clicked.connect(self._on_send_to_wordpress)
         self.btn_sources_detail.clicked.connect(self._on_copy_sources_detail)
         # Input-Tabs (YouTube / Transkript)
         self.input_tabs.currentChanged.connect(self._on_input_tab_changed)
@@ -1439,6 +1445,19 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "Fehler", f"Export fehlgeschlagen: {e}")
                 logger.error(f"Markdown-Export fehlgeschlagen: {e}")
+
+    def _on_send_to_wordpress(self) -> None:
+        """Öffnet den WordPress-Sende-Dialog mit der aktuellen Analyse."""
+        result = self.result_text.toPlainText().strip()
+        if not result:
+            QMessageBox.warning(self, "An Blog senden", "Kein Analyse-Ergebnis vorhanden.")
+            return
+
+        from src.gui.wordpress_dialog import WordPressSendDialog
+
+        suggested_title = self.video_info.title if self.video_info else ""
+        dialog = WordPressSendDialog(result, suggested_title, parent=self)
+        dialog.exec()
 
     def _export_comparison_markdown(self, content: str) -> None:
         """Speichert das fertige Vergleichs-Markdown ohne zusätzlichen Header."""

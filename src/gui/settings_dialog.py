@@ -10,7 +10,7 @@ from typing import Optional
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QGroupBox, QFormLayout, QMessageBox, QComboBox, QWidget,
-    QCheckBox, QFileDialog,
+    QCheckBox, QFileDialog, QScrollArea, QFrame, QApplication,
 )
 from PyQt6.QtCore import pyqtSlot
 from PyQt6.QtGui import QFont
@@ -24,6 +24,19 @@ from src.core.perplexity_client import PerplexityClient
 from src.core.openrouter_client import OpenRouterClient
 from src.core.debug_logger import DebugLogger
 from src.core.rating_store import RatingStore
+from src.core.wordpress_client import (
+    WP_STATUSES, WordPressClient,
+    get_wp_config, save_wp_config,
+    get_wp_app_password, save_wp_app_password, delete_wp_app_password,
+)
+
+# Benutzerfreundliche Beschriftungen für die WordPress-Status-Auswahl.
+_WP_STATUS_LABELS = {
+    "draft": "Entwurf (draft)",
+    "private": "Privat (private)",
+    "publish": "Veröffentlichen (publish)",
+    "pending": "Ausstehend (pending)",
+}
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +64,22 @@ class SettingsDialog(QDialog):
         self._load_current_keys()
 
     def _setup_ui(self) -> None:
-        """Erstellt das Dialog-Layout."""
-        layout = QVBoxLayout(self)
+        """Erstellt das Dialog-Layout.
+
+        Der Inhalt liegt in einem scrollbaren Bereich, damit der Dialog auch auf
+        kleinen Displays (z.B. Notebook) passt und die Buttons unten stets
+        erreichbar bleiben.
+        """
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Scrollbarer Inhaltsbereich
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+
+        container = QWidget()
+        layout = QVBoxLayout(container)
         layout.setSpacing(15)
 
         # Provider-Gruppen
@@ -63,14 +90,22 @@ class SettingsDialog(QDialog):
         # Default-Einstellungen
         layout.addWidget(self._create_defaults_group())
 
+        # WordPress-Blog
+        layout.addWidget(self._create_wordpress_group())
+
         # Debug-Einstellungen
         layout.addWidget(self._create_debug_group())
 
         # Bewertungsdaten
         layout.addWidget(self._create_ratings_group())
 
-        # Buttons
+        layout.addStretch()
+        scroll.setWidget(container)
+        outer_layout.addWidget(scroll, stretch=1)
+
+        # Buttons (außerhalb des Scrollbereichs -> immer sichtbar)
         btn_layout = QHBoxLayout()
+        btn_layout.setContentsMargins(15, 10, 15, 10)
         btn_layout.addStretch()
 
         self.btn_save = QPushButton("Speichern")
@@ -83,7 +118,12 @@ class SettingsDialog(QDialog):
         self.btn_cancel.clicked.connect(self.reject)
         btn_layout.addWidget(self.btn_cancel)
 
-        layout.addLayout(btn_layout)
+        outer_layout.addLayout(btn_layout)
+
+        # Anfangsgröße an verfügbare Bildschirmhöhe anpassen (mit Rand)
+        screen = QApplication.primaryScreen()
+        avail_h = screen.availableGeometry().height() if screen else 900
+        self.resize(580, min(860, max(420, avail_h - 120)))
 
     def _create_provider_group(self, provider_id: str, provider_name: str) -> QGroupBox:
         """Erstellt eine Provider-Gruppe mit Key-Eingabe und Test-Button."""
@@ -163,6 +203,129 @@ class SettingsDialog(QDialog):
         group_layout.addRow(self.channel_meta_checkbox)
 
         return group
+
+    def _create_wordpress_group(self) -> QGroupBox:
+        """Erstellt die WordPress-Blog-Gruppe (URL, Benutzer, App-Passwort)."""
+        group = QGroupBox("WordPress-Blog")
+        group_layout = QFormLayout(group)
+
+        wp = get_wp_config()
+
+        # URL
+        self.wp_url_input = QLineEdit(wp.url)
+        self.wp_url_input.setPlaceholderText("https://diggi.torja.de")
+        group_layout.addRow("URL:", self.wp_url_input)
+
+        # Benutzername
+        self.wp_user_input = QLineEdit(wp.username)
+        self.wp_user_input.setPlaceholderText("WordPress-Benutzername")
+        group_layout.addRow("Benutzer:", self.wp_user_input)
+
+        # Application Password (+ Sichtbarkeit, Test, Löschen)
+        pw_layout = QHBoxLayout()
+        self.wp_pw_input = QLineEdit()
+        self.wp_pw_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.wp_pw_input.setPlaceholderText("Application Password…")
+        self.wp_pw_input.setMinimumWidth(280)
+        existing_pw = get_wp_app_password()
+        if existing_pw:
+            self.wp_pw_input.setText(existing_pw)
+        pw_layout.addWidget(self.wp_pw_input)
+
+        self.wp_pw_toggle = QPushButton("Zeigen")
+        self.wp_pw_toggle.setMaximumWidth(70)
+        self.wp_pw_toggle.setCheckable(True)
+        self.wp_pw_toggle.toggled.connect(self._toggle_wp_pw_visibility)
+        pw_layout.addWidget(self.wp_pw_toggle)
+
+        btn_wp_test = QPushButton("Test")
+        btn_wp_test.setMaximumWidth(60)
+        btn_wp_test.clicked.connect(self._on_wp_test)
+        pw_layout.addWidget(btn_wp_test)
+
+        btn_wp_delete = QPushButton("X")
+        btn_wp_delete.setMaximumWidth(30)
+        btn_wp_delete.setToolTip("Application Password löschen")
+        btn_wp_delete.clicked.connect(self._on_wp_delete_password)
+        pw_layout.addWidget(btn_wp_delete)
+
+        group_layout.addRow("App-Passwort:", pw_layout)
+
+        # Default-Status
+        self.wp_status_combo = QComboBox()
+        for status in WP_STATUSES:
+            self.wp_status_combo.addItem(
+                _WP_STATUS_LABELS.get(status, status), status
+            )
+        idx = self.wp_status_combo.findData(wp.default_status)
+        if idx >= 0:
+            self.wp_status_combo.setCurrentIndex(idx)
+        group_layout.addRow("Default-Status:", self.wp_status_combo)
+
+        # Default-Kategorie
+        self.wp_category_input = QLineEdit(wp.default_category)
+        self.wp_category_input.setPlaceholderText("z.B. YouTube-Analysen (optional)")
+        group_layout.addRow("Default-Kategorie:", self.wp_category_input)
+
+        # Status-Label
+        self.wp_status_label = QLabel("")
+        self.wp_status_label.setStyleSheet("color: gray; font-style: italic;")
+        self.wp_status_label.setWordWrap(True)
+        group_layout.addRow("Status:", self.wp_status_label)
+
+        return group
+
+    def _toggle_wp_pw_visibility(self, visible: bool) -> None:
+        """Zeigt/versteckt das WordPress-App-Passwort."""
+        if visible:
+            self.wp_pw_input.setEchoMode(QLineEdit.EchoMode.Normal)
+            self.wp_pw_toggle.setText("Verbergen")
+        else:
+            self.wp_pw_input.setEchoMode(QLineEdit.EchoMode.Password)
+            self.wp_pw_toggle.setText("Zeigen")
+
+    @pyqtSlot()
+    def _on_wp_test(self) -> None:
+        """Testet die WordPress-Verbindung mit den eingegebenen Daten."""
+        from src.core.wordpress_client import WordPressConfig
+
+        url = self.wp_url_input.text().strip()
+        user = self.wp_user_input.text().strip()
+        password = self.wp_pw_input.text().strip()
+        if not (url and user and password):
+            QMessageBox.warning(
+                self, "WordPress-Test",
+                "Bitte URL, Benutzer und Application Password eingeben."
+            )
+            return
+
+        self.wp_status_label.setText("Teste…")
+        self.wp_status_label.setStyleSheet("color: #2196F3; font-style: italic;")
+        self.wp_status_label.repaint()
+
+        config = WordPressConfig(url=url, username=user)
+        client = WordPressClient(config, password)
+        success, message = client.test_connection()
+        if success:
+            self.wp_status_label.setText(message)
+            self.wp_status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+        else:
+            self.wp_status_label.setText(message)
+            self.wp_status_label.setStyleSheet("color: #F44336; font-weight: bold;")
+
+    @pyqtSlot()
+    def _on_wp_delete_password(self) -> None:
+        """Löscht das gespeicherte WordPress-App-Passwort."""
+        reply = QMessageBox.question(
+            self, "App-Passwort löschen",
+            "WordPress Application Password wirklich löschen?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            delete_wp_app_password()
+            self.wp_pw_input.clear()
+            self.wp_status_label.setText("App-Passwort gelöscht")
+            self.wp_status_label.setStyleSheet("color: #808080; font-style: italic;")
 
     def _create_debug_group(self) -> QGroupBox:
         """Erstellt die Debug-Logging-Gruppe."""
@@ -457,6 +620,17 @@ class SettingsDialog(QDialog):
         prefs["debug_logging"] = self.debug_checkbox.isChecked()
         prefs["show_channel_meta"] = self.channel_meta_checkbox.isChecked()
         save_preferences(prefs)
+
+        # WordPress-Konfiguration speichern (nicht-sensibel + Passwort via keyring)
+        save_wp_config(
+            url=self.wp_url_input.text(),
+            username=self.wp_user_input.text(),
+            default_status=self.wp_status_combo.currentData(),
+            default_category=self.wp_category_input.text(),
+        )
+        wp_password = self.wp_pw_input.text().strip()
+        if wp_password:
+            save_wp_app_password(wp_password)
 
         logger.info(f"{saved_count} API-Key(s) gespeichert")
         self.accept()
