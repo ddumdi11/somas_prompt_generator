@@ -25,7 +25,7 @@ from src.core.openrouter_client import OpenRouterClient
 from src.core.debug_logger import DebugLogger
 from src.core.rating_store import RatingStore
 from src.core.wordpress_client import (
-    WP_STATUSES, WordPressClient,
+    WP_STATUSES,
     get_wp_config, save_wp_config,
     get_wp_app_password, save_wp_app_password, delete_wp_app_password,
 )
@@ -238,10 +238,10 @@ class SettingsDialog(QDialog):
         self.wp_pw_toggle.toggled.connect(self._toggle_wp_pw_visibility)
         pw_layout.addWidget(self.wp_pw_toggle)
 
-        btn_wp_test = QPushButton("Test")
-        btn_wp_test.setMaximumWidth(60)
-        btn_wp_test.clicked.connect(self._on_wp_test)
-        pw_layout.addWidget(btn_wp_test)
+        self._btn_wp_test = QPushButton("Test")
+        self._btn_wp_test.setMaximumWidth(60)
+        self._btn_wp_test.clicked.connect(self._on_wp_test)
+        pw_layout.addWidget(self._btn_wp_test)
 
         btn_wp_delete = QPushButton("X")
         btn_wp_delete.setMaximumWidth(30)
@@ -286,8 +286,9 @@ class SettingsDialog(QDialog):
 
     @pyqtSlot()
     def _on_wp_test(self) -> None:
-        """Testet die WordPress-Verbindung mit den eingegebenen Daten."""
-        from src.core.wordpress_client import WordPressConfig
+        """Testet die WordPress-Verbindung asynchron (kein GUI-Freeze)."""
+        from src.core.wordpress_client import WordPressConfig, run_connection_test
+        from src.core.wordpress_worker import WordPressWorker
 
         url = self.wp_url_input.text().strip()
         user = self.wp_user_input.text().strip()
@@ -301,17 +302,31 @@ class SettingsDialog(QDialog):
 
         self.wp_status_label.setText("Teste…")
         self.wp_status_label.setStyleSheet("color: #2196F3; font-style: italic;")
-        self.wp_status_label.repaint()
+        self._btn_wp_test.setEnabled(False)
 
         config = WordPressConfig(url=url, username=user)
-        client = WordPressClient(config, password)
-        success, message = client.test_connection()
-        if success:
-            self.wp_status_label.setText(message)
-            self.wp_status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
-        else:
-            self.wp_status_label.setText(message)
-            self.wp_status_label.setStyleSheet("color: #F44336; font-weight: bold;")
+        # Referenz auf den Worker halten (sonst GC), läuft im Hintergrund.
+        self._wp_test_worker = WordPressWorker(run_connection_test, config, password)
+        self._wp_test_worker.succeeded.connect(self._on_wp_test_result)
+        self._wp_test_worker.failed.connect(self._on_wp_test_failed)
+        self._wp_test_worker.finished.connect(
+            lambda: self._btn_wp_test.setEnabled(True)
+        )
+        self._wp_test_worker.start()
+
+    @pyqtSlot(object)
+    def _on_wp_test_result(self, result: tuple) -> None:
+        """Verarbeitet das Ergebnis des Verbindungstests (Main-Thread)."""
+        success, message = result
+        self.wp_status_label.setText(message)
+        color = "#4CAF50" if success else "#F44336"
+        self.wp_status_label.setStyleSheet(f"color: {color}; font-weight: bold;")
+
+    @pyqtSlot(str)
+    def _on_wp_test_failed(self, message: str) -> None:
+        """Zeigt einen unerwarteten Fehler des Verbindungstests an."""
+        self.wp_status_label.setText(f"Fehler: {message}")
+        self.wp_status_label.setStyleSheet("color: #F44336; font-weight: bold;")
 
     @pyqtSlot()
     def _on_wp_delete_password(self) -> None:

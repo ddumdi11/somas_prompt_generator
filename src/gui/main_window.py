@@ -1446,6 +1446,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Fehler", f"Export fehlgeschlagen: {e}")
                 logger.error(f"Markdown-Export fehlgeschlagen: {e}")
 
+    @pyqtSlot()
     def _on_send_to_wordpress(self) -> None:
         """Öffnet den WordPress-Sende-Dialog mit der aktuellen Analyse."""
         result = self.result_text.toPlainText().strip()

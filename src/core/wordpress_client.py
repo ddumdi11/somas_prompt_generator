@@ -421,3 +421,64 @@ class WordPressClient:
             raise WordPressError(
                 f"Unerwartete Antwort von WordPress: {exc}"
             ) from exc
+
+
+# --------------------------------------------------------------------------- #
+# High-Level-Operationen (für den asynchronen Worker, blockierend ausgeführt)
+# --------------------------------------------------------------------------- #
+
+
+def run_connection_test(config: WordPressConfig, app_password: str) -> tuple[bool, str]:
+    """Führt einen Verbindungstest aus (blockierend – im Worker-Thread nutzen).
+
+    Args:
+        config: WordPress-Konfiguration.
+        app_password: Application Password.
+
+    Returns:
+        Tupel ``(success, message)``.
+    """
+    return WordPressClient(config, app_password).test_connection()
+
+
+def publish_post(
+    config: WordPressConfig,
+    app_password: str,
+    title: str,
+    markdown_content: str,
+    status: str = DEFAULT_STATUS,
+    category_names: Optional[list[str]] = None,
+    tag_names: Optional[list[str]] = None,
+) -> tuple[int, str]:
+    """Konvertiert Markdown, löst Taxonomien auf und postet (blockierend).
+
+    Diese Funktion bündelt alle Netzwerk-Operationen, damit sie als Einheit im
+    Worker-Thread laufen kann.
+
+    Args:
+        config: WordPress-Konfiguration.
+        app_password: Application Password.
+        title: Beitragstitel.
+        markdown_content: Beitragsinhalt als Markdown.
+        status: Beitragsstatus.
+        category_names: Optionale Kategorie-Namen.
+        tag_names: Optionale Tag-Namen.
+
+    Returns:
+        Tupel ``(post_id, link)``.
+
+    Raises:
+        WordPressError: Bei API-/Netzwerkfehlern.
+        RuntimeError: Wenn das ``markdown``-Paket fehlt.
+    """
+    client = WordPressClient(config, app_password)
+    html = markdown_to_html(markdown_content)
+    category_ids = client.resolve_terms(category_names or [], "categories")
+    tag_ids = client.resolve_terms(tag_names or [], "tags")
+    return client.post(
+        title=title,
+        html_content=html,
+        status=status,
+        category_ids=category_ids or None,
+        tag_ids=tag_ids or None,
+    )

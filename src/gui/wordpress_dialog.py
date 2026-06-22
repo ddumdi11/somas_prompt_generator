@@ -18,10 +18,11 @@ from PyQt6.QtWidgets import (
 )
 
 from src.core.wordpress_client import (
-    WordPressClient, WordPressError, WP_STATUSES,
-    assemble_content, markdown_to_html,
+    WP_STATUSES,
+    assemble_content, markdown_to_html, publish_post,
     get_wp_config, get_wp_app_password, has_wp_credentials,
 )
+from src.core.wordpress_worker import WordPressWorker
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,8 @@ class WordPressSendDialog(QDialog):
 
         self._config = get_wp_config()
         self._last_link: str = ""
+        self._pending_status: str = ""
+        self._send_worker: Optional[WordPressWorker] = None
 
         self._setup_ui(analysis_md, suggested_title)
 
@@ -229,44 +232,46 @@ class WordPressSendDialog(QDialog):
 
         status = self.status_combo.currentData()
         category_names = [self.category_input.text()] if self.category_input.text().strip() else []
-        tag_names = [t for t in self.tags_input.text().split(",") if t.strip()]
+        tag_names = [t.strip() for t in self.tags_input.text().split(",") if t.strip()]
 
+        self._pending_status = status
         self.btn_send.setEnabled(False)
         self._set_status("Sende an WordPress…", error=False)
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-        try:
-            client = WordPressClient(self._config, app_password)
-            html = markdown_to_html(self._assembled_markdown())
 
-            category_ids = client.resolve_terms(category_names, "categories")
-            tag_ids = client.resolve_terms(tag_names, "tags")
+        # Netzwerk-Operationen im Hintergrund (Referenz halten -> kein GC).
+        self._send_worker = WordPressWorker(
+            publish_post,
+            self._config, app_password, title, self._assembled_markdown(),
+            status, category_names, tag_names,
+        )
+        self._send_worker.succeeded.connect(self._on_send_result)
+        self._send_worker.failed.connect(self._on_send_failed)
+        self._send_worker.start()
 
-            post_id, link = client.post(
-                title=title,
-                html_content=html,
-                status=status,
-                category_ids=category_ids or None,
-                tag_ids=tag_ids or None,
-            )
-        except (WordPressError, RuntimeError) as exc:
-            QApplication.restoreOverrideCursor()
-            logger.error("WordPress-Senden fehlgeschlagen: %s", exc)
-            self._set_status(str(exc), error=True)
-            QMessageBox.critical(self, "Senden fehlgeschlagen", str(exc))
-            self.btn_send.setEnabled(True)
-            return
-        else:
-            QApplication.restoreOverrideCursor()
-
+    @pyqtSlot(object)
+    def _on_send_result(self, result: tuple) -> None:
+        """Verarbeitet das erfolgreiche Senden (Main-Thread)."""
+        QApplication.restoreOverrideCursor()
+        post_id, link = result
         self._last_link = link
         self.btn_open.setEnabled(bool(link))
-        status_word = _STATUS_LABELS.get(status, status)
+        status_word = _STATUS_LABELS.get(self._pending_status, self._pending_status)
         self._set_status(
             f"Gesendet ✓ (Beitrag #{post_id}, Status: {status_word}).",
             error=False,
         )
         self.btn_send.setEnabled(True)
-        logger.info("WordPress-Beitrag #%s erstellt (%s)", post_id, status)
+        logger.info("WordPress-Beitrag #%s erstellt (%s)", post_id, self._pending_status)
+
+    @pyqtSlot(str)
+    def _on_send_failed(self, message: str) -> None:
+        """Behandelt einen Fehler beim Senden (Main-Thread)."""
+        QApplication.restoreOverrideCursor()
+        logger.error("WordPress-Senden fehlgeschlagen: %s", message)
+        self._set_status(message, error=True)
+        QMessageBox.critical(self, "Senden fehlgeschlagen", message)
+        self.btn_send.setEnabled(True)
 
     @pyqtSlot()
     def _on_open_link(self) -> None:
