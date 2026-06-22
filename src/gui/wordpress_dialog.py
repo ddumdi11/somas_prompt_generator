@@ -231,7 +231,7 @@ class WordPressSendDialog(QDialog):
             return
 
         status = self.status_combo.currentData()
-        category_names = [self.category_input.text()] if self.category_input.text().strip() else []
+        category_names = [self.category_input.text().strip()] if self.category_input.text().strip() else []
         tag_names = [t.strip() for t in self.tags_input.text().split(",") if t.strip()]
 
         self._pending_status = status
