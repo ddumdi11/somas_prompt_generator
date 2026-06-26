@@ -587,6 +587,77 @@ def normalize_markdown_headings(text: str) -> str:
     return re.sub(r'(?m)^(\s*#{1,6})(?=[^#\s])', r'\1 ', text)
 
 
+# --- Reasoning-Leak-Schutz (v0.11+) ---
+
+# Erstes kanonisches SOMAS-Abschnitts-Header (Analyse beginnt regulär hiermit).
+_FRAMING_HEADER_RE = re.compile(r"(?m)^\s*#{1,6}\s*FRAMING\b", re.IGNORECASE)
+
+# Typische englische/deutsche Reasoning-Floskeln, mit denen Modelle ihren
+# Denkprozess einleiten, statt direkt das Ergebnis auszugeben.
+_REASONING_TELLS_RE = re.compile(
+    r"(?im)\b("
+    r"let me|i need to|i should|i'?ll|i will|first,? let me|now let me|"
+    r"let'?s analyze|let me analyze|let me think|okay,? let me|"
+    r"lass mich|ich muss zun|ich werde zun|zuerst muss ich|"
+    r"analysieren wir|gehen wir"
+    r")\b"
+)
+
+
+def strip_reasoning_preamble(text: str) -> tuple[str, bool]:
+    """Entfernt einen vorangestellten Reasoning-Block vor der eigentlichen Analyse.
+
+    Manche (Reasoning-)Modelle kippen ihren Denkprozess direkt in den Content,
+    bevor die Analyse beginnt. Eine reguläre SOMAS-Analyse startet mit
+    ``### FRAMING``. Steht davor substanzieller Text, der nach Reasoning aussieht
+    (Floskeln wie „Let me…" oder schlicht sehr lang), wird dieser Vorspann
+    entfernt. Kurze, harmlose Einleitungen bleiben unangetastet.
+
+    Args:
+        text: Roh-Content der Modellantwort.
+
+    Returns:
+        Tupel ``(bereinigter_text, wurde_gekürzt)``. Wird nichts entfernt, ist
+        der erste Wert der Originaltext (bzw. normalisiert) und der zweite False.
+    """
+    if not text:
+        return text, False
+
+    normalized = normalize_markdown_headings(text)
+    match = _FRAMING_HEADER_RE.search(normalized)
+    if not match or match.start() == 0:
+        return text, False
+
+    preamble = normalized[:match.start()]
+    looks_like_reasoning = bool(_REASONING_TELLS_RE.search(preamble))
+    is_long = len(preamble.strip()) > 400
+    if looks_like_reasoning or is_long:
+        return normalized[match.start():].lstrip(), True
+
+    return text, False
+
+
+def looks_like_reasoning_leak(text: str) -> bool:
+    """Heuristik: Sieht der Text nach durchgesickertem Reasoning aus?
+
+    Greift, wenn der Anfang NICHT mit einer Markdown-Überschrift beginnt UND
+    Reasoning-Floskeln im Kopf enthält. Bewusst konservativ – dient nur als
+    nicht-fataler Hinweis an den Benutzer, nicht als hartes Filterkriterium.
+
+    Args:
+        text: (Idealerweise bereits preamble-bereinigter) Analysetext.
+
+    Returns:
+        True, wenn der Text verdächtig nach rohem Reasoning aussieht.
+    """
+    if not text:
+        return False
+    head = text.lstrip()
+    if head.startswith("#"):
+        return False
+    return bool(_REASONING_TELLS_RE.search(head[:600]))
+
+
 def clean_synthesis_output(text: str) -> str:
     """Bereinigt die Synthese-Ausgabe für die saubere Einbettung ins Layout.
 
