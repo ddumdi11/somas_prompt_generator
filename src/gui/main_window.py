@@ -20,7 +20,9 @@ from src.core.prompt_builder import (
     extract_claims_from_faktencheck, cap_claims,
 )
 from src.core.linkedin_formatter import format_for_linkedin
-from src.core.export import export_to_markdown, get_suggested_filename, save_markdown
+from src.core.export import (
+    export_to_markdown, get_suggested_filename, save_markdown, get_default_save_dir,
+)
 from src.core.api_client import APIResponse, APIStatus
 from src.core.api_worker import APIWorker
 from src.core.debug_logger import DebugLogger, APP_VERSION
@@ -1413,7 +1415,7 @@ class MainWindow(QMainWindow):
         # Dateiname vorschlagen (sanitized für sichere Dateinamen)
         preset_name = self.current_preset.name if self.current_preset else ""
         suggested = get_suggested_filename(self.video_info, preset_name)
-        default_name = f"{suggested}.md"
+        default_name = str(get_default_save_dir() / f"{suggested}.md")
 
         # Datei-Dialog
         file_path, _ = QFileDialog.getSaveFileName(
@@ -1463,11 +1465,11 @@ class MainWindow(QMainWindow):
     def _export_comparison_markdown(self, content: str) -> None:
         """Speichert das fertige Vergleichs-Markdown ohne zusätzlichen Header."""
         from PyQt6.QtWidgets import QFileDialog
-        from src.core.export import get_exports_dir, sanitize_filename
+        from src.core.export import sanitize_filename
 
         title = self.video_info.title if self.video_info else "SOMAS"
         base = sanitize_filename(title) if title else "SOMAS"
-        default_path = str(get_exports_dir() / f"{base}_Modellvergleich.md")
+        default_path = str(get_default_save_dir() / f"{base}_Modellvergleich.md")
 
         file_path, _ = QFileDialog.getSaveFileName(
             self, "Modellvergleich exportieren", default_path,
@@ -1902,7 +1904,19 @@ class MainWindow(QMainWindow):
         # falls die Verifikation für diesen Lauf läuft).
         self.btn_verify_retry.setEnabled(False)
         self._clear_stale_sources()
-        self.result_text.setText(response.content)
+
+        # Reasoning-Leak-Schutz: manche Modelle kippen ihren Denkprozess in den
+        # Content. Für Anzeige/Export den Vorspann abschneiden; der ROH-Content
+        # in `response` bleibt für DB-Speicherung und Faktencheck-Verifikation
+        # unverändert (dort hilft die vollständige Behauptungsliste).
+        from src.core.prompt_builder import (
+            strip_reasoning_preamble, looks_like_reasoning_leak,
+        )
+        display_content, was_stripped = strip_reasoning_preamble(response.content)
+        self.result_text.setText(display_content)
+        if was_stripped or looks_like_reasoning_leak(display_content):
+            self._warn_reasoning_leak(was_stripped)
+
         logger.info(
             f"API-Antwort: {len(response.content)} Zeichen, "
             f"{response.tokens_used} Tokens ({response.model_used})"
@@ -1936,6 +1950,43 @@ class MainWindow(QMainWindow):
         # Rework-Button zurücksetzen
         self.btn_rework.setText("\u2702 Kürzen lassen")
         self.btn_rework.setEnabled(True)
+
+    def _warn_reasoning_leak(self, was_stripped: bool) -> None:
+        """Weist nicht-fatal darauf hin, dass der Output rohes Reasoning enthielt.
+
+        Manche Modelle (z.B. einzelne Reasoning-Varianten) schreiben ihren
+        Denkprozess statt der reinen Analyse in den Content. Der Hinweistext
+        unterscheidet, ob tatsächlich ein Vorspann entfernt wurde
+        (``was_stripped=True``) oder der Text nur heuristisch verdächtig wirkt,
+        aber UNVERÄNDERT angezeigt wird.
+
+        Args:
+            was_stripped: True, wenn strip_reasoning_preamble() einen Vorspann
+                entfernt hat; False, wenn nur die Heuristik angeschlagen hat.
+        """
+        intro = (
+            "Das gewählte Modell hat vermutlich Teile seines Denkprozesses "
+            "(„Reasoning“) in die Antwort geschrieben. "
+        )
+        if was_stripped:
+            detail = (
+                "Ein vorangestellter Reasoning-Block wurde automatisch entfernt; "
+                "der angezeigte Text kann aber noch Reste enthalten."
+            )
+        else:
+            detail = (
+                "Der angezeigte Text wurde NICHT automatisch verändert – bitte "
+                "prüfe ihn auf eingestreute Denkschritte."
+            )
+        tip = (
+            "\n\nTipp: Ein anderes Modell liefert für diese Analyse meist ein "
+            "saubereres Ergebnis."
+        )
+        QMessageBox.warning(
+            self,
+            "Hinweis: Modell-Reasoning erkannt",
+            intro + detail + tip,
+        )
 
     @pyqtSlot(str)
     def _on_api_error(self, error_message: str) -> None:
