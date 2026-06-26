@@ -444,11 +444,23 @@ class SettingsDialog(QDialog):
 
     @pyqtSlot()
     def _on_buy_coffee(self) -> None:
-        """Öffnet die Buy-Me-a-Coffee-Seite im Standardbrowser."""
+        """Öffnet die Buy-Me-a-Coffee-Seite im Standardbrowser.
+
+        Meldet dem Benutzer explizit, wenn das Betriebssystem das Öffnen
+        ablehnt (``openUrl`` liefert dann ``False``), und nennt die URL zum
+        manuellen Aufruf.
+        """
         from PyQt6.QtCore import QUrl
         from PyQt6.QtGui import QDesktopServices
 
-        QDesktopServices.openUrl(QUrl("https://www.buymeacoffee.com/ddumdi11"))
+        url = "https://www.buymeacoffee.com/ddumdi11"
+        if not QDesktopServices.openUrl(QUrl(url)):
+            QMessageBox.warning(
+                self,
+                "Link konnte nicht geöffnet werden",
+                "Der Browser konnte nicht automatisch geöffnet werden.\n"
+                f"Bitte rufe die Seite manuell auf:\n{url}",
+            )
 
     @pyqtSlot()
     def _on_export_channels(self) -> None:
