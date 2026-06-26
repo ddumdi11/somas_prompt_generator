@@ -12,6 +12,8 @@ import sys
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
+import pytest
+
 # Projekt-Root auf den Importpfad legen (Lauf ohne Installation/pytest)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -31,6 +33,13 @@ def _run_requests_client(cls, module_path, payload):
         return cls("dummy-key").send_prompt("prompt", "some/model")
 
 
+@pytest.mark.parametrize(
+    "name,cls,module_path",
+    [
+        ("OpenRouter", OpenRouterClient, "src.core.openrouter_client"),
+        ("Perplexity", PerplexityClient, "src.core.perplexity_client"),
+    ],
+)
 def test_requests_based(name, cls, module_path):
     # 1) content == None -> ERROR (kein Crash), finish_reason in Meldung
     r = _run_requests_client(cls, module_path,

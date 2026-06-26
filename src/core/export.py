@@ -27,6 +27,23 @@ def get_exports_dir() -> Path:
     return exports_dir
 
 
+def get_default_save_dir() -> Path:
+    """Gibt das Standard-Verzeichnis für interaktive Speichern-Dialoge zurück.
+
+    Bevorzugt den Downloads-Ordner des Benutzers, fällt auf das Home-Verzeichnis
+    (~) zurück. Damit landen exportierte Markdowns nicht mehr versehentlich im
+    Arbeits-/Projektverzeichnis (das beim App-Start die Vorgabe war).
+
+    Returns:
+        Pfad zum Downloads-Ordner, sonst zum Home-Verzeichnis.
+    """
+    home = Path.home()
+    downloads = home / "Downloads"
+    if downloads.is_dir():
+        return downloads
+    return home
+
+
 # Mapping von problematischen Unicode-Zeichen zu sicheren Alternativen
 UNICODE_REPLACEMENTS = {
     '\u02BC': "'",      # Modifier Letter Apostrophe → normales Apostroph

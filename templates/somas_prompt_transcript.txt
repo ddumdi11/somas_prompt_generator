@@ -2,7 +2,7 @@
 
 {% endif %}Analysiere das folgende Transkript nach dem SOMAS-Schema (Source Overview Mapping And extraction Schema).
 WICHTIG: "SOMAS" ist nur der Name dieses Analyse-Frameworks. Verwende den Begriff NICHT in deiner Analyse.
-Triff keine Annahmen über das Geschlecht sprechender Personen, sofern es nicht eindeutig aus dem Text oder den Metadaten hervorgeht.
+BEZEICHNUNG DER SPRECHENDEN: Verwende natürliche Bezeichnungen – den Namen der Person (sofern aus Titel, Autor/Kanal oder Metadaten ersichtlich), sonst Rolle/Format wie „Host", „Creator", „Moderatorin"/„Moderator", „Gast" oder den Kanalnamen. Vermeide künstliche Hilfskonstruktionen wie „die sprechende Person". Triff keine Annahmen über das Geschlecht, sofern es nicht eindeutig aus Text oder Metadaten hervorgeht; weiche dann auf Name, Rolle oder Kanal aus statt auf umständliche Platzhalter.
 
 KONFIGURATION:
 - Tiefe: {{ depth }} ({{ depth_description }})
