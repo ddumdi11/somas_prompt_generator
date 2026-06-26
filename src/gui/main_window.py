@@ -1915,7 +1915,7 @@ class MainWindow(QMainWindow):
         display_content, was_stripped = strip_reasoning_preamble(response.content)
         self.result_text.setText(display_content)
         if was_stripped or looks_like_reasoning_leak(display_content):
-            self._warn_reasoning_leak()
+            self._warn_reasoning_leak(was_stripped)
 
         logger.info(
             f"API-Antwort: {len(response.content)} Zeichen, "
@@ -1951,23 +1951,41 @@ class MainWindow(QMainWindow):
         self.btn_rework.setText("\u2702 Kürzen lassen")
         self.btn_rework.setEnabled(True)
 
-    def _warn_reasoning_leak(self) -> None:
+    def _warn_reasoning_leak(self, was_stripped: bool) -> None:
         """Weist nicht-fatal darauf hin, dass der Output rohes Reasoning enthielt.
 
         Manche Modelle (z.B. einzelne Reasoning-Varianten) schreiben ihren
-        Denkprozess statt der reinen Analyse in den Content. Der angezeigte Text
-        wurde, soweit möglich, bereits bereinigt – die Analyse kann aber
-        weiterhin Reste enthalten. Ein anderes Modell liefert i.d.R. ein
-        saubereres Ergebnis.
+        Denkprozess statt der reinen Analyse in den Content. Der Hinweistext
+        unterscheidet, ob tatsächlich ein Vorspann entfernt wurde
+        (``was_stripped=True``) oder der Text nur heuristisch verdächtig wirkt,
+        aber UNVERÄNDERT angezeigt wird.
+
+        Args:
+            was_stripped: True, wenn strip_reasoning_preamble() einen Vorspann
+                entfernt hat; False, wenn nur die Heuristik angeschlagen hat.
         """
+        intro = (
+            "Das gewählte Modell hat vermutlich Teile seines Denkprozesses "
+            "(„Reasoning“) in die Antwort geschrieben. "
+        )
+        if was_stripped:
+            detail = (
+                "Ein vorangestellter Reasoning-Block wurde automatisch entfernt; "
+                "der angezeigte Text kann aber noch Reste enthalten."
+            )
+        else:
+            detail = (
+                "Der angezeigte Text wurde NICHT automatisch verändert – bitte "
+                "prüfe ihn auf eingestreute Denkschritte."
+            )
+        tip = (
+            "\n\nTipp: Ein anderes Modell liefert für diese Analyse meist ein "
+            "saubereres Ergebnis."
+        )
         QMessageBox.warning(
             self,
             "Hinweis: Modell-Reasoning erkannt",
-            "Das gewählte Modell hat vermutlich Teile seines Denkprozesses "
-            "(„Reasoning“) in die Antwort geschrieben. Der angezeigte "
-            "Text wurde automatisch bereinigt, kann aber noch Reste enthalten.\n\n"
-            "Tipp: Ein anderes Modell liefert für diese Analyse meist ein "
-            "saubereres Ergebnis.",
+            intro + detail + tip,
         )
 
     @pyqtSlot(str)

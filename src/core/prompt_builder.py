@@ -594,10 +594,15 @@ _FRAMING_HEADER_RE = re.compile(r"(?m)^\s*#{1,6}\s*FRAMING\b", re.IGNORECASE)
 
 # Typische englische/deutsche Reasoning-Floskeln, mit denen Modelle ihren
 # Denkprozess einleiten, statt direkt das Ergebnis auszugeben.
+# Apostroph-Klasse: ASCII (') UND typografisch (’, ʼ) – Modelle schreiben
+# Kontraktionen oft mit geschwungenem Apostroph (z.B. "I’ll", "let’s"). Der
+# Apostroph ist PFLICHT (kein '?'), damit bare Wörter wie "ill"/"lets" nicht
+# fälschlich als Reasoning-Floskel matchen.
+_APO = r"['’ʼ]"
 _REASONING_TELLS_RE = re.compile(
     r"(?im)\b("
-    r"let me|i need to|i should|i'?ll|i will|first,? let me|now let me|"
-    r"let'?s analyze|let me analyze|let me think|okay,? let me|"
+    r"let me|i need to|i should|i" + _APO + r"ll|i will|first,? let me|now let me|"
+    r"let" + _APO + r"s analyze|let me analyze|let me think|okay,? let me|"
     r"lass mich|ich muss zun|ich werde zun|zuerst muss ich|"
     r"analysieren wir|gehen wir"
     r")\b"
