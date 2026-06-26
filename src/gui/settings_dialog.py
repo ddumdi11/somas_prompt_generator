@@ -99,6 +99,9 @@ class SettingsDialog(QDialog):
         # Bewertungsdaten
         layout.addWidget(self._create_ratings_group())
 
+        # Unterstützen (Buy Me a Coffee)
+        layout.addWidget(self._create_support_group())
+
         layout.addStretch()
         scroll.setWidget(container)
         outer_layout.addWidget(scroll, stretch=1)
@@ -414,6 +417,50 @@ class SettingsDialog(QDialog):
         group_layout.addRow(btn_layout)
 
         return group
+
+    def _create_support_group(self) -> QGroupBox:
+        """Erstellt die Unterstützen-Gruppe mit Buy-Me-a-Coffee-Button."""
+        group = QGroupBox("Unterstützen")
+        group_layout = QVBoxLayout(group)
+
+        info = QLabel(
+            "Wenn dir der SOMAS Prompt Generator Zeit spart, freue ich mich "
+            "über einen Kaffee. Vielen Dank!"
+        )
+        info.setWordWrap(True)
+        info.setStyleSheet("color: gray;")
+        group_layout.addWidget(info)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_coffee = QPushButton("☕ Buy me a coffee")
+        btn_coffee.setMinimumWidth(200)
+        btn_coffee.clicked.connect(self._on_buy_coffee)
+        btn_layout.addWidget(btn_coffee)
+        btn_layout.addStretch()
+        group_layout.addLayout(btn_layout)
+
+        return group
+
+    @pyqtSlot()
+    def _on_buy_coffee(self) -> None:
+        """Öffnet die Buy-Me-a-Coffee-Seite im Standardbrowser.
+
+        Meldet dem Benutzer explizit, wenn das Betriebssystem das Öffnen
+        ablehnt (``openUrl`` liefert dann ``False``), und nennt die URL zum
+        manuellen Aufruf.
+        """
+        from PyQt6.QtCore import QUrl
+        from PyQt6.QtGui import QDesktopServices
+
+        url = "https://www.buymeacoffee.com/ddumdi11"
+        if not QDesktopServices.openUrl(QUrl(url)):
+            QMessageBox.warning(
+                self,
+                "Link konnte nicht geöffnet werden",
+                "Der Browser konnte nicht automatisch geöffnet werden.\n"
+                f"Bitte rufe die Seite manuell auf:\n{url}",
+            )
 
     @pyqtSlot()
     def _on_export_channels(self) -> None:

@@ -1,5 +1,7 @@
 Analysiere das folgende YouTube-Video nach dem SOMAS-Schema (Source Overview Mapping And extraction Schema).
 
+BEZEICHNUNG DER SPRECHENDEN: Verwende natürliche Bezeichnungen – den Namen der Person (sofern aus Titel, Kanal oder Metadaten ersichtlich), sonst Rolle/Format wie „Host", „Creator", „Moderatorin"/„Moderator" oder den Kanalnamen. Vermeide künstliche Hilfskonstruktionen wie „die sprechende Person". Ist das Geschlecht nicht erkennbar, weiche auf Name, Rolle oder Kanal aus statt auf umständliche Platzhalter; erfinde kein Geschlecht.
+
 KONFIGURATION:
 - Tiefe: {{ depth }} ({{ depth_description }})
 - Abschnitte: FRAMING, KERNTHESE, ELABORATION, IMPLIKATION + 1 passendes Erweiterungsmodul

@@ -1,5 +1,7 @@
 # SOMAS Prompt Generator
 
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-FFDD00?logo=buymeacoffee&logoColor=black)](https://www.buymeacoffee.com/ddumdi11)
+
 > **S**ource **O**verview **M**apping **A**nd extraction **S**chema – Prompt Generator
 >
 > Eine Desktop-App zur automatischen Generierung und KI-gestützten Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte.
