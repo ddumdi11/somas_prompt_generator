@@ -1,10 +1,10 @@
 # SOMAS Spec — Integration des `youtube-intake-service` (Core, in-process)
 
-> Status: **Entwurf (review-reif)** — Architektur, Packaging, Import-Reinheit,
-> Erfolgs-Wire-Form (§3, 12 Felder eingefroren), O4 & O5 alle geklärt. **Vorbehalt:**
-> die Fehlerpfad-Zeile (O4-Raise-Vertrag) ist zugesagt, aber noch NICHT in
-> Service-Code verifiziert → CodeRabbit-PR erst nach grünem Licht von Architekt
-> Youtube-Service final mergen.
+> Status: **Final / merge-reif** — Architektur, Packaging, Import-Reinheit,
+> Erfolgs-Wire-Form (§3, 12 Felder eingefroren), O4 & O5 geklärt. **O4 verifiziert &
+> live (2026-06-27):** Raise-Vertrag im Service-Branch gelandet, HTTP-Body
+> byte-gleich (`invalid_url`→400, `video_unavailable`→404). Fehlerpfad freigegeben;
+> PR `docs/intake-spec-revision` kann nach CodeRabbit final gemergt werden.
 > **Ersetzt** die frühere Fassung dieses Dokuments (HTTP-Sidecar + Port-Discovery);
 > jene Annahme ist überholt.
 > Zielversion SOMAS: **TBD** (Umbau erst NACH Service-v1.0-Tag — siehe §2).
@@ -102,10 +102,14 @@ unerwartet → IntakeError(error_code="processing_failed")
 ```
 
 Teilerfolg („Video geholt, kein Transkript") ist **kein** Fehler → dict mit
-`status="metadata_only"`. Dieser Raise-Vertrag ist von Architekt Youtube-Service
-zugesagt, aber im Service-Branch noch nicht verifiziert (er wird im O4-Durchgang
-nachgezogen) — daher Erfolgsfelder festzurren, **Fehlerpfad-Zeile als „pending
-O4-Landing" markieren**, PR erst nach grünem Licht final mergen.
+`status="metadata_only"`. **O4 verifiziert & live (2026-06-27):** der Raise-Vertrag
+ist im Service-Branch gelandet (`invalid_url`→400, `video_unavailable`→404,
+HTTP-Body byte-gleich) — Fehlerpfad **freigegeben** (kein „pending" mehr).
+
+> ⚠ **Hinweis für den Alt-Code-Rückbau (§4.3/§6):** `InvalidURLError` erbt **nicht
+> mehr** von `ValueError`. Beim Entfernen der alten YouTube-Logik auf etwaige
+> `except ValueError`-Stellen achten, die früher ungültige URLs gefangen haben —
+> sie greifen für `InvalidURLError` nicht mehr.
 
 ---
 
@@ -168,6 +172,8 @@ def resolve_video_info(url, *, use_core: bool) -> VideoInfo:
 > Sicherheitsnetz. **Nach** verifiziertem Core-Build in die SOMAS-Exe darf die alte
 > direkte-YouTube-Funktionalität (`yt-dlp`/`youtube-transcript-api` in
 > `youtube_client.py`) vollständig zurückgebaut werden (eigener Schritt, §6).
+> ⚠ Dabei `except ValueError`-Stellen prüfen: `InvalidURLError` erbt nicht (mehr)
+> von `ValueError`, alte URL-Fehlerpfade greifen sonst ins Leere.
 
 ### 4.4 PyInstaller-Bundling
 - Der Core liegt als normal installiertes Paket im SOMAS-Venv (kein Pfad-Import) →
@@ -198,7 +204,8 @@ Env-Vars + `.env.example` + README-Hinweis).
 2. `intake_adapter.py` + Mapping gemäß finalem Core-Kontrakt (Punkt 1).
 3. Router + Fallback verdrahten; headless gegen echte URL testen.
 4. PyInstaller-Build mit Core; Exe-Smoke-Test.
-5. **Erst nach Verifikation:** Alt-YouTube-Code in SOMAS zurückbauen.
+5. **Erst nach Verifikation:** Alt-YouTube-Code in SOMAS zurückbauen (dabei auf
+   `except ValueError` achten — `InvalidURLError` erbt nicht mehr davon).
 6. Tests, README/CLAUDE.md-Changelog, Spec-Status auf „umgesetzt".
 
 ---
