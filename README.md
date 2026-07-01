@@ -215,9 +215,11 @@ openai>=1.50.0
 ## 🚀 Installation & Start
 
 ```bash
-# Repository klonen
-git clone https://github.com/ddumdi11/somas_prompt_generator.git
+# Repository klonen (inkl. Submodul)
+git clone --recurse-submodules https://github.com/ddumdi11/somas_prompt_generator.git
 cd somas_prompt_generator
+# Falls ohne --recurse-submodules geklont wurde:
+# git submodule update --init --recursive
 
 # Virtual Environment erstellen
 python -m venv venv
@@ -230,6 +232,20 @@ pip install -r requirements.txt
 # App starten
 python main.py
 ```
+
+### Optional: YouTube-Intake-Core
+
+Für den (opt-in) YouTube-Intake-Service-Modus wird der Core aus dem Submodul
+`external/youtube-intake-service` installiert — **nur der Core, ohne `[server]`-Extra**:
+
+```bash
+pip install ./external/youtube-intake-service
+```
+
+Danach in den Einstellungen „YouTube-Intake-Service (Core) verwenden" aktivieren.
+Ohne diese Installation (oder bei deaktiviertem Toggle) nutzt SOMAS unverändert den
+bisherigen direkten Weg (yt-dlp / youtube-transcript-api) — es ist also **optional**.
+Nach einem Pin-Wechsel des Submoduls den Core neu installieren.
 
 ---
 
