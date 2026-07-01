@@ -93,8 +93,21 @@ def fetch(url: str, language: str = "de") -> IntakeResult:
         error_code = getattr(e, "error_code", "processing_failed")
         message = getattr(e, "message", None) or str(e)
         raise IntakeFailed(error_code, message) from e
+    except Exception as e:
+        # Unerwartete Fehler aus dem Core (NICHT IntakeError) dürfen nicht roh
+        # entkommen — sonst bricht der ValueError-Kontrakt der Aufrufer
+        # (resolve_video_info fängt nur IntakeUnavailable/IntakeFailed). Als
+        # harter Fehler mit generischem error_code weiterreichen.
+        raise IntakeFailed("processing_failed", f"Unerwarteter Core-Fehler: {e}") from e
 
     try:
+        raw_warnings = data.get("warnings", [])
+        if not isinstance(raw_warnings, list):
+            # Fail-fast wie bei den übrigen Kontrakt-Feldern statt still zu
+            # coercen (z.B. würde list("text") die Zeichen zerlegen).
+            raise TypeError(
+                f"'warnings' muss eine Liste sein, war {type(raw_warnings).__name__}"
+            )
         video_info = VideoInfo(
             title=data["title"],
             channel=data["channel"],
@@ -106,7 +119,7 @@ def fetch(url: str, language: str = "de") -> IntakeResult:
             video_info=video_info,
             status=data.get("status", ""),
             transcript_available=bool(data.get("transcript_available", False)),
-            warnings=list(data.get("warnings") or []),
+            warnings=list(raw_warnings),
         )
     except (KeyError, TypeError) as e:
         # Wire-Form ist eingefroren; ein Mapping-Fehler heißt Kontraktbruch → laut

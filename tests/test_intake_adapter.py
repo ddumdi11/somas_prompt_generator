@@ -125,6 +125,35 @@ def test_fetch_broken_wireform_is_intakefailed(monkeypatch):
     assert excinfo.value.error_code == "mapping_error"
 
 
+def test_fetch_generic_error_becomes_intakefailed(monkeypatch):
+    from src.core import intake_adapter
+    mod = _install_fake_core(monkeypatch, None)
+
+    def boom(url, language="de"):
+        raise RuntimeError("irgendwas Unerwartetes im Core")
+
+    mod.process = boom
+
+    # Nicht-IntakeError darf NICHT roh entkommen (sonst bricht der ValueError-
+    # Kontrakt der Aufrufer) → als IntakeFailed mit generischem Code.
+    with pytest.raises(intake_adapter.IntakeFailed) as excinfo:
+        intake_adapter.fetch("u")
+    assert excinfo.value.error_code == "processing_failed"
+
+
+def test_fetch_nonlist_warnings_is_intakefailed(monkeypatch):
+    from src.core import intake_adapter
+    _install_fake_core(
+        monkeypatch,
+        lambda url, language="de": _wire_dict(warnings="kein array"),
+    )
+
+    # Nicht-Listen-warnings werden NICHT still coerct, sondern fail-fast.
+    with pytest.raises(intake_adapter.IntakeFailed) as excinfo:
+        intake_adapter.fetch("u")
+    assert excinfo.value.error_code == "mapping_error"
+
+
 # --- Router: resolve_video_info() --------------------------------------------
 
 def test_resolve_use_core_false_uses_old_path(monkeypatch):
