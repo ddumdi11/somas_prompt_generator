@@ -48,6 +48,24 @@ from src.config.api_config import (
 
 logger = logging.getLogger(__name__)
 
+# v0.11.0: finish_reason-Werte, die eine bei max_tokens abgeschnittene (trunkierte)
+# Antwort signalisieren. Providerübergreifend normalisiert (Anthropic "max_tokens"
+# → "length" im Client), hier defensiv trotzdem alle Varianten erfasst.
+_TRUNCATION_FINISH_REASONS = frozenset({"length", "max_tokens", "truncated"})
+
+
+def _is_truncated_finish_reason(finish_reason: str) -> bool:
+    """Prüft, ob ein finish_reason eine abgeschnittene Antwort anzeigt.
+
+    Args:
+        finish_reason: Der von der API gemeldete Stopp-Grund (kann leer sein).
+
+    Returns:
+        True, wenn die Antwort bei der Token-Grenze trunkiert wurde.
+    """
+    return bool(finish_reason) and finish_reason.strip().lower() in _TRUNCATION_FINISH_REASONS
+
+
 # Kürzungs-Prompt für Ergebnis-Nachbearbeitung (Teil 3: Zeichenlimit-Reihe)
 REWORK_PROMPT_TEMPLATE = """Kürze die folgende SOMAS-Analyse auf EXAKT unter {max_chars} Zeichen.
 
@@ -1905,6 +1923,16 @@ class MainWindow(QMainWindow):
         self.btn_verify_retry.setEnabled(False)
         self._clear_stale_sources()
 
+        # v0.11.0 (PR 3): Trunkierungs-Gate. Eine bei max_tokens abgeschnittene
+        # Antwort ist KEINE gültige Analyse — eine halb abgeschnittene
+        # Behauptungsliste ist für einen Faktencheck gefährlicher als ein offener
+        # Fehler. Getrennt vom Reasoning-Leak-Dialog behandeln (zwei Symptome).
+        # Weder speichern noch verifizieren. (Increment B ergänzt hier den
+        # sichtbaren Auto-Retry.)
+        if _is_truncated_finish_reason(response.finish_reason):
+            self._handle_truncated_response(response)
+            return
+
         # Reasoning-Leak-Schutz: manche Modelle kippen ihren Denkprozess in den
         # Content. Für Anzeige/Export den Vorspann abschneiden; der ROH-Content
         # in `response` bleibt für DB-Speicherung und Faktencheck-Verifikation
@@ -1986,6 +2014,49 @@ class MainWindow(QMainWindow):
             self,
             "Hinweis: Modell-Reasoning erkannt",
             intro + detail + tip,
+        )
+
+    def _handle_truncated_response(self, response: APIResponse) -> None:
+        """Behandelt eine bei max_tokens abgeschnittene (trunkierte) Antwort.
+
+        v0.11.0 (PR 3): Eine trunkierte Antwort gilt NICHT als gültige Analyse.
+        Sie wird weder in der Datenbank gespeichert noch an die Faktencheck-
+        Verifikation (Stufe 2) übergeben — eine halb abgeschnittene
+        Behauptungsliste darf nie in die Web-Verifikation gehen. Der abgeschnittene
+        Rohtext wird zur Transparenz angezeigt, aber klar als unvollständig
+        markiert. (Increment B ersetzt dies durch einen sichtbaren Auto-Retry mit
+        offenem Fehlschlag bei erneutem Misserfolg.)
+
+        Args:
+            response: Die trunkierte API-Antwort.
+        """
+        logger.warning(
+            f"Trunkierte Antwort (finish_reason={response.finish_reason}, "
+            f"{len(response.content)} Zeichen) — nicht als Analyse gewertet"
+        )
+        # Rohtext zur Transparenz zeigen (aber NICHT speichern/verifizieren).
+        self.result_text.setText(response.content)
+        self.api_status_label.setText("Abgeschnitten (Token-Limit) — keine gültige Analyse")
+
+        # UI zurücksetzen wie im regulären Pfad, aber ohne Speichern/Verifikation.
+        self._is_rework = False
+        self._update_generate_enabled()
+        self.btn_generate.setText("Generate Prompt")
+        self.btn_rework.setText("✂ Kürzen lassen")
+        self.btn_rework.setEnabled(True)
+
+        QMessageBox.warning(
+            self,
+            "Antwort abgeschnitten (Token-Limit)",
+            "Die Antwort des Modells wurde an der Token-Grenze abgeschnitten "
+            f"(finish_reason = {response.finish_reason}) und ist damit "
+            "unvollständig.\n\n"
+            "Sie wird NICHT als gültige Analyse gespeichert und NICHT für den "
+            "Faktencheck verwendet — eine abgeschnittene Behauptungsliste wäre "
+            "irreführend.\n\n"
+            "Tipp: Erneut ausführen oder ein anderes Modell wählen. Sehr lange "
+            "Analysen (z.B. erzwungener Faktencheck auf kurzen Quellen) sprengen "
+            "eher das Budget.",
         )
 
     @pyqtSlot(str)
