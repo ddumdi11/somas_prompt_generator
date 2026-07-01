@@ -259,6 +259,15 @@ FAKTENCHECK_NO_LIMIT_HINT = (
     "Liste die Behauptungen VOLLSTÄNDIG auf — Vollständigkeit hat Vorrang vor Kürze."
 )
 
+# v0.11.0 (A4): Final-Only-Zaun. Hält Arbeitsnotizen/Selbstanweisungen aus dem
+# sichtbaren Output und ergänzt die Reasoning-Leak-Härtung (reasoning.exclude)
+# auf Prompt-Ebene. Wird bei erzwungenem Modul vorangestellt.
+FINAL_ONLY_FENCE = (
+    "Gib ausschließlich die fertige Analyse aus — keine Arbeitsnotizen, keine "
+    "Selbstanweisungen, keine Sätze über den Prompt oder die Aufgabe "
+    "(z. B. „Ich muss …“, „Wir müssen …“, „Der Nutzer fordert …“)."
+)
+
 # Entfernt die Zeichenlimit-Kontrollzeilen aus einem gerenderten Prompt (Kopf-
 # Warnung, Regel-Zeile, Erinnerung). An den tatsächlichen Template-Wortlaut
 # angeankert, damit eingebettete Transkript-Zeilen mit "Zeichenlimit"/"maximale
@@ -291,10 +300,18 @@ def _apply_custom_overrides(
         parts.append(custom_system_prompt.strip())
 
     if custom_module:
+        # v0.11.0 (A4): Widerspruch aufgelöst. Der alte Wortlaut „Verwende
+        # ausschließlich das Modul '{X}'. Keine andere Wahl ist erlaubt." las sich
+        # wie „gib NUR den Modul-Block aus" und kollidierte mit dem Basis-Template
+        # („genau 5 Absätze: FRAMING…IMPLIKATION + gewähltes Modul"). Zielverhalten
+        # ist immer die volle Analyse + das erzwungene Modul als 5. Abschnitt.
         parts.append(
-            f"PFLICHT-MODUL: Verwende ausschließlich das Modul '{custom_module}'. "
-            f"Keine andere Wahl ist erlaubt."
+            f"PFLICHT-MODUL: Erzwinge '{custom_module}' als 5. Abschnitt. Behalte die "
+            f"vier Standardabschnitte FRAMING, KERNTHESE, ELABORATION und IMPLIKATION "
+            f"unverändert bei. Wähle kein anderes Erweiterungsmodul."
         )
+        # Final-Only-Zaun: hält Arbeitsnotizen/Reasoning aus dem sichtbaren Output.
+        parts.append(FINAL_ONLY_FENCE)
         # v0.10.0/v0.10.1: Bei erzwungenem FAKTENCHECK das parsbare 3-Block-Format
         # injizieren (deckt alle Presets ab, auch namens-only) UND die
         # Zeichenlimit-Zeilen aus dem Template entfernen, damit kein Widerspruch
