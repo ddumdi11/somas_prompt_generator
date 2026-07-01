@@ -97,6 +97,60 @@ def get_video_info(url: str) -> VideoInfo:
         raise ValueError(f"Konnte Video-Informationen nicht abrufen: {e}")
 
 
+def resolve_video_info(url: str, *, use_core: Optional[bool] = None) -> VideoInfo:
+    """Router: holt Metadaten über den Intake-Core ODER den Alt-Pfad.
+
+    Ist der Intake-Core aktiviert (Preference ``use_intake_core``) und importierbar,
+    wird ``intake_adapter.fetch`` genutzt; andernfalls (oder bei nicht verfügbarem
+    Core) fällt die Funktion transparent auf ``get_video_info`` zurück. Der Default
+    ist AUS → ohne Opt-in verhält sich SOMAS exakt wie bisher.
+
+    Der öffentliche Kontrakt entspricht ``get_video_info``: harte Fehler werden als
+    ``ValueError`` geworfen (der typisierte ``IntakeFailed`` des Core wird dafür
+    umgewandelt), damit bestehende Aufrufer mit ``except ValueError`` unverändert
+    funktionieren. (Beim späteren Alt-Code-Rückbau ggf. auf ``except ValueError``
+    achten — ``IntakeError``/``InvalidURLError`` erben NICHT von ``ValueError``.)
+
+    Args:
+        url: YouTube-URL.
+        use_core: Erzwingt den Pfad; ``None`` liest die Preference ``use_intake_core``.
+
+    Returns:
+        VideoInfo-Objekt (Titel, Kanal, Dauer, URL, Transkript).
+
+    Raises:
+        ValueError: Bei ungültiger URL oder Abruf-Fehler (beide Pfade).
+    """
+    if use_core is None:
+        try:
+            from src.config.api_config import load_preferences
+            use_core = bool(load_preferences().get("use_intake_core", False))
+        except Exception:
+            use_core = False
+
+    if use_core:
+        try:
+            from src.core.intake_adapter import fetch, IntakeUnavailable, IntakeFailed
+        except ImportError as e:
+            logger.warning(f"Intake-Adapter nicht importierbar, Fallback: {e}")
+        else:
+            try:
+                result = fetch(url)
+                for warning in result.warnings:
+                    logger.info(f"Intake-Core Hinweis: {warning}")
+                return result.video_info
+            except IntakeUnavailable as e:
+                # Core nicht installiert → transparent auf Alt-Pfad zurückfallen.
+                logger.warning(f"Intake-Core nicht verfügbar, Fallback: {e}")
+            except IntakeFailed as e:
+                # Harter, inhaltlicher Fehler: als ValueError durchreichen
+                # (Kontrakt wie get_video_info; kein Fallback, der nur denselben
+                # Fehler langsamer reproduzieren würde).
+                raise ValueError(e.message) from e
+
+    return get_video_info(url)
+
+
 def get_transcript(url: str, language: str = "de") -> Optional[str]:
     """Holt das Transkript eines YouTube-Videos.
 

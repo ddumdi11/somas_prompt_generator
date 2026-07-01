@@ -1,0 +1,3 @@
+[submodule "external/youtube-intake-service"]
+	path = external/youtube-intake-service
+	url = https://github.com/ddumdi11/youtube-intake-service.git

@@ -12,7 +12,7 @@ from PyQt6.QtCore import Qt, pyqtSlot, QEvent, QPoint
 from PyQt6.QtGui import QFont
 
 from src.config.defaults import VideoInfo, SomasConfig, TimeRange
-from src.core.youtube_client import get_video_info
+from src.core.youtube_client import resolve_video_info
 from src.core.prompt_builder import (
     build_prompt, build_prompt_from_transcript,
     load_presets, get_preset_by_name, get_preset_by_id, PromptPreset,
@@ -991,7 +991,7 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            self.video_info = get_video_info(url)
+            self.video_info = resolve_video_info(url)
             self.video_info_source = "youtube"
             self._display_meta()
             self._clear_stale_sources()

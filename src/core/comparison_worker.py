@@ -28,7 +28,7 @@ from .prompt_builder import (
     get_template_dir,
     normalize_markdown_headings,
 )
-from .youtube_client import build_thumbnail_urls, extract_video_id, get_video_info
+from .youtube_client import build_thumbnail_urls, extract_video_id, resolve_video_info
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +112,7 @@ class ComparisonWorker(QThread):
             self._emit_step("meta")
             if cfg.input_mode == "youtube":
                 try:
-                    video_info = get_video_info(cfg.url)
+                    video_info = resolve_video_info(cfg.url)
                 except ValueError as e:
                     self._fail("meta", str(e))
                     return

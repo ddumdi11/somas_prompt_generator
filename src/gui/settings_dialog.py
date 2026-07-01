@@ -205,6 +205,18 @@ class SettingsDialog(QDialog):
         )
         group_layout.addRow(self.channel_meta_checkbox)
 
+        # YouTube-Intake-Core (In-Process statt direktem yt-dlp/Transkript)
+        self.intake_core_checkbox = QCheckBox(
+            "YouTube-Intake-Service (Core) für Metadaten/Transkript verwenden"
+        )
+        self.intake_core_checkbox.setToolTip(
+            "Nutzt den eingebundenen youtube-intake-service-Core in-process.\n"
+            "Fällt automatisch auf den bisherigen Weg zurück, wenn der Core fehlt.\n"
+            "Standard: aus."
+        )
+        self.intake_core_checkbox.setChecked(prefs.get("use_intake_core", False))
+        group_layout.addRow(self.intake_core_checkbox)
+
         return group
 
     def _create_wordpress_group(self) -> QGroupBox:
@@ -681,6 +693,7 @@ class SettingsDialog(QDialog):
             prefs["last_provider"] = default_provider
         prefs["debug_logging"] = self.debug_checkbox.isChecked()
         prefs["show_channel_meta"] = self.channel_meta_checkbox.isChecked()
+        prefs["use_intake_core"] = self.intake_core_checkbox.isChecked()
         save_preferences(prefs)
 
         # WordPress-Konfiguration speichern (nicht-sensibel + Passwort via keyring)
