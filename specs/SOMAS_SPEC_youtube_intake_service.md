@@ -1,213 +1,239 @@
-# SOMAS Spec — Integration des `youtube-intake-service`
+# SOMAS Spec — Integration des `youtube-intake-service` (Core, in-process)
 
-> Status: **Entwurf / Spezifikation** (Implementierung in eigener Phase)
-> Zielversion: **TBD** (nächste Minor nach WordPress-Export)
-> Autor: Architektur-Abstimmung Thorsten ↔ Claude
-> Datum: 2026-06-26
-
----
-
-## 1. Ziel & Motivation
-
-Der [`youtube-intake-service`](https://github.com/ddumdi11/youtube-intake-service)
-ist ein kleiner lokaler **FastAPI-Sidecar** (eigenständige `.exe`), der aus einer
-YouTube-URL saubere, fertige Daten macht: Titel, Kanal, Dauer, Thumbnail und
-Transkript — plus ein vorgefertigtes Markdown. Er findet selbst einen freien
-Port, schreibt seine Verbindungsdaten in eine Datei und fährt nach Inaktivität
-automatisch herunter.
-
-SOMAS macht dieselbe Arbeit aktuell **in-process** in `src/core/youtube_client.py`
-(via `yt-dlp` + `youtube-transcript-api`). Die Integration verschiebt diese
-Verantwortung **optional** an den Sidecar. Vorteile:
-
-- **Entkopplung** der fragilen YouTube-Abhängigkeiten (`yt-dlp` bricht häufig bei
-  YouTube-Änderungen) vom GUI-Prozess — Updates am Sidecar ohne SOMAS-Release.
-- **Wiederverwendung** desselben Dienstes durch andere Tools/Workflows (n8n,
-  Skripte) — eine Quelle der Wahrheit für Intake.
-- **Robustheit**: Sidecar-Absturz reißt die GUI nicht mit; klare
-  `status`/`errors`-Felder.
-
-**Leitprinzip:** Die Integration ist **additiv und nicht-brechend**. Der bestehende
-In-Process-Pfad bleibt als **Fallback** vollständig erhalten. Kein Sidecar →
-SOMAS funktioniert exakt wie heute.
+> Status: **Final / merge-reif** — Architektur, Packaging, Import-Reinheit,
+> Erfolgs-Wire-Form (§3, 12 Felder eingefroren), O4 & O5 geklärt. **O4 verifiziert &
+> live (2026-06-27):** Raise-Vertrag im Service-Branch gelandet, HTTP-Body
+> byte-gleich (`invalid_url`→400, `video_unavailable`→404). Fehlerpfad freigegeben;
+> PR `docs/intake-spec-revision` kann nach CodeRabbit final gemergt werden.
+> **Ersetzt** die frühere Fassung dieses Dokuments (HTTP-Sidecar + Port-Discovery);
+> jene Annahme ist überholt.
+> Zielversion SOMAS: **TBD** (Umbau erst NACH Service-v1.0-Tag — siehe §2).
+> Rollen: Architekt Somas-App ↔ Architekt Youtube-Service, ausführend: Kurt.
+> Datum: 2026-06-27
 
 ---
 
-## 2. Scope
+## 1. Ziel & Architektur-Leitlinie
 
-### In Scope
-- Service-Discovery (Auffinden eines laufenden Sidecars).
-- HTTP-Client (`GET /process`, `GET /health`) mit Timeout/Fehlerbehandlung.
-- Mapping der Service-Antwort auf das bestehende `VideoInfo`-Datenmodell.
-- Fallback-Logik: Sidecar nicht erreichbar/fehlerhaft → bestehender
-  In-Process-Pfad (`get_video_info`).
-- Settings-Toggle: „YouTube-Intake-Service verwenden (falls verfügbar)".
-- Optionaler Auto-Start des Sidecars (nur wenn Pfad zur `.exe` konfiguriert).
+Der `youtube-intake-service` ist der zentrale, wiederverwendbare YouTube-Baustein
+(URL → Metadaten/Transkript/Thumbnail + SOMAS-Markdown) und ersetzt duplizierten
+Extraktionscode in den Konsumenten. SOMAS ist der **erste** zu migrierende
+Konsument.
 
-### Out of Scope (vorerst)
-- Bündeln/Mitliefern der Sidecar-`.exe` mit SOMAS (separate Distribution).
-- Ersetzen des In-Process-Pfads (bleibt dauerhaft als Fallback).
-- Nutzung des vom Service gelieferten `markdown`-Felds (SOMAS baut sein Markdown
-  selbst via `export.py`; siehe §6, offene Frage O3).
+**Tragende Entscheidung (Sync-Brief 2026-06-27):**
 
----
-
-## 3. Service-Schnittstelle (Ist-Stand des Sidecars)
-
-### Discovery
-- Beim Start schreibt der Service Verbindungsdaten nach
-  `~/.youtube_intake/service.info` (siehe `service.info.example` im Repo).
-- Bindet an `127.0.0.1`, Port aus Bereich **51283–51300** (Auto-Discovery).
-- Fährt nach Inaktivität automatisch herunter (Default-Timeout konfigurierbar
-  via `--timeout` Minuten, 1–1440).
-
-### Endpunkte
-- `GET /health` → `{ "status": "ok", "timeout_in_seconds": <int> }`
-  (setzt zugleich den Idle-Timer zurück → Liveness-Check).
-- `GET /process?url=<youtube_url>&language=de` → siehe Felder unten.
-
-### Antwortfelder `GET /process` (HTTP 200)
-| Feld | Bedeutung | SOMAS-Mapping |
-| ---- | --------- | ------------- |
-| `status` | `complete` \| `metadata_only` | steuert Transkript-Handling |
-| `transcript_available` | `true` / `false` | Info/Logging |
-| `title` | Videotitel | `VideoInfo.title` |
-| `channel` | Kanal/Uploader | `VideoInfo.channel` |
-| `duration` | Dauer in **Sekunden** (roh) | `VideoInfo.duration` |
-| `duration_formatted` | `MM:SS` / `H:MM:SS` | (SOMAS rechnet selbst → ignorierbar) |
-| `url` | angefragte URL | `VideoInfo.url` |
-| `thumbnail_url_maxres` | Max-Res-Thumbnail | (SOMAS baut Thumbnails via `build_thumbnail_urls`) |
-| `transcript` | Klartext-Transkript (leer wenn keins) | `VideoInfo.transcript` |
-| `markdown` | fertiges Markdown | vorerst ungenutzt (O3) |
-| `warnings` | nicht-fatale Hinweise | Logging/Status |
-| `errors` | leer bei Erfolg | Logging |
-
-### Fehlerantworten
-Einheitlicher JSON-Body mit passendem HTTP-Status:
-
-| Status | `error_code` | Bedeutung |
-| ------ | ------------ | --------- |
-| `400` | `invalid_url` | Keine gültige YouTube-URL |
-| `404` | `video_unavailable` | Video privat/entfernt/geo-blockiert |
-| `500` | `processing_failed` | Unerwarteter Fehler |
+- **Core/Server-Split** im Service-Repo. **Core** = reine Logik, importierbar, KEIN
+  Port / KEINE `service.info` / KEINE Shutdown-Schleife. **Server** = dünne
+  FastAPI-Schicht über dem Core (bedient nur Extension/Nicht-Python-Clients).
+- **SOMAS importiert den Core in-process** (`intake.process(url)`-artig), **nicht**
+  den HTTP-Weg. Grund: einfaches PyInstaller-Bundling (Core als Dependency, keine
+  zweite Exe, kein Daemon-Lebenszyklus, kein „Service läuft nicht"-Fall).
+- **Korrektheitsregel (kritisch):** SOMAS importiert den **Core, NIEMALS den
+  Server.** Ein versehentlicher Import der FastAPI-App würde einen Port binden /
+  `service.info` überschreiben und mit dem laufenden Webclip-Daemon kollidieren.
+- **Submodule** ist das Vehikel; SOMAS pinnt auf einen **festen Tag (v1.x)**.
 
 ---
 
-## 4. Architektur in SOMAS
+## 2. Verbindliche Reihenfolge
 
-### Neue Datei: `src/core/intake_client.py`
-Kapselt Discovery + HTTP. Keine PyQt-Abhängigkeit (testbar/headless).
+Service **v1.0** fertig → als eigenständiges Repo gepusht → **getaggt** → **erst
+dann** SOMAS-Submodul-Verdrahtung. Der Tag, auf den SOMAS pinnt, existiert nicht
+vor dem v1.0-Tag.
+
+> **Hold:** Bis zum v1.0-Tag werden in SOMAS **keine internen Abläufe** angefasst.
+> Dieses Dokument ist Planung, kein Eingriff.
+
+Service-v1.0-DoD liegt auf der Youtube-Service-Seite (Dauer: rohe Sekunden im JSON,
+human-friendly im Markdown; `status`/`errors` härten; `.gitignore` + `service.info`-
+Beispiel + API-Tests; Port-Konflikt-Feedback 51283–51300; PyInstaller-Build +
+Exe-Smoke-Test; git init + push + tag). Hier nur referenziert, nicht dupliziert.
+
+---
+
+## 3. Core-API-Kontrakt
+
+> Wire-Form **eingefroren** (Architekt Youtube-Service, 2026-06-27): Erfolgs-dict
+> mit **12 Feldern in dieser Reihenfolge**, kanonisch und ab jetzt unverändert.
+> SOMAS mappt **direkt aus dem dict** — keine `IntakeResult`-Dataclass nötig.
 
 ```text
-read_service_info() -> Optional[ServiceInfo]      # liest ~/.youtube_intake/service.info
-is_service_healthy(info, timeout=2.0) -> bool     # GET /health
-process_url(url, language="de", timeout=120)
-        -> IntakeResult                            # GET /process, gemappt
-to_video_info(IntakeResult) -> VideoInfo          # Mapping auf bestehendes Modell
+intake.process(url: str, language: str = "de") -> dict   # NUR Erfolg/Teilerfolg
+# Harte Fehler werden GERAISED (keine Fehler-dicts) → siehe O4 unten.
 ```
 
-- `ServiceInfo`: `host`, `port`, ggf. `pid`/`started_at` (Format gemäß
-  `service.info.example` final fixieren — **O1**).
-- `IntakeResult`: 1:1-Abbild der relevanten Antwortfelder + `status`/`errors`.
-- Fehler werden als **typisierte Exceptions** (`IntakeUnavailable`,
-  `IntakeProcessingError`) signalisiert, damit der Aufrufer sauber auf Fallback
-  schalten kann.
+| # | Core-dict-Feld | Typ | SOMAS-Mapping |
+| - | -------------- | --- | ------------- |
+| 1 | `status` | str | `complete` \| `metadata_only` (in-process NIE `error` → wird geraised) |
+| 2 | `transcript_available` | bool | **das** „hat Transkript?"-Signal — hierüber prüfen, NICHT über `transcript == ""` |
+| 3 | `title` | str | `VideoInfo.title` |
+| 4 | `channel` | str | `VideoInfo.channel` |
+| 5 | `duration` | int (Sek.) | `VideoInfo.duration` |
+| 6 | `duration_formatted` | str | informativ (SOMAS rechnet via `VideoInfo.duration_formatted`) |
+| 7 | `url` | str | `VideoInfo.url` |
+| 8 | `thumbnail_url_maxres` | str | einziges Thumbnail-Feld |
+| 9 | `transcript` | str (`""`=keins) | `VideoInfo.transcript` |
+| 10 | `markdown` | str | **ungenutzt** — SOMAS baut eigenes Markdown via `export.py` |
+| 11 | `warnings` | list | u. a. Sprach-Fallback-Hinweis (s. O5) |
+| 12 | `errors` | list | leer bei Erfolg |
 
-### Integrationspunkt
-Zentral dort, wo SOMAS heute `get_video_info(url)` ruft (YouTube-Pfad im
-`main_window` bzw. der zuständige Worker). Vorgeschlagene **Router-Funktion** in
-`youtube_client.py` oder neuer dünner Wrapper:
+**Drei Korrekturen ggü. der vorherigen Tabelle (wichtig fürs Mapping):**
+
+1. **Kein** `video_id` top-level und **keine** `thumbnail_urls`-Map — nur
+   `thumbnail_url_maxres`. SD/HQ-Varianten baut SOMAS weiter selbst via
+   `build_thumbnail_urls`; die dafür nötige **Video-ID leitet SOMAS selbst aus
+   `url` ab** (bestehendes `extract_video_id`), der Core liefert sie nicht.
+2. **„Kein Transkript" über `transcript_available` (bzw. `status`), NICHT** über die
+   Leerheit des `transcript`-Strings — der ist `""` (nicht `None`), `status`/
+   `transcript_available` sind das verlässliche Signal.
+3. Der **Fehler-Body** (4 Felder: `status`, `error_code`, `detail`, `errors`, inkl.
+   FastAPI-`detail`) ist **nur** für die Comet-Extension (HTTP) relevant. SOMAS
+   bekommt in-process eine **Exception**, nicht diesen Body.
+
+**Fehlerpfad (O4) — Vertrag, ⚠ pending Verifikation im Service-Code:** Harte Fehler
+werden als typisierte Exceptions geworfen, die der Adapter aus `youtube_intake_core`
+importiert:
 
 ```text
-def resolve_video_info(url, *, prefer_service: bool) -> VideoInfo:
-    if prefer_service:
-        info = read_service_info()
-        if info and is_service_healthy(info):
-            try:
-                return to_video_info(process_url(url))
-            except IntakeProcessingError:
-                # 404/400: echtes inhaltliches Problem → NICHT blind weiterfallen,
-                #          dem Nutzer melden (sonst doppelte Fehlversuche).
-                raise
-            except IntakeUnavailable:
-                pass  # Netzwerk/Timeout → Fallback
-    return get_video_info(url)   # bestehender In-Process-Pfad
+IntakeError(Exception)            # .error_code, .message
+ ├─ InvalidURLError               # error_code="invalid_url"       (ohne Netz erkennbar)
+ └─ VideoUnavailableError         # error_code="video_unavailable" (yt-dlp: video weg)
+unerwartet → IntakeError(error_code="processing_failed")
 ```
 
-> Designentscheidung **D1**: Bei **inhaltlichen** Fehlern (400/404) NICHT auf den
-> In-Process-Pfad zurückfallen (würde nur denselben Fehler langsamer
-> reproduzieren). Nur bei **Erreichbarkeits**-Problemen (kein `service.info`,
-> `/health` rot, Timeout, Connection-Refused) Fallback.
+Teilerfolg („Video geholt, kein Transkript") ist **kein** Fehler → dict mit
+`status="metadata_only"`. **O4 verifiziert & live (2026-06-27):** der Raise-Vertrag
+ist im Service-Branch gelandet (`invalid_url`→400, `video_unavailable`→404,
+HTTP-Body byte-gleich) — Fehlerpfad **freigegeben** (kein „pending" mehr).
+
+> ⚠ **Hinweis für den Alt-Code-Rückbau (§4.3/§6):** `InvalidURLError` erbt **nicht
+> mehr** von `ValueError`. Beim Entfernen der alten YouTube-Logik auf etwaige
+> `except ValueError`-Stellen achten, die früher ungültige URLs gefangen haben —
+> sie greifen für `InvalidURLError` nicht mehr.
 
 ---
 
-## 5. GUI / Settings
+## 4. SOMAS-seitige Integration (Skizze)
 
-- Neue Checkbox in `settings_dialog.py` (Gruppe „YouTube-Intake"):
-  **„YouTube-Intake-Service verwenden, wenn verfügbar"** (Default: **aus**,
-  damit Bestandsverhalten unverändert bleibt, bis bewusst aktiviert).
-- Persistenz analog bestehender Prefs (`user_preferences.json`,
-  `load_preferences`/`save_preferences`), Key z.B. `use_intake_service`.
-- Optionales Feld **„Pfad zur Service-.exe"** für Auto-Start (**O2**); leer =
-  kein Auto-Start, nur Nutzung eines bereits laufenden Sidecars.
-- Status-Label „Service erreichbar / nicht erreichbar" mit Test-Button
-  (analog WordPress-Test, asynchron via Worker — kein GUI-Freeze).
+### 4.1 Submodul + Import  ✓ bestätigt
+- Service-Repo als Submodul hinzufügen, auf v1.x-Tag gepinnt. ⟨URL/Tag TBD⟩
+- **Packaging (bestätigt):** Core ist ein echtes installierbares Paket
+  (`pyproject`). SOMAS zieht per **`pip install ./<submodul>`** ausschließlich den
+  Core; FastAPI/uvicorn stecken im **`[server]`-Extra** und kommen bei SOMAS gar
+  nicht erst mit.
+- **Import-Reinheit (bestätigt, strukturell erzwungen):** Da SOMAS ohne `[server]`
+  installiert, ist FastAPI im SOMAS-Venv schlicht **nicht vorhanden** — die „nie den
+  Server"-Regel ist damit nicht mehr versehentlich brechbar. (Service-Seite sichert
+  es zusätzlich per Subprozess-Test ab.) Hinweis: aktueller Core ist VOR dem Split
+  noch nicht rein — gilt erst ab dem Split/v1.0.
+
+### 4.2 Neuer dünner Wrapper in SOMAS
+`src/core/intake_adapter.py` (Name TBD), ohne PyQt-Abhängigkeit:
+
+```text
+from youtube_intake_core import process, IntakeError   # (+ Subklassen bei Bedarf)
+
+def process_url(url, language="de") -> VideoInfo:
+    try:
+        d = process(url, language=language)
+    except IntakeError as e:        # invalid_url | video_unavailable | processing_failed
+        raise IntakeFailed(e.error_code, e.message)   # SOMAS-eigener Fehlertyp
+    return VideoInfo(
+        title=d["title"], channel=d["channel"],
+        duration=d["duration"], url=d["url"],
+        transcript=d["transcript"],            # "" wenn keins
+    )
+    # „kein Transkript" am Aufrufort über d["transcript_available"] / d["status"]
+    #  == "metadata_only" erkennen — NICHT über transcript == "".
+    #  Video-ID für Thumbnails: extract_video_id(d["url"]) (Core liefert keine).
+```
+
+- Kapselt Core-Aufruf + Feld-Mapping (§3) an EINER Stelle.
+- `IntakeError` (typisiert, mit `error_code`) → differenzierte GUI-`QMessageBox`
+  (ungültige URL vs. Video nicht verfügbar vs. unerwartet).
+- `status`/`transcript_available` reicht der Adapter mit durch (z.B. via
+  Rückgabe-Tupel oder einem schlanken Resultobjekt), damit der Aufrufer den
+  „nur Metadaten / kein Transkript"-Hinweis setzen kann.
+
+### 4.3 Router + Fallback während der Migration
+Am bestehenden YouTube-Pfad (heute `get_video_info(url)`):
+
+```text
+def resolve_video_info(url, *, use_core: bool) -> VideoInfo:
+    if use_core:
+        try:
+            return intake_adapter.process_url(url)
+        except CoreUnavailable:      # Import-/Build-Problem → Fallback
+            pass
+    return get_video_info(url)        # bestehende In-Process-YouTube-Logik
+```
+
+> Übergangs-Designentscheidung: Solange der alte Pfad existiert, dient er als
+> Sicherheitsnetz. **Nach** verifiziertem Core-Build in die SOMAS-Exe darf die alte
+> direkte-YouTube-Funktionalität (`yt-dlp`/`youtube-transcript-api` in
+> `youtube_client.py`) vollständig zurückgebaut werden (eigener Schritt, §6).
+> ⚠ Dabei `except ValueError`-Stellen prüfen: `InvalidURLError` erbt nicht (mehr)
+> von `ValueError`, alte URL-Fehlerpfade greifen sonst ins Leere.
+
+### 4.4 PyInstaller-Bundling
+- Der Core liegt als normal installiertes Paket im SOMAS-Venv (kein Pfad-Import) →
+  PyInstaller greift ihn wie jede Dependency. Prüfen: bringt der Core eigene
+  Daten-Dateien mit (z.B. Markdown-Templates), die als `--add-data`/hidden-imports
+  gebündelt werden müssen? Exe smoke-testen (eine echte URL → `VideoInfo`).
 
 ---
 
-## 6. Fehler- & Edge-Cases
+## 5. Koexistenz-Fußnoten (Hygiene, kein Absturzrisiko)
+- **Webshare-Proxy ist v1.1+, NICHT v1.0** (Korrektur Architekt Youtube-Service):
+  Stand real existiert noch KEINE Proxy-Logik. Da SOMAS erst nach dem v1.0-Tag
+  integriert, darf zum Integrationszeitpunkt **keine** Proxy-/Env-Var-Annahme
+  vorausgesetzt werden — v1.0 kennt diese Env-Vars nicht. Die folgende Notiz ist
+  rein **vorausschauend** für den Fall, dass Proxy-Support (v1.1+) später ankommt:
+  Daemon + SOMAS würden sich dann dieselben Credentials und damit ein Rate/Quota-
+  Kontingent teilen (bei aktuellem Volumen irrelevant).
+- Falls der Core Dateien rauslegt (Thumbnails/Cache): pro Video-ID benennen und
+  atomar schreiben, damit parallele Läufe (Daemon ↔ SOMAS) sich nicht überschreiben.
 
-- **Kein `service.info`** → Service gilt als nicht vorhanden → Fallback.
-- **`service.info` vorhanden, aber Port tot** (Service beendet) → `/health`
-  schlägt fehl → Fallback. (Stale-Info nicht als hart fatal behandeln.)
-- **`metadata_only`** (kein Transkript) → `VideoInfo.transcript = ""`; SOMAS
-  verhält sich wie heute bei fehlendem Transkript (Tab/Hinweise unverändert).
-- **Timeout** beim `/process` (langes Video) → konfigurierbares Timeout
-  (Default 120 s, wie In-Process); bei Überschreitung Fallback + Hinweis.
-- **Sprache**: SOMAS reicht die gewählte Sprache als `language`-Param durch
-  (Default `de`).
-- **Idle-Shutdown**: Vor jedem `/process` ein `/health` (setzt Timer zurück)
-  ODER direkt `/process` und bei Connection-Refused einmal Auto-Start versuchen
-  (falls `.exe`-Pfad gesetzt).
-
----
-
-## 7. Tests
-
-- `tests/test_intake_client.py` (vollständig offline, HTTP **gemockt**):
-  - `read_service_info`: vorhanden / fehlt / korrupt.
-  - `is_service_healthy`: ok / Timeout / Connection-Refused.
-  - `process_url` Mapping: `complete`, `metadata_only`, 400/404/500.
-  - `to_video_info`: Felder korrekt gemappt (Sekunden, leeres Transkript).
-  - Router `resolve_video_info`: Service-aus / Service-an-gesund /
-    Service-an-tot → korrekter Pfad bzw. Fallback; D1 (kein Fallback bei 404).
-- Kein echter Netz-/Sidecar-Zugriff in der CI (wie beim Service-Repo selbst).
+**Ops (greift erst ab v1.1):** Keine Proxy-Credentials ins Git (Webshare nur via
+Env-Vars + `.env.example` + README-Hinweis).
 
 ---
 
-## 8. Offene Fragen (vor Implementierung klären)
-
-- **O1 — `service.info`-Format:** Exaktes Format aus `service.info.example`
-  übernehmen (Key/Value? JSON? nur `host:port`?). Quelle: Service-Repo.
-- **O2 — Auto-Start ja/nein:** Soll SOMAS den Sidecar bei Bedarf selbst starten
-  (konfigurierter `.exe`-Pfad) oder nur einen **bereits laufenden** Dienst
-  nutzen? (Auto-Start = mehr Komfort, aber Prozess-Lifecycle-Verantwortung.)
-- **O3 — `markdown`-Feld nutzen?** Service liefert fertiges Markdown. SOMAS baut
-  sein Markdown jedoch selbst (Header, Thumbnail, SOMAS-Block via `export.py`).
-  Vorschlag: Service-`markdown` **ignorieren**, nur strukturierte Felder nutzen
-  (Konsistenz mit Modellvergleich/Einzelexport).
-- **O4 — Distribution:** Wird die `.exe` später mit SOMAS gebündelt oder bleibt
-  sie getrennt installierbar? (Beeinflusst Settings-UX und Docs.)
-- **O5 — Sprache/Transkript-Auswahl:** Reicht der einzelne `language`-Param, oder
-  braucht SOMAS später mehrsprachige Fallbacks (de→en), wie heute in
-  `get_transcript`?
+## 6. Migrations-/Rollout-Schritte (NACH v1.0-Tag)
+1. Submodul hinzufügen + auf Tag pinnen; Import-/Packaging-Form festlegen (Punkt 2).
+2. `intake_adapter.py` + Mapping gemäß finalem Core-Kontrakt (Punkt 1).
+3. Router + Fallback verdrahten; headless gegen echte URL testen.
+4. PyInstaller-Build mit Core; Exe-Smoke-Test.
+5. **Erst nach Verifikation:** Alt-YouTube-Code in SOMAS zurückbauen (dabei auf
+   `except ValueError` achten — `InvalidURLError` erbt nicht mehr davon).
+6. Tests, README/CLAUDE.md-Changelog, Spec-Status auf „umgesetzt".
 
 ---
 
-## 9. Umsetzungsschritte (Phasen-Skizze)
+## 7. Bewusst NICHT in dieser Phase
+- Comet-Extension (komplett separat, eigener Ort, reiner HTTP-Client — **nicht**
+  in SOMAS und **nicht** ins Service-Repo).
+- SOMAS-Interna anfassen, bevor Service v1.0 getaggt ist.
+- WordPress-Integration (zweiter Konsument, später).
 
-1. `intake_client.py` + Datenklassen + Mapping (headless, getestet).
-2. Router `resolve_video_info` + Verdrahtung am bestehenden YouTube-Pfad.
-3. Settings-Toggle + Status/Test (asynchron).
-4. (Optional, O2) Auto-Start des Sidecars.
-5. Tests, README/CLAUDE.md-Changelog, Spec-Status auf „umgesetzt".
+---
+
+## 8. Offene Fragen (an Architekt Youtube-Service)
+- ~~**O1** — Form/Signatur von `intake.process`~~ **✓ geklärt:** dict-Form,
+  `duration` int + `duration_formatted` str, Mapping aus dict, keine Dataclass.
+  Verbleibt nur: **exakte Schlüsselnamen** ⟨Kurts Liste⟩ → §3 final.
+- ~~**O2** — Packaging~~ **✓ geklärt:** installierbares Paket (`pyproject`),
+  `pip install ./<submodul>` zieht nur Core; FastAPI im `[server]`-Extra.
+- ~~**O3** — Import-Reinheit~~ **✓ geklärt:** strukturell via Weglassen von
+  `[server]` (FastAPI nicht im Venv) + Subprozess-Test; rein ab Split/v1.0.
+- ~~**O4** — Fehlerverhalten~~ **✓ geklärt (Vertrag, ⚠ Code-Verifikation ausstehend):**
+  harte Fehler (ungültige URL, nicht verfügbares Video) → typisierte **Exception**
+  mit `error_code` (`IntakeError`/`InvalidURLError`/`VideoUnavailableError` aus
+  `youtube_intake_core`); Teilerfolg (kein Transkript) → **dict** mit
+  `status="metadata_only"`. Raise-Vertrag im Service-Branch noch nicht verifiziert
+  → §3-Fehlerpfad „pending O4-Landing", PR erst nach grünem Licht final.
+- ~~**O5** — Sprach-Fallback~~ **✓ geklärt:** bleibt im **Core** (angefragt → en →
+  erste verfügbare). Bei Sprachabweichung schreibt der Core einen Eintrag in die
+  bestehende `warnings`-Liste (kein neuer Schlüssel) — SOMAS kann daraus „nur auf
+  Englisch verfügbar" anzeigen. Strukturiertes `transcript_language`-Feld wäre eine
+  additive **v1.1**-Nettigkeit, bewusst nicht v1.0.
