@@ -92,6 +92,7 @@ class DebugLogger:
         model_used: str = "",
         citations: list[str] | None = None,
         error: str | None = None,
+        finish_reason: str = "",
     ) -> None:
         """Logs received API response.
 
@@ -104,6 +105,9 @@ class DebugLogger:
             model_used: Tatsächlich verwendetes Modell (kann vom Request abweichen).
             citations: Optionale Quellen-URLs (z.B. von Perplexity).
             error: Fehlermeldung bei API-Fehlern.
+            finish_reason: Stopp-Grund des Modells (z.B. "stop", "length"). v0.11.0:
+                persistiert, weil "length"/"max_tokens" eine Trunkierung verraten —
+                im Iran-Sample fehlte genau dieses Feld.
         """
         if not self.enabled or log_dir is None:
             return
@@ -113,6 +117,7 @@ class DebugLogger:
             "duration_seconds": round(duration, 1),
             "status_code": status_code,
             "model_used": model_used,
+            "finish_reason": finish_reason,
             "tokens_input": tokens.get("input", 0),
             "tokens_output": tokens.get("output", 0),
             "tokens_total": tokens.get("total", 0),

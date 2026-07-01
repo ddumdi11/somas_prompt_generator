@@ -208,6 +208,7 @@ class OpenRouterClient(LLMClient):
                     model_used=model,
                     provider_used=self.PROVIDER_NAME,
                     tokens_used=tokens,
+                    finish_reason=finish_reason or "",
                 )
 
             logger.error(f"OpenRouter HTTP {response.status_code}: {response.text}")

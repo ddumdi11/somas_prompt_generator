@@ -35,6 +35,10 @@ class APIResponse:
     tokens_used: int = 0
     citations: list[str] = field(default_factory=list)
     duration_seconds: float = 0.0
+    # v0.11.0: Warum das Modell gestoppt hat (z.B. "stop", "length", "max_tokens").
+    # "length"/"max_tokens"/"truncated" signalisieren eine abgeschnittene Antwort
+    # (Trunkierung) und werden im Antwort-Handling als harter Gate ausgewertet.
+    finish_reason: str = ""
 
 
 class LLMClient(ABC):

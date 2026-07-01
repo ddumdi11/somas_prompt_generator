@@ -112,6 +112,7 @@ class OpenAIClient(LLMClient):
                 model_used=model,
                 provider_used=self.PROVIDER_NAME,
                 tokens_used=tokens_used,
+                finish_reason=finish_reason or "",
             )
 
         except ImportError:
