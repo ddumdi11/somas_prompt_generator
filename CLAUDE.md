@@ -148,8 +148,21 @@ openai>=1.50.0
 
 **Installation:**
 ```bash
+# Submodul mit klonen (oder nachträglich initialisieren)
+git clone --recurse-submodules <repo-url>
+# git submodule update --init --recursive   # falls ohne --recurse-submodules geklont
+
 pip install -r requirements.txt
+
+# Optional: YouTube-Intake-Core (opt-in, nur Core ohne [server]-Extra)
+pip install ./external/youtube-intake-service
 ```
+
+> **Submodul `external/youtube-intake-service`** (auf Tag gepinnt): der wiederverwendbare
+> YouTube-Baustein. SOMAS importiert den **Core** in-process (`youtube_intake_core`,
+> via `src/core/intake_adapter.py` → Router `resolve_video_info`), NIE den Server.
+> Aktivierung über Settings-Toggle `use_intake_core` (Default aus); ohne Aktivierung/Install
+> läuft der bisherige direkte Weg. Nach Pin-Wechsel Core neu installieren.
 
 ---
 
