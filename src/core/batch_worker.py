@@ -23,7 +23,7 @@ from .rating_store import (
     RatingStore,
     extract_module_from_result,
 )
-from .youtube_client import get_video_info
+from .youtube_client import resolve_video_info
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +123,7 @@ class BatchWorker(QThread):
         self.item_status_changed.emit(index, "loading")
         item.status = "loading"
 
-        video_info = get_video_info(item.url)
+        video_info = resolve_video_info(item.url)
         item.video_info = video_info
         self.item_metadata_loaded.emit(index, video_info)
 
