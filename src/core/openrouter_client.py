@@ -146,6 +146,14 @@ class OpenRouterClient(LLMClient):
                     # Context-Window als Worst-Case und blockt bei moderatem
                     # Guthaben mit HTTP 402.
                     "max_tokens": DEFAULT_MAX_TOKENS,
+                    # v0.11.0 (Reasoning-Leak-Härtung, stärkster Hebel): Das Modell
+                    # reasont weiterhin INTERN (Qualität bleibt), gibt die Reasoning-
+                    # Tokens aber NICHT zurück. Verhindert, dass manche Upstream-
+                    # Backends das Reasoning inline in `content` serialisieren, das
+                    # Token-Budget auffressen und die finale Analyse abschneiden
+                    # (realer Iran-DeepSeek-Fall 2026-07-01). Nur OpenRouter — andere
+                    # Provider haben eigene Reasoning-Semantik und bleiben unangetastet.
+                    "reasoning": {"exclude": True},
                 },
                 timeout=120,
             )
@@ -165,6 +173,12 @@ class OpenRouterClient(LLMClient):
 
                 # content kann fehlen oder None sein; manche (Reasoning-)Modelle
                 # liefern den Text stattdessen im Feld 'reasoning'.
+                # v0.11.0: Mit reasoning.exclude=true (s. Request-Body) sollte
+                # 'reasoning' im Normalfall leer sein; bleibt dann auch 'content'
+                # leer, greift unten der Leer-Guard → sauberer Fehler statt
+                # Reasoning-Müll. Der 'reasoning'-Fallback bleibt nur als Notnagel
+                # für Backends, die exclude ignorieren; solche Fälle fängt zusätzlich
+                # der finish_reason-Gate (PR 3) bzw. der Struktur-Validator (PR 5) ab.
                 content = message.get("content") or message.get("reasoning")
 
                 # Leerer/fehlender Inhalt: sauber als Fehler melden statt bei
@@ -194,6 +208,7 @@ class OpenRouterClient(LLMClient):
                     model_used=model,
                     provider_used=self.PROVIDER_NAME,
                     tokens_used=tokens,
+                    finish_reason=self._normalize_finish_reason(finish_reason),
                 )
 
             logger.error(f"OpenRouter HTTP {response.status_code}: {response.text}")

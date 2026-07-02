@@ -35,6 +35,10 @@ class APIResponse:
     tokens_used: int = 0
     citations: list[str] = field(default_factory=list)
     duration_seconds: float = 0.0
+    # v0.11.0: Warum das Modell gestoppt hat (z.B. "stop", "length", "max_tokens").
+    # "length"/"max_tokens"/"truncated" signalisieren eine abgeschnittene Antwort
+    # (Trunkierung) und werden im Antwort-Handling als harter Gate ausgewertet.
+    finish_reason: str = ""
 
 
 class LLMClient(ABC):
@@ -46,6 +50,29 @@ class LLMClient(ABC):
 
     PROVIDER_ID: str = ""
     PROVIDER_NAME: str = ""
+
+    @staticmethod
+    def _normalize_finish_reason(
+        raw: str | None, extra_map: dict[str, str] | None = None
+    ) -> str:
+        """Normalisiert den provider-spezifischen Stopp-Grund einheitlich.
+
+        Zentralisiert das ``raw or ""`` sowie provider-spezifische Aliasse, damit
+        der Trunkierungs-Gate (main_window `_TRUNCATION_FINISH_REASONS`) über alle
+        Clients konsistente Werte bekommt.
+
+        Args:
+            raw: Roher finish_reason/stop_reason (kann None sein).
+            extra_map: Optionale Aliasse, z.B. ``{"max_tokens": "length"}``
+                für Anthropic.
+
+        Returns:
+            Bereinigter finish_reason ("" wenn nicht vorhanden).
+        """
+        value = (raw or "").strip()
+        if extra_map and value in extra_map:
+            return extra_map[value]
+        return value
 
     @abstractmethod
     def get_available_models(self) -> list[dict]:

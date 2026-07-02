@@ -102,6 +102,13 @@ class AnthropicClient(LLMClient):
                     + getattr(message.usage, "output_tokens", 0)
                 )
 
+            # v0.11.0: stop_reason durchreichen. Anthropic nennt Trunkierung
+            # "max_tokens" — auf das providerübergreifende "length" normalisieren,
+            # damit der finish_reason-Gate einheitlich greift.
+            finish_reason = self._normalize_finish_reason(
+                stop_reason, {"max_tokens": "length"}
+            )
+
             logger.info(
                 f"Anthropic Antwort: {len(content)} Zeichen, "
                 f"{tokens_used} Tokens"
@@ -113,6 +120,7 @@ class AnthropicClient(LLMClient):
                 model_used=model,
                 provider_used=self.PROVIDER_NAME,
                 tokens_used=tokens_used,
+                finish_reason=finish_reason,
             )
 
         except ImportError:

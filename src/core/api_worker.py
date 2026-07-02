@@ -102,6 +102,7 @@ class APIWorker(QThread):
                         duration=duration,
                         model_used=response.model_used,
                         citations=response.citations,
+                        finish_reason=response.finish_reason,
                     )
             else:
                 self.status_changed.emit(APIStatus.ERROR.value)
@@ -117,6 +118,7 @@ class APIWorker(QThread):
                         duration=duration,
                         model_used=response.model_used,
                         error=response.error_message,
+                        finish_reason=response.finish_reason,
                     )
 
         except Exception as e:

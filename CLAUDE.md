@@ -7,7 +7,7 @@
 ## 🎯 Projektkontext
 
 **Name:** SOMAS Prompt Generator
-**Version:** 0.10.1
+**Version:** 0.11.0
 **Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
 **Sprache:** Python 3.11+
 **GUI-Framework:** PyQt6
@@ -357,8 +357,34 @@ TEST_URLS = [
 - [x] „Verifikation erneut versuchen"-Button: nur Stufe 2, Modellwechsel möglich, ersetzt Abschnitt
 - [x] Tests `tests/test_export_header.py` + erweiterte Parser-Tests
 
+### Phase 13: Reasoning-Leak-Härtung ✅ (v0.11.0)
+
+Behebt einen realen Final-Answer-Leak (DeepSeek-V4-Pro, 2026-07-01): Modell kippte
+sein Reasoning in den sichtbaren Content, fraß das Token-Budget, finale Analyse
+wurde abgeschnitten. Spec: `SOMAS_v0.11.0_SPEC_reasoning_leak_haertung.md`.
+
+- [x] Increment A · PR 1: OpenRouter `reasoning.exclude=true` (Reasoning bleibt intern,
+  verunreinigt `content` nicht) — nur OpenRouter, andere Provider unangetastet
+- [x] Increment A · PR 2: `finish_reason` durch `APIResponse` + alle 4 Clients (Anthropic
+  `stop_reason`, `max_tokens`→`length`) + im Debug-Log persistiert
+- [x] Increment A · PR 3: `finish_reason`-Gate — trunkierte Antwort (`length`/`max_tokens`/
+  `truncated`) gilt nicht als gültige Analyse
+- [x] Increment A · PR 4: FAKTENCHECK-Prompt-Widerspruch aufgelöst (`_apply_custom_overrides`:
+  „Erzwinge X als 5. Abschnitt…") + Final-Only-Zaun (`FINAL_ONLY_FENCE`)
+- [x] Increment B · PR 5 / B1: preamble-scoped Struktur-/Trunkierungs-Validator
+  `validate_analysis_structure` → `ValidationResult{ok, reason}` (Start-Anker, Template-
+  Echo-Guard, Header-Reihenfolge, FAKTENCHECK-Sub-Header, Trunkierungs-Heuristik)
+- [x] Increment B · PR 5 / B2: Retry-Eskalation (1× sichtbarer Auto-Retry, dann offener
+  „Modelllauf fehlgeschlagen" statt Scheinanalyse) + Abbrechen-Button für den Analyse-Call;
+  Verifikation (Stufe 2) nur auf gültiger Analyse
+- [x] Iran-Fixture + `tests/test_reasoning_leak_validator.py` (Leak/Trunkierung ungültig,
+  Clean gültig, False-Positive-Guards)
+
 ### Backlog
 
+- [ ] A4-Feinschliff: erzwungenes Modul aus der `MODUL-AUSWAHL`-Liste entfernen
+  (generisches Entfernen würde Beschreibung anderer Module löschen; ggf. FAKTENCHECK-Sonderfall)
+- [ ] FAKTENCHECK-Zweiteilung (getrennte Calls für eigenes Token-Budget) — nur bei Bedarf
 - [ ] Docstring-Coverage auf ≥80 % (Test-Funktionen) — CodeRabbit-Gate, niedrige Priorität
 - [ ] Wochentags-basierte Perspektive-Defaults (nach Recherche)
 - [ ] Englisch-Support

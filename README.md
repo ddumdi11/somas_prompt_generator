@@ -16,7 +16,17 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuell (v0.10.1) — Faktencheck-Verifikation (gehärtet)
+### Aktuell (v0.11.0) — Reasoning-Leak-Härtung
+
+Behebt einen realen **Final-Answer-Leak**: Ein Modell kippte statt der Analyse seinen Denkprozess in die Antwort, verbrauchte damit das Token-Budget und wurde mitten im Satz abgeschnitten – heraus kam Notizen-Müll statt einer Analyse.
+
+- **Reasoning bleibt draußen** – OpenRouter-Analysen senden `reasoning.exclude=true`: Das Modell denkt intern weiter (Qualität bleibt), gibt den Denkprozess aber nicht mehr zurück und verunreinigt den Analysetext nicht
+- **Trunkierung wird sichtbar** – `finish_reason` wird durch alle Provider gereicht und protokolliert; eine bei der Token-Grenze abgeschnittene Antwort gilt **nicht** als gültige Analyse (statt eine halbe, „halb-plausible" Behauptungsliste anzuzeigen)
+- **Struktur-Validator** – Prüft die Analyse positiv (Start mit `### FRAMING`, erwartete Abschnitte in Reihenfolge, bei Faktencheck die drei Sub-Header, keine abgeschnittene Nummerierung) – **ohne** legitime Analysen zu verwerfen, die zufällig Wörter wie „Prompt" im Text haben
+- **Ein sichtbarer Auto-Retry** – Bei Leak/Trunkierung/fehlender Struktur wird **einmal** automatisch neu angefordert (abbrechbar). Bleibt es fehlerhaft, erscheint ein offener **„Modelllauf fehlgeschlagen"** – bewusst **keine** kosmetisch reparierte Scheinanalyse
+- **Sauberer Faktencheck-Prompt** – Der erzwungene FAKTENCHECK-Modus enthält keinen Widerspruch mehr (volle Analyse **+** FAKTENCHECK als 5. Abschnitt); ein Final-Only-Zaun hält Arbeitsnotizen aus dem Output. Die Web-Verifikation (Stufe 2) startet **nur** auf einer gültigen, nicht-trunkierten Analyse
+
+### Seit v0.10.1 — Faktencheck-Verifikation (gehärtet)
 
 - **Zweistufige Faktenprüfung** – Das FAKTENCHECK-Modul trennt jetzt strikt **Meinungen**, **Interpretationen** und **überprüfbare Behauptungen** (relevanz-sortiert). Optional prüft danach ein web-fähiges Modell **nur die nackten Behauptungen** und liefert pro Behauptung **Verdikt + Quelle**
 - **Halluzinations-Schutz** – In der Verifikation stehen **keine Meinungen** im Prompt – das Modell kann nicht durch rhetorische Sprache „verführt" werden. Zusätzlicher Riegel gegen erfundene Quellen (kann nicht belegt werden → Verdikt „nicht überprüfbar", Quelle „—")
@@ -339,6 +349,7 @@ Die App implementiert das SOMAS-Framework mit Content-Type-spezifischen Analyse-
 
 | Version | Datum | Änderungen |
 | --------- | ------- | ------------ |
+| 0.11.0 | 2026-07-02 | Reasoning-Leak-Härtung: OpenRouter `reasoning.exclude=true` (Denkprozess bleibt intern), `finish_reason` durchgereicht + geloggt + als harter Trunkierungs-Gate, preamble-scoped Struktur-/Trunkierungs-Validator, ein sichtbarer + abbrechbarer Auto-Retry statt Scheinanalyse („Modelllauf fehlgeschlagen"), FAKTENCHECK-Prompt-Widerspruch aufgelöst + Final-Only-Zaun, Iran-Leak als Test-Fixture |
 | 0.10.1 | 2026-06-16 | Faktencheck-Härtung: Unabhängigkeits-Riegel (kein Eigenbeleg durchs Video, `source_hint` injection-sicher), „Verifikation erneut versuchen"-Button (nur Stufe 2, Modellwechsel), Perplexity-Modelle aktualisiert (`sonar-reasoning-pro`/`sonar-deep-research`), `DEFAULT_MAX_TOKENS=8192` (HTTP-402-Fix), einheitlicher Export-Kopf (Titel + Thumbnail), Zeichenlimit-Fix bei FAKTENCHECK |
 | 0.10.0 | 2026-06-14 | Faktencheck-Verifikation (Hybrid): Stufe 1 trennt Meinungen/Interpretationen/Behauptungen; optionale Stufe 2 verifiziert Behauptungen per web-fähigem Modell (Verdikt + Quelle, 4-stufige Skala), Halluzinations-Schutz + Riegel gegen erfundene Quellen, `:online`-Schalter, Top-N-Kappung, Auto-Anhang |
 | 0.9.1 | 2026-05-30 | Fix: leeren/None-Content der Provider (z.B. OpenRouter `tencent/hy3-preview`) sauber als Fehler behandeln statt Crash; `reasoning`-Fallback + `finish_reason`-Diagnose; alle 4 Clients abgesichert; Regressionstest |
