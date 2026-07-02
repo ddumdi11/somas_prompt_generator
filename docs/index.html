@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="SOMAS Prompt Generator v0.10.0 – Strukturierte YouTube-Analysen mit KI-Power. Faktencheck-Verifikation (Verdikt + Quelle), Modellvergleich, Custom Prompt Editor, 4 API-Provider, Batch-Modus, 200+ Modelle.">
+    <meta name="description" content="SOMAS Prompt Generator v0.11.0 – Strukturierte YouTube-Analysen mit KI-Power. Robuster Faktencheck (Reasoning-Schutz, Vollständigkeits-Check), Verifikation mit Verdikt + Quelle, Modellvergleich, 4 API-Provider, Batch-Modus, 200+ Modelle.">
     <title>SOMAS Prompt Generator – KI-gestützte Video-Analysen</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -13,7 +13,7 @@
         <div class="container">
             <h1>🎯 SOMAS Prompt Generator</h1>
             <p class="tagline">Strukturierte YouTube-Analysen mit KI-Power.<br>200+ Modelle · Ein Klick · LinkedIn-ready.</p>
-            <p class="version-badge">✨ v0.10.0: Faktencheck-Verifikation · Modellvergleich · 4 API-Provider · Batch-Modus · 200+ Modelle</p>
+            <p class="version-badge">✨ v0.11.0: Reasoning-Schutz &amp; Vollständigkeits-Check · Faktencheck-Verifikation · Modellvergleich · 4 API-Provider · 200+ Modelle</p>
             <div class="cta-buttons">
                 <a href="https://github.com/ddumdi11/somas_prompt_generator" class="btn btn-primary">GitHub Repo</a>
                 <a href="https://github.com/ddumdi11/somas_prompt_generator/releases" class="btn btn-secondary">Download</a>
@@ -29,10 +29,44 @@
         </div>
     </section>
 
-    <!-- NEU in v0.10.0 -->
+    <!-- NEU in v0.11.0 -->
     <section class="whats-new">
         <div class="container">
-            <h2>🆕 Neu in v0.10.0 – Faktencheck-Verifikation</h2>
+            <h2>🆕 Neu in v0.11.0 – Verlässliche Analysen</h2>
+            <p class="section-intro">Robuster Faktencheck: kein Denk-Kauderwelsch im Ergebnis, keine abgeschnittenen Analysen – und ein ehrlicher Hinweis, wenn ein Modell mal patzt.</p>
+            <div class="new-features-grid">
+                <div class="new-feature-card new-feature-card-highlight">
+                    <span class="new-feature-icon">🧠</span>
+                    <h3>Kein Reasoning im Ergebnis</h3>
+                    <p>Manche Modelle kippen ihren Denkprozess mitten in die Analyse. SOMAS hält ihn jetzt draußen (<code>reasoning.exclude</code>) und erkennt Reste automatisch – du bekommst die Analyse, nicht die Selbstgespräche des Modells.</p>
+                    <span class="new-feature-detail">Sauberer Output statt Denk-Dump</span>
+                </div>
+                <div class="new-feature-card new-feature-card-highlight">
+                    <span class="new-feature-icon">🧯</span>
+                    <h3>Ehrlicher Fehlschlag statt Schein-Analyse</h3>
+                    <p>Bricht ein Modell mittendrin ab, zeigt SOMAS keine halbe Behauptungsliste als „fertig". Stattdessen ein sichtbarer Neuversuch – und wenn es wieder scheitert, ein klares „Modelllauf fehlgeschlagen".</p>
+                    <span class="new-feature-detail">1× Auto-Retry, dann Klartext</span>
+                </div>
+                <div class="new-feature-card">
+                    <span class="new-feature-icon">📏</span>
+                    <h3>Vollständigkeit geprüft</h3>
+                    <p>Ein Validator prüft jede Analyse auf Struktur und Abbruch: alle Abschnitte da, der Faktencheck sauber angehängt, kein Satz mitten abgeschnitten. Erst dann startet die Verifikation.</p>
+                    <span class="new-feature-detail">finish_reason-Gate + Struktur-Check</span>
+                </div>
+                <div class="new-feature-card">
+                    <span class="new-feature-icon">🛡️</span>
+                    <h3>Unabhängiger Faktencheck</h3>
+                    <p>Das geprüfte Video zählt nicht als eigener Beleg: Eine Behauptung gilt nur dann als bestätigt, wenn eine unabhängige externe Quelle sie stützt. Kein Zirkelschluss (seit v0.10.1).</p>
+                    <span class="new-feature-detail">Nur externe Quellen</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- v0.10.0 -->
+    <section class="whats-new whats-new-v07">
+        <div class="container">
+            <h2>🔎 v0.10.0 – Faktencheck-Verifikation</h2>
             <p class="section-intro">Von der rhetorischen Analyse zur harten Faktenprüfung – in zwei Stufen, mit Halluzinations-Schutz.</p>
             <div class="new-features-grid">
                 <div class="new-feature-card new-feature-card-highlight">
