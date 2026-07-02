@@ -166,6 +166,13 @@ class MainWindow(QMainWindow):
         self._current_analysis_id: int | None = None
         self._is_rework: bool = False
 
+        # v0.11.0 (B2): Retry-Eskalation für ungültige/trunkierte Analysen.
+        # Merkt sich den zuletzt gesendeten Analyse-Prompt + Kontext, um bei
+        # Leak/Trunkierung genau EINMAL automatisch neu anzufordern.
+        self._analysis_prompt: str = ""
+        self._analysis_requires_faktencheck: bool = False
+        self._analysis_retry_count: int = 0
+
         # Custom Prompt Overrides (gesetzt durch PromptEditDialog)
         self._custom_system_prompt: str | None = None
         self._custom_module: str | None = None
@@ -301,6 +308,15 @@ class MainWindow(QMainWindow):
         self.btn_batch.setMinimumHeight(40)
         self.btn_batch.setToolTip("2\u20135 YouTube-URLs sequenziell analysieren")
         generate_row.addWidget(self.btn_batch)
+
+        # v0.11.0 (B2): Abbrechen-Button f\u00fcr den laufenden Analyse-Call (auch f\u00fcr
+        # den automatischen Retry). Nur w\u00e4hrend eines Laufs aktiv.
+        self.btn_api_cancel = QPushButton("Abbrechen")
+        self.btn_api_cancel.setMinimumHeight(40)
+        self.btn_api_cancel.setEnabled(False)
+        self.btn_api_cancel.setToolTip("Laufenden Analyse-Aufruf abbrechen")
+        self.btn_api_cancel.clicked.connect(self._on_api_cancel)
+        generate_row.addWidget(self.btn_api_cancel)
         main_layout.addLayout(generate_row)
 
         # Generierter Prompt
@@ -1264,7 +1280,9 @@ class MainWindow(QMainWindow):
 
         # API-Automatik: Falls aktiv, automatisch API-Call starten
         if self.api_checkbox.isChecked():
-            self._start_api_call(prompt)
+            self._start_api_call(
+                prompt, require_faktencheck=(effective_module == "FAKTENCHECK")
+            )
 
     def _generate_from_transcript(self) -> None:
         """Generiert einen SOMAS-Prompt aus manuellem Transkript."""
@@ -1331,7 +1349,9 @@ class MainWindow(QMainWindow):
 
         # API-Automatik
         if self.api_checkbox.isChecked():
-            self._start_api_call(prompt)
+            self._start_api_call(
+                prompt, require_faktencheck=(effective_module == "FAKTENCHECK")
+            )
 
     @pyqtSlot()
     def _on_copy_prompt(self):
@@ -1841,13 +1861,29 @@ class MainWindow(QMainWindow):
             f"background-color: {color}22; color: {color};"
         )
 
-    def _start_api_call(self, prompt: str) -> None:
-        """Startet einen API-Call im Worker-Thread."""
+    def _start_api_call(
+        self, prompt: str, require_faktencheck: bool = False, is_retry: bool = False
+    ) -> None:
+        """Startet einen API-Call im Worker-Thread.
+
+        Args:
+            prompt: Der zu sendende Analyse-Prompt.
+            require_faktencheck: True, wenn dieser Lauf FAKTENCHECK erzwingt (der
+                Struktur-Validator prüft dann zusätzlich den FAKTENCHECK-Block).
+            is_retry: True, wenn dies der automatische Wiederholungsversuch (B2)
+                ist — dann wird der Retry-Zähler nicht zurückgesetzt.
+        """
         provider_id = self.provider_combo.currentData()
         model_id = self._get_active_model_id()
 
         if not provider_id or not model_id:
             return
+
+        # v0.11.0 (B2): Kontext für einen möglichen Auto-Retry merken.
+        self._analysis_prompt = prompt
+        self._analysis_requires_faktencheck = require_faktencheck
+        if not is_retry:
+            self._analysis_retry_count = 0
 
         api_key = get_api_key(provider_id)
         if not api_key:
@@ -1904,9 +1940,10 @@ class MainWindow(QMainWindow):
         self._api_worker.error_occurred.connect(self._on_api_error)
         self._api_worker.start()
 
-        # UI während API-Call sperren
+        # UI während API-Call sperren; Abbrechen-Button aktivieren.
         self.btn_generate.setEnabled(False)
         self.btn_generate.setText("API-Aufruf läuft...")
+        self.btn_api_cancel.setEnabled(True)
 
     @pyqtSlot(str)
     def _on_api_status_changed(self, status: str) -> None:
@@ -1921,59 +1958,77 @@ class MainWindow(QMainWindow):
         # Neues Analyse-Ergebnis → alter Retry-Stand ungültig (wird neu gesetzt,
         # falls die Verifikation für diesen Lauf läuft).
         self.btn_verify_retry.setEnabled(False)
+        self.btn_api_cancel.setEnabled(False)  # Lauf beendet
         self._clear_stale_sources()
 
-        # v0.11.0 (PR 3): Trunkierungs-Gate. Eine bei max_tokens abgeschnittene
-        # Antwort ist KEINE gültige Analyse — eine halb abgeschnittene
-        # Behauptungsliste ist für einen Faktencheck gefährlicher als ein offener
-        # Fehler. Getrennt vom Reasoning-Leak-Dialog behandeln (zwei Symptome).
-        # Weder speichern noch verifizieren. (Increment B ergänzt hier den
-        # sichtbaren Auto-Retry.)
-        if _is_truncated_finish_reason(response.finish_reason):
-            self._handle_truncated_response(response)
-            return
-
-        # Reasoning-Leak-Schutz: manche Modelle kippen ihren Denkprozess in den
-        # Content. Für Anzeige/Export den Vorspann abschneiden; der ROH-Content
-        # in `response` bleibt für DB-Speicherung und Faktencheck-Verifikation
-        # unverändert (dort hilft die vollständige Behauptungsliste).
         from src.core.prompt_builder import (
             strip_reasoning_preamble, looks_like_reasoning_leak,
+            validate_analysis_structure,
         )
+
+        # Rework (reine Kürzung): keine Struktur-/Retry-Logik, nur anzeigen.
+        if self._is_rework:
+            display_content, was_stripped = strip_reasoning_preamble(response.content)
+            self.result_text.setText(display_content)
+            if was_stripped or looks_like_reasoning_leak(display_content):
+                self._warn_reasoning_leak(was_stripped)
+            self._is_rework = False
+            self._update_generate_enabled()
+            self.btn_generate.setText("Generate Prompt")
+            self.btn_rework.setText("✂ Kürzen lassen")
+            self.btn_rework.setEnabled(True)
+            return
+
+        # v0.11.0 (B2): Qualitäts-Gate + Eskalation für frische Analysen. Prüfe
+        # (a) Trunkierung via finish_reason UND (b) Struktur/Trunkierung via
+        # Validator auf dem preamble-bereinigten Text. Bei Leak/Trunkierung/
+        # fehlender Struktur wird EINMAL sichtbar neu angefordert (statt eine
+        # kosmetisch reparierte Scheinanalyse anzuzeigen).
         display_content, was_stripped = strip_reasoning_preamble(response.content)
+        truncated = _is_truncated_finish_reason(response.finish_reason)
+        validation = validate_analysis_structure(
+            display_content, require_faktencheck=self._analysis_requires_faktencheck
+        )
+        if truncated or not validation.ok:
+            reason = (
+                "Antwort abgeschnitten (Token-Limit)" if truncated
+                else validation.reason
+            )
+            self._escalate_failed_analysis(reason)
+            return
+
+        # --- gültige, vollständige Analyse ---
+        # Der ROH-Content in `response` bleibt für DB-Speicherung und Faktencheck-
+        # Verifikation unverändert (dort hilft die vollständige Behauptungsliste).
         self.result_text.setText(display_content)
         if was_stripped or looks_like_reasoning_leak(display_content):
             self._warn_reasoning_leak(was_stripped)
 
         logger.info(
             f"API-Antwort: {len(response.content)} Zeichen, "
-            f"{response.tokens_used} Tokens ({response.model_used})"
+            f"{response.tokens_used} Tokens ({response.model_used}, "
+            f"finish_reason={response.finish_reason or '-'})"
         )
 
         # Analyse in Datenbank speichern + Bewertungs-Widget aktivieren
-        # (nur bei echten Analysen, nicht bei Rework/Kürzung)
-        if not self._is_rework:
-            self._save_analysis_record(response)
-            self.rating_widget.reset()
-            self.rating_widget.set_visible_after_analysis(True)
-            # Kanal-Button zeigen wenn channel_name vorhanden
-            channel_name = self._get_current_channel_name()
-            self.btn_channel_rating.setVisible(bool(channel_name))
+        self._save_analysis_record(response)
+        self.rating_widget.reset()
+        self.rating_widget.set_visible_after_analysis(True)
+        # Kanal-Button zeigen wenn channel_name vorhanden
+        channel_name = self._get_current_channel_name()
+        self.btn_channel_rating.setVisible(bool(channel_name))
         # Automatisch speichern wenn Custom-Overrides aktiv
         has_custom = any([self._custom_system_prompt, self._custom_module])
-        if has_custom and not self._is_rework:
+        if has_custom:
             self._autosave_user_preset()
-
-        was_rework = self._is_rework
-        self._is_rework = False
 
         # UI entsperren
         self._update_generate_enabled()
         self.btn_generate.setText("Generate Prompt")
 
-        # Faktencheck-Verifikation (Stufe 2): nach echter Analyse automatisch starten
-        if not was_rework:
-            self._maybe_start_verification(response)
+        # Faktencheck-Verifikation (Stufe 2): nur auf gültiger, nicht-trunkierter
+        # Analyse (durch das Gate oben garantiert).
+        self._maybe_start_verification(response)
 
         # Rework-Button zurücksetzen
         self.btn_rework.setText("\u2702 Kürzen lassen")
@@ -2016,54 +2071,94 @@ class MainWindow(QMainWindow):
             intro + detail + tip,
         )
 
-    def _handle_truncated_response(self, response: APIResponse) -> None:
-        """Behandelt eine bei max_tokens abgeschnittene (trunkierte) Antwort.
+    def _escalate_failed_analysis(self, reason: str) -> None:
+        """Eskaliert eine ungültige/trunkierte Analyse (v0.11.0, B2).
 
-        v0.11.0 (PR 3): Eine trunkierte Antwort gilt NICHT als gültige Analyse.
-        Sie wird weder in der Datenbank gespeichert noch an die Faktencheck-
-        Verifikation (Stufe 2) übergeben — eine halb abgeschnittene
-        Behauptungsliste darf nie in die Web-Verifikation gehen. Der abgeschnittene
-        Rohtext wird zur Transparenz angezeigt, aber klar als unvollständig
-        markiert. (Increment B ersetzt dies durch einen sichtbaren Auto-Retry mit
-        offenem Fehlschlag bei erneutem Misserfolg.)
+        Fordert genau EINMAL automatisch neu an (sichtbar + abbrechbar). Bei
+        erneutem Fehlschlag wird die Analyse als „Modelllauf fehlgeschlagen"
+        gemeldet — es wird bewusst KEINE kosmetisch reparierte Scheinanalyse
+        angezeigt (Grundsatz: lieber offener Fehlschlag).
 
         Args:
-            response: Die trunkierte API-Antwort.
+            reason: Kurzbegründung (Trunkierung oder Validator-Grund).
         """
-        logger.warning(
-            f"Trunkierte Antwort (finish_reason={response.finish_reason}, "
-            f"{len(response.content)} Zeichen) — nicht als Analyse gewertet"
-        )
-        # Rohtext zur Transparenz zeigen (aber NICHT speichern/verifizieren).
-        self.result_text.setText(response.content)
-        self.api_status_label.setText("Abgeschnitten (Token-Limit) — keine gültige Analyse")
+        if self._analysis_retry_count < 1 and self._analysis_prompt:
+            self._analysis_retry_count += 1
+            logger.warning(
+                f"Analyse ungültig ({reason}) — automatischer Retry "
+                f"{self._analysis_retry_count}/1"
+            )
+            # Keine Scheinanalyse zeigen; sichtbaren Fortschritt setzen.
+            self.result_text.setPlainText(
+                f"⏳ Die Antwort war ungültig ({reason}).\n\n"
+                "Automatischer erneuter Versuch läuft … (kann abgebrochen werden)."
+            )
+            self._start_api_call(
+                self._analysis_prompt,
+                require_faktencheck=self._analysis_requires_faktencheck,
+                is_retry=True,
+            )
+            # btn_generate-Text nach _start_api_call überschreiben, damit der Retry
+            # klar erkennbar ist (_start_api_call setzt „API-Aufruf läuft...").
+            self.btn_generate.setText("Erneuter Versuch läuft…")
+            return
 
-        # UI zurücksetzen wie im regulären Pfad, aber ohne Speichern/Verifikation.
-        self._is_rework = False
+        self._handle_failed_analysis(reason)
+
+    def _handle_failed_analysis(self, reason: str) -> None:
+        """Zeigt einen offenen Fehlschlag statt einer reparierten Scheinanalyse.
+
+        v0.11.0 (B2): Wird nach einem erfolglosen Auto-Retry aufgerufen. Die
+        Analyse wird NICHT gespeichert und die Faktencheck-Verifikation NICHT
+        gestartet.
+
+        Args:
+            reason: Kurzbegründung des Fehlschlags.
+        """
+        logger.error(f"Modelllauf fehlgeschlagen (nach Retry): {reason}")
+        self.result_text.setPlainText(
+            "⚠ Modelllauf fehlgeschlagen — keine gültige Analyse.\n\n"
+            f"Grund: {reason}\n\n"
+            "Die Antwort war auch nach einem erneuten Versuch unvollständig oder "
+            "enthielt statt der Analyse Arbeitsnotizen. Es wird bewusst KEINE "
+            "reparierte Teil-Analyse angezeigt (eine abgeschnittene "
+            "Behauptungsliste wäre für den Faktencheck irreführend).\n\n"
+            "Bitte ein anderes Modell wählen und erneut ausführen."
+        )
+        self.api_status_label.setText(
+            "Modelllauf fehlgeschlagen — anderes Modell wählen"
+        )
         self._update_generate_enabled()
         self.btn_generate.setText("Generate Prompt")
-        self.btn_rework.setText("✂ Kürzen lassen")
         self.btn_rework.setEnabled(True)
-
         QMessageBox.warning(
             self,
-            "Antwort abgeschnitten (Token-Limit)",
-            "Die Antwort des Modells wurde an der Token-Grenze abgeschnitten "
-            f"(finish_reason = {response.finish_reason}) und ist damit "
-            "unvollständig.\n\n"
-            "Sie wird NICHT als gültige Analyse gespeichert und NICHT für den "
-            "Faktencheck verwendet — eine abgeschnittene Behauptungsliste wäre "
-            "irreführend.\n\n"
-            "Tipp: Erneut ausführen oder ein anderes Modell wählen. Sehr lange "
-            "Analysen (z.B. erzwungener Faktencheck auf kurzen Quellen) sprengen "
-            "eher das Budget.",
+            "Modelllauf fehlgeschlagen",
+            "Die Analyse ist auch nach einem automatischen erneuten Versuch "
+            f"ungültig geblieben.\n\nGrund: {reason}\n\n"
+            "Es wird bewusst keine kosmetisch reparierte Teil-Analyse angezeigt. "
+            "Bitte ein anderes Modell wählen.",
         )
+
+    @pyqtSlot()
+    def _on_api_cancel(self) -> None:
+        """Bricht den laufenden Analyse-Call ab (auch den Auto-Retry, B2)."""
+        if self._api_worker and self._api_worker.isRunning():
+            self._api_worker.cancel()
+            logger.info("Analyse-Call vom Benutzer abgebrochen")
+        # Weitere Auto-Retries für diesen Lauf unterbinden.
+        self._analysis_retry_count = 1
+        self.btn_api_cancel.setEnabled(False)
+        self.api_status_label.setText("Abgebrochen")
+        self._update_generate_enabled()
+        self.btn_generate.setText("Generate Prompt")
 
     @pyqtSlot(str)
     def _on_api_error(self, error_message: str) -> None:
         """Handler für API-Fehler."""
         logger.error(f"API-Fehler: {error_message}")
         self.api_status_label.setText(f"Fehler: {error_message[:50]}")
+        self.btn_api_cancel.setEnabled(False)
         QMessageBox.warning(self, "API-Fehler", error_message)
 
         # Rework-Flag zurücksetzen (sonst bleibt es nach Fehler hängen)
