@@ -136,7 +136,7 @@ class PerplexityClient(LLMClient):
                     provider_used=self.PROVIDER_NAME,
                     tokens_used=tokens,
                     citations=citations,
-                    finish_reason=finish_reason or "",
+                    finish_reason=self._normalize_finish_reason(finish_reason),
                 )
 
             logger.error(f"Perplexity HTTP {response.status_code}: {response.text}")

@@ -105,7 +105,9 @@ class AnthropicClient(LLMClient):
             # v0.11.0: stop_reason durchreichen. Anthropic nennt Trunkierung
             # "max_tokens" — auf das providerübergreifende "length" normalisieren,
             # damit der finish_reason-Gate einheitlich greift.
-            finish_reason = "length" if stop_reason == "max_tokens" else (stop_reason or "")
+            finish_reason = self._normalize_finish_reason(
+                stop_reason, {"max_tokens": "length"}
+            )
 
             logger.info(
                 f"Anthropic Antwort: {len(content)} Zeichen, "

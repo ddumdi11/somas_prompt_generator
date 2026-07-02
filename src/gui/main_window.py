@@ -172,6 +172,11 @@ class MainWindow(QMainWindow):
         self._analysis_prompt: str = ""
         self._analysis_requires_faktencheck: bool = False
         self._analysis_retry_count: int = 0
+        # Lauf-ID gegen verspätete/abgebrochene Antworten: cancel() stoppt nur
+        # künftige Emits, ein bereits gequeuedes Signal darf aber nicht mehr
+        # verarbeitet werden. Nur die Antwort mit aktueller ID gilt (0 = keiner aktiv).
+        self._api_request_seq: int = 0
+        self._api_active_request_id: int = 0
 
         # Custom Prompt Overrides (gesetzt durch PromptEditDialog)
         self._custom_system_prompt: str | None = None
@@ -1885,6 +1890,11 @@ class MainWindow(QMainWindow):
         if not is_retry:
             self._analysis_retry_count = 0
 
+        # v0.11.0: neue Lauf-ID vergeben (gegen verspätete/abgebrochene Antworten).
+        self._api_request_seq += 1
+        current_request_id = self._api_request_seq
+        self._api_active_request_id = current_request_id
+
         api_key = get_api_key(provider_id)
         if not api_key:
             self._update_api_status("error")
@@ -1935,9 +1945,15 @@ class MainWindow(QMainWindow):
             debug_logger=self._debug_logger,
             debug_meta=debug_meta,
         )
+        # Response/Error mit der Lauf-ID verbinden, damit eine verspätete Antwort
+        # eines überholten/abgebrochenen Laufs verworfen werden kann.
         self._api_worker.status_changed.connect(self._on_api_status_changed)
-        self._api_worker.response_received.connect(self._on_api_response)
-        self._api_worker.error_occurred.connect(self._on_api_error)
+        self._api_worker.response_received.connect(
+            lambda resp, rid=current_request_id: self._on_api_response(resp, rid)
+        )
+        self._api_worker.error_occurred.connect(
+            lambda msg, rid=current_request_id: self._on_api_error(msg, rid)
+        )
         self._api_worker.start()
 
         # UI während API-Call sperren; Abbrechen-Button aktivieren.
@@ -1950,9 +1966,21 @@ class MainWindow(QMainWindow):
         """Handler für API-Statusänderungen."""
         self._update_api_status(status)
 
-    @pyqtSlot(object)
-    def _on_api_response(self, response: APIResponse) -> None:
-        """Handler für erfolgreiche API-Antwort."""
+    def _on_api_response(
+        self, response: APIResponse, request_id: int | None = None
+    ) -> None:
+        """Handler für erfolgreiche API-Antwort.
+
+        Args:
+            response: Die API-Antwort.
+            request_id: Lauf-ID (via Lambda gebunden). Gehört sie nicht zum aktuell
+                aktiven Lauf (z.B. nach Abbruch/Neustart), wird die Antwort
+                verworfen. ``None`` (direkter Aufruf, z.B. Test) überspringt die Prüfung.
+        """
+        # v0.11.0: verspätete/abgebrochene Antwort verwerfen (Race nach cancel()).
+        if request_id is not None and request_id != self._api_active_request_id:
+            logger.info("Verwerfe verspätete/abgebrochene API-Antwort")
+            return
         self._last_api_response = response
         self._is_comparison_result = False
         # Neues Analyse-Ergebnis → alter Retry-Stand ungültig (wird neu gesetzt,
@@ -2146,16 +2174,31 @@ class MainWindow(QMainWindow):
         if self._api_worker and self._api_worker.isRunning():
             self._api_worker.cancel()
             logger.info("Analyse-Call vom Benutzer abgebrochen")
-        # Weitere Auto-Retries für diesen Lauf unterbinden.
+        # Aktiven Lauf invalidieren: eine evtl. schon gequeuedte Antwort/Fehler
+        # wird in _on_api_response/_on_api_error verworfen. Weitere Auto-Retries
+        # für diesen Lauf unterbinden.
+        self._api_active_request_id = 0
         self._analysis_retry_count = 1
         self.btn_api_cancel.setEnabled(False)
         self.api_status_label.setText("Abgebrochen")
         self._update_generate_enabled()
         self.btn_generate.setText("Generate Prompt")
 
-    @pyqtSlot(str)
-    def _on_api_error(self, error_message: str) -> None:
-        """Handler für API-Fehler."""
+    def _on_api_error(
+        self, error_message: str, request_id: int | None = None
+    ) -> None:
+        """Handler für API-Fehler.
+
+        Args:
+            error_message: Die Fehlermeldung.
+            request_id: Lauf-ID (via Lambda gebunden). Ein Fehler aus einem
+                überholten/abgebrochenen Lauf wird verworfen (kein Dialog nach
+                „Abgebrochen"). ``None`` (direkter Aufruf) überspringt die Prüfung.
+        """
+        # v0.11.0: verspäteten/abgebrochenen Fehler verwerfen (Race nach cancel()).
+        if request_id is not None and request_id != self._api_active_request_id:
+            logger.info("Verwerfe verspäteten/abgebrochenen API-Fehler")
+            return
         logger.error(f"API-Fehler: {error_message}")
         self.api_status_label.setText(f"Fehler: {error_message[:50]}")
         self.btn_api_cancel.setEnabled(False)
