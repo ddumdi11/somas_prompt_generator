@@ -680,6 +680,162 @@ def looks_like_reasoning_leak(text: str) -> bool:
     return bool(_REASONING_TELLS_RE.search(head[:600]))
 
 
+# --- Struktur-/Trunkierungs-Validator (v0.11.0, B1) ---
+
+# Kanonische Standardabschnitte in Pflicht-Reihenfolge (vor dem Erweiterungsmodul).
+_CANONICAL_SECTIONS = ("FRAMING", "KERNTHESE", "ELABORATION", "IMPLIKATION")
+
+# Vertrags-Sub-Header des FAKTENCHECK-Blocks (Stufe-2-Parser hängt daran).
+_FAKTENCHECK_SUBHEADERS = (
+    "**Meinungen:**", "**Interpretationen:**", "**Behauptungen (überprüfbar):**",
+)
+
+# Template-Platzhalter, der NIE im fertigen Output stehen darf. Taucht er auf,
+# hat das Modell das OUTPUT-FORMAT-Skelett zitiert statt es auszufüllen (realer
+# Iran-Leak: der Reasoning-Dump echote '### [GEWÄHLTES MODUL]').
+_TEMPLATE_PLACEHOLDER_RE = re.compile(
+    r"(?im)^\s*#{1,6}\s*\[?\s*GEWÄHLTES\s+MODUL", re.UNICODE
+)
+
+# Trunkierungs-Signale am Textende: dangling Interpunktion, offene Konjunktion/
+# Funktionswort oder eine nackte Listennummer ohne Inhalt ("mitten in
+# Nummerierung/Satz"). Satzende (. ! ? … und schließende Klammern/Anführungen)
+# gilt als vollständig.
+_DANGLING_PUNCT_RE = re.compile(r"[,:;–—-]$")
+_SENTENCE_END_RE = re.compile(r"[.!?…»”\"')\]]$")
+_DANGLING_WORD_RE = re.compile(
+    r"(?i)\b("
+    r"und|oder|aber|dann|denn|weil|dass|sowie|bzw|beziehungsweise|"
+    r"der|die|das|ein|eine|einen|einem|einer|"
+    r"zum|zur|mit|von|für|auf|bei|nach|über|unter|durch|gegen|ohne|um|als"
+    r")$"
+)
+_BARE_NUMBER_LINE_RE = re.compile(r"^\d+[\.\)]?\s*$")
+
+
+@dataclass
+class ValidationResult:
+    """Ergebnis der Struktur-/Trunkierungsprüfung einer Analyse.
+
+    Attributes:
+        ok: True, wenn die Analyse strukturell gültig und nicht trunkiert wirkt.
+        reason: Kurzbegründung bei ``ok=False`` (leer bei Erfolg).
+    """
+    ok: bool
+    reason: str = ""
+
+
+def _looks_truncated(text: str) -> bool:
+    """Heuristik: Endet der Text abgeschnitten (mitten in Satz/Nummerierung)?
+
+    Bewusst konservativ: schlägt nur bei klaren Signalen an (dangling
+    Interpunktion, offenes Funktionswort, nackte Listennummer). Eine Analyse,
+    die mit Satzendezeichen schließt, gilt als vollständig. Der primäre
+    Trunkierungs-Indikator bleibt ``finish_reason`` (API-Ebene); diese Heuristik
+    ist das Netz für Fälle, in denen das Feld fehlt/unzuverlässig ist.
+
+    Args:
+        text: Der zu prüfende Analysetext.
+
+    Returns:
+        True, wenn der Text abgeschnitten wirkt.
+    """
+    s = text.rstrip()
+    if not s:
+        return True
+    last_line = s.splitlines()[-1].strip()
+    # Nackte Listennummer ohne Inhalt → offene Aufzählung.
+    if _BARE_NUMBER_LINE_RE.match(last_line):
+        return True
+    # Sauberer Satzabschluss → vollständig.
+    if _SENTENCE_END_RE.search(s):
+        return False
+    # Dangling Interpunktion (Komma, Doppelpunkt, Gedankenstrich …).
+    if _DANGLING_PUNCT_RE.search(s):
+        return True
+    # Offenes Funktionswort / Konjunktion am Ende.
+    if _DANGLING_WORD_RE.search(last_line):
+        return True
+    return False
+
+
+def validate_analysis_structure(
+    text: str, require_faktencheck: bool = False
+) -> ValidationResult:
+    """Prüft eine (bereits preamble-bereinigte) Analyse POSITIV auf Struktur.
+
+    Ergänzt ``strip_reasoning_preamble`` um eine Strukturprüfung, damit ein
+    Reasoning-Leak oder eine Trunkierung nicht als gültige Analyse durchrutscht.
+    Die Erkennung ist **preamble-scoped** (Start-Anker ``### FRAMING``) — es gibt
+    KEINEN globalen Substring-Scan, damit legitime Analysen mit Wörtern wie
+    „Prompt"/„ich werde"/„fordert … auf" im Fließtext nicht verworfen werden.
+
+    Der Validator entscheidet NICHT selbst über einen Retry — er liefert nur
+    ``{ok, reason}``; die GUI zieht daraus die Konsequenz (Eskalation).
+
+    Args:
+        text: Die zu prüfende Analyse (idealerweise nach strip_reasoning_preamble).
+        require_faktencheck: Wenn True, muss ``### FAKTENCHECK`` nach
+            ``### IMPLIKATION`` mit den drei Vertrags-Sub-Headern vorhanden sein.
+
+    Returns:
+        ValidationResult mit ``ok`` und ggf. ``reason``.
+    """
+    if not text or not text.strip():
+        return ValidationResult(False, "leerer Text")
+
+    normalized = normalize_markdown_headings(text).lstrip()
+
+    # 1. Start-Anker: eine reguläre SOMAS-Analyse beginnt mit ### FRAMING.
+    #    (Preamble-scoped — kein globaler Reasoning-Scan.)
+    if not re.match(r"^#{1,6}\s*FRAMING\b", normalized, re.IGNORECASE):
+        return ValidationResult(
+            False, "beginnt nicht mit '### FRAMING' (Reasoning-Leak?)"
+        )
+
+    # 2. Template-Echo: der Platzhalter '### [GEWÄHLTES MODUL]' darf nie im
+    #    fertigen Output stehen (Modell hat das Skelett zitiert statt gefüllt).
+    if _TEMPLATE_PLACEHOLDER_RE.search(normalized):
+        return ValidationResult(
+            False, "Template-Platzhalter '### [GEWÄHLTES MODUL]' im Output"
+        )
+
+    # 3. Kanonische Standardabschnitte vorhanden und in Reihenfolge.
+    positions = []
+    for section in _CANONICAL_SECTIONS:
+        m = re.search(rf"(?m)^#{{1,6}}\s*{section}\b", normalized, re.IGNORECASE)
+        if not m:
+            return ValidationResult(False, f"Abschnitt '### {section}' fehlt")
+        positions.append(m.start())
+    if positions != sorted(positions):
+        return ValidationResult(
+            False, "Standardabschnitte nicht in erwarteter Reihenfolge"
+        )
+    implikation_pos = positions[-1]
+
+    # 4. FAKTENCHECK (falls erzwungen): nach IMPLIKATION + drei Sub-Header.
+    if require_faktencheck:
+        mf = re.search(r"(?m)^#{1,6}\s*FAKTENCHECK\b", normalized, re.IGNORECASE)
+        if not mf:
+            return ValidationResult(False, "'### FAKTENCHECK' fehlt")
+        if mf.start() < implikation_pos:
+            return ValidationResult(
+                False, "'### FAKTENCHECK' steht nicht nach '### IMPLIKATION'"
+            )
+        faktencheck_block = normalized[mf.start():]
+        for sub in _FAKTENCHECK_SUBHEADERS:
+            if sub not in faktencheck_block:
+                return ValidationResult(
+                    False, f"FAKTENCHECK-Sub-Header {sub} fehlt"
+                )
+
+    # 5. Trunkierungs-Heuristik (mitten in Satz/Nummerierung abgeschnitten).
+    if _looks_truncated(normalized):
+        return ValidationResult(False, "Antwort endet abgeschnitten (Trunkierung)")
+
+    return ValidationResult(True, "")
+
+
 def clean_synthesis_output(text: str) -> str:
     """Bereinigt die Synthese-Ausgabe für die saubere Einbettung ins Layout.
 
