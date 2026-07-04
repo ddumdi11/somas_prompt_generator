@@ -357,6 +357,59 @@ class WordPressClient:
                 ids.append(self.get_or_create_term(cleaned, taxonomy))
         return ids
 
+    def upload_media(
+        self, image_bytes: bytes, filename: str, mime: str = "image/jpeg",
+    ) -> int:
+        """Lädt ein Bild in die WordPress-Mediathek hoch.
+
+        Erwartet die rohen Bild-Bytes und lädt sie via ``POST /media`` hoch. Der
+        Dateiname wird über den ``Content-Disposition``-Header übermittelt (so
+        verlangt es die REST-API für Datei-Uploads).
+
+        Args:
+            image_bytes: Die rohen Bilddaten.
+            filename: Dateiname für die Mediathek (z.B. ``somas-thumbnail-<id>.jpg``).
+            mime: MIME-Typ der Bilddaten (Standard ``image/jpeg``).
+
+        Returns:
+            Die numerische Media-ID des angelegten Anhangs.
+
+        Raises:
+            WordPressError: Bei API-/Netzwerkfehlern (inkl. 401/403 = fehlende
+                ``upload_files``-Rechte).
+        """
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Type": mime,
+        }
+        try:
+            resp = requests.post(
+                self._endpoint("media"),
+                data=image_bytes,
+                headers=headers,
+                auth=self._auth,
+                timeout=_REQUEST_TIMEOUT,
+            )
+            resp.raise_for_status()
+            return int(resp.json()["id"])
+        except requests.HTTPError as exc:
+            detail = ""
+            try:
+                detail = exc.response.json().get("message", "")
+            except (ValueError, AttributeError):
+                detail = exc.response.text[:200] if exc.response is not None else ""
+            raise WordPressError(
+                f"Bild-Upload fehlgeschlagen (HTTP "
+                f"{exc.response.status_code if exc.response is not None else '?'})"
+                f"{': ' + detail if detail else ''}"
+            ) from exc
+        except requests.RequestException as exc:
+            raise WordPressError(f"Netzwerkfehler beim Bild-Upload: {exc}") from exc
+        except (KeyError, ValueError) as exc:
+            raise WordPressError(
+                f"Unerwartete Antwort beim Bild-Upload: {exc}"
+            ) from exc
+
     def post(
         self,
         title: str,
@@ -364,6 +417,7 @@ class WordPressClient:
         status: str = DEFAULT_STATUS,
         category_ids: Optional[list[int]] = None,
         tag_ids: Optional[list[int]] = None,
+        featured_media: Optional[int] = None,
     ) -> tuple[int, str]:
         """Erstellt einen Beitrag in WordPress.
 
@@ -374,6 +428,7 @@ class WordPressClient:
                 ``pending``).
             category_ids: Optionale Kategorie-IDs.
             tag_ids: Optionale Tag-IDs.
+            featured_media: Optionale Media-ID für das Beitragsbild (featured image).
 
         Returns:
             Tupel ``(post_id, link)``.
@@ -393,6 +448,8 @@ class WordPressClient:
             payload["categories"] = category_ids
         if tag_ids:
             payload["tags"] = tag_ids
+        if featured_media:
+            payload["featured_media"] = featured_media
 
         try:
             resp = requests.post(
