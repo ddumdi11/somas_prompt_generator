@@ -16,7 +16,16 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuell (v0.11.0) — Reasoning-Leak-Härtung
+### Aktuell (v0.12.0) — WordPress-Veröffentlichung
+
+Sendet eine fertige SOMAS-Analyse direkt als Beitrag an eine selbstgehostete WordPress-Seite (REST-API). Da SOMAS eine Desktop-App ist, genügt HTTP Basic Auth mit einem **Application Password** – kein CORS, kein Plugin nötig.
+
+- **Sende-Dialog** – Getrennte Felder für Intro / Analyse / Outro (Markdown), einstellbarer Status (Entwurf/Privat/Veröffentlichen/Ausstehend), Kategorie und Tags, plus HTML-Vorschau. Der Default-Status („Entwurf") kommt aus den Einstellungen
+- **YouTube-Thumbnail als Beitragsbild** – Das Thumbnail des analysierten Videos wird in die Mediathek hochgeladen und als **echtes Beitragsbild** (featured image) gesetzt – nicht inline. Checkbox „YouTube-Thumbnail als Beitragsbild verwenden" (aktiv bei Video, ausgeblendet im Transkript-Modus). **Nicht fatal:** Schlägt der Bild-Upload fehl (z. B. fehlende Rechte), wird der Beitrag trotzdem gepostet – der Text ist wichtiger als das Bild
+- **Sicher & lokal** – URL/Benutzer/Defaults in den Einstellungen, das Application Password im OS-Credential-Manager (wie die API-Keys)
+- **Voraussetzungen** – WP-Benutzer mit Veröffentlichungsrecht (fürs Beitragsbild zusätzlich `upload_files`, also Autor/Admin) und ein Application Password. Security-Plugins wie **Wordfence** ggf. für REST-/Application-Password-Requests freischalten
+
+### Seit v0.11.0 — Reasoning-Leak-Härtung
 
 Behebt einen realen **Final-Answer-Leak**: Ein Modell kippte statt der Analyse seinen Denkprozess in die Antwort, verbrauchte damit das Token-Budget und wurde mitten im Satz abgeschnitten – heraus kam Notizen-Müll statt einer Analyse.
 
@@ -349,6 +358,7 @@ Die App implementiert das SOMAS-Framework mit Content-Type-spezifischen Analyse-
 
 | Version | Datum | Änderungen |
 | --------- | ------- | ------------ |
+| 0.12.0 | 2026-07-04 | WordPress-Veröffentlichung: Analyse als Beitrag senden (Intro/Analyse/Outro, Status/Kategorie/Tags, HTML-Vorschau) + YouTube-Thumbnail als **Beitragsbild** (featured image, Media-Upload mit Fallback-Kette maxres→hq→sd, nicht-fatal). App-Password im OS-Keyring; Voraussetzung `upload_files` + ggf. Wordfence-Freigabe |
 | 0.11.0 | 2026-07-02 | Reasoning-Leak-Härtung: OpenRouter `reasoning.exclude=true` (Denkprozess bleibt intern), `finish_reason` durchgereicht + geloggt + als harter Trunkierungs-Gate, preamble-scoped Struktur-/Trunkierungs-Validator, ein sichtbarer + abbrechbarer Auto-Retry statt Scheinanalyse („Modelllauf fehlgeschlagen"), FAKTENCHECK-Prompt-Widerspruch aufgelöst + Final-Only-Zaun, Iran-Leak als Test-Fixture |
 | 0.10.1 | 2026-06-16 | Faktencheck-Härtung: Unabhängigkeits-Riegel (kein Eigenbeleg durchs Video, `source_hint` injection-sicher), „Verifikation erneut versuchen"-Button (nur Stufe 2, Modellwechsel), Perplexity-Modelle aktualisiert (`sonar-reasoning-pro`/`sonar-deep-research`), `DEFAULT_MAX_TOKENS=8192` (HTTP-402-Fix), einheitlicher Export-Kopf (Titel + Thumbnail), Zeichenlimit-Fix bei FAKTENCHECK |
 | 0.10.0 | 2026-06-14 | Faktencheck-Verifikation (Hybrid): Stufe 1 trennt Meinungen/Interpretationen/Behauptungen; optionale Stufe 2 verifiziert Behauptungen per web-fähigem Modell (Verdikt + Quelle, 4-stufige Skala), Halluzinations-Schutz + Riegel gegen erfundene Quellen, `:online`-Schalter, Top-N-Kappung, Auto-Anhang |

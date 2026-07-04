@@ -16,6 +16,7 @@ speichert.
 import logging
 from dataclasses import dataclass
 from typing import Optional
+from urllib.parse import urlparse
 
 import keyring
 import requests
@@ -45,6 +46,11 @@ WP_STATUSES = ("draft", "private", "publish", "pending")
 DEFAULT_STATUS = "draft"
 
 _REQUEST_TIMEOUT = 30
+
+#: Erlaubte Hosts für den Beitragsbild-Download (SSRF-Schutz). Aktuell liefert nur
+#: ``build_thumbnail_urls`` die URLs (i.ytimg.com); die Allowlist verhindert, dass
+#: ein künftiger Aufrufer den Client zu beliebigen internen Adressen schickt.
+_ALLOWED_THUMBNAIL_HOSTS = frozenset({"i.ytimg.com", "img.youtube.com"})
 
 
 # --------------------------------------------------------------------------- #
@@ -357,6 +363,59 @@ class WordPressClient:
                 ids.append(self.get_or_create_term(cleaned, taxonomy))
         return ids
 
+    def upload_media(
+        self, image_bytes: bytes, filename: str, mime: str = "image/jpeg",
+    ) -> int:
+        """Lädt ein Bild in die WordPress-Mediathek hoch.
+
+        Erwartet die rohen Bild-Bytes und lädt sie via ``POST /media`` hoch. Der
+        Dateiname wird über den ``Content-Disposition``-Header übermittelt (so
+        verlangt es die REST-API für Datei-Uploads).
+
+        Args:
+            image_bytes: Die rohen Bilddaten.
+            filename: Dateiname für die Mediathek (z.B. ``somas-thumbnail-<id>.jpg``).
+            mime: MIME-Typ der Bilddaten (Standard ``image/jpeg``).
+
+        Returns:
+            Die numerische Media-ID des angelegten Anhangs.
+
+        Raises:
+            WordPressError: Bei API-/Netzwerkfehlern (inkl. 401/403 = fehlende
+                ``upload_files``-Rechte).
+        """
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Type": mime,
+        }
+        try:
+            resp = requests.post(
+                self._endpoint("media"),
+                data=image_bytes,
+                headers=headers,
+                auth=self._auth,
+                timeout=_REQUEST_TIMEOUT,
+            )
+            resp.raise_for_status()
+            return int(resp.json()["id"])
+        except requests.HTTPError as exc:
+            detail = ""
+            try:
+                detail = exc.response.json().get("message", "")
+            except (ValueError, AttributeError):
+                detail = exc.response.text[:200] if exc.response is not None else ""
+            raise WordPressError(
+                f"Bild-Upload fehlgeschlagen (HTTP "
+                f"{exc.response.status_code if exc.response is not None else '?'})"
+                f"{': ' + detail if detail else ''}"
+            ) from exc
+        except requests.RequestException as exc:
+            raise WordPressError(f"Netzwerkfehler beim Bild-Upload: {exc}") from exc
+        except (KeyError, ValueError) as exc:
+            raise WordPressError(
+                f"Unerwartete Antwort beim Bild-Upload: {exc}"
+            ) from exc
+
     def post(
         self,
         title: str,
@@ -364,6 +423,7 @@ class WordPressClient:
         status: str = DEFAULT_STATUS,
         category_ids: Optional[list[int]] = None,
         tag_ids: Optional[list[int]] = None,
+        featured_media: Optional[int] = None,
     ) -> tuple[int, str]:
         """Erstellt einen Beitrag in WordPress.
 
@@ -374,6 +434,7 @@ class WordPressClient:
                 ``pending``).
             category_ids: Optionale Kategorie-IDs.
             tag_ids: Optionale Tag-IDs.
+            featured_media: Optionale Media-ID für das Beitragsbild (featured image).
 
         Returns:
             Tupel ``(post_id, link)``.
@@ -393,6 +454,8 @@ class WordPressClient:
             payload["categories"] = category_ids
         if tag_ids:
             payload["tags"] = tag_ids
+        if featured_media:
+            payload["featured_media"] = featured_media
 
         try:
             resp = requests.post(
@@ -441,6 +504,60 @@ def run_connection_test(config: WordPressConfig, app_password: str) -> tuple[boo
     return WordPressClient(config, app_password).test_connection()
 
 
+def _is_allowed_thumbnail_url(url: str) -> bool:
+    """Prüft, ob eine URL für den Beitragsbild-Download zugelassen ist (SSRF-Schutz).
+
+    Erlaubt nur ``https`` auf einem der bekannten YouTube-Thumbnail-Hosts, damit
+    der Client nicht zu beliebigen (z.B. internen) Adressen gelenkt werden kann.
+
+    Args:
+        url: Die zu prüfende URL.
+
+    Returns:
+        True, wenn Schema und Host in der Allowlist stehen.
+    """
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    return (
+        parsed.scheme == "https"
+        and (parsed.hostname or "").lower() in _ALLOWED_THUMBNAIL_HOSTS
+    )
+
+
+def _download_thumbnail(urls: list[str]) -> Optional[bytes]:
+    """Lädt das erste erreichbare Bild aus einer Fallback-Kette von URLs.
+
+    YouTube liefert nicht für jedes Video ein ``maxresdefault.jpg`` (404); daher
+    wird die Liste (typisch maxres → hq → sd) der Reihe nach durchprobiert. Aus
+    Sicherheitsgründen werden nur URLs auf der Host-Allowlist geladen (SSRF-Schutz).
+
+    Args:
+        urls: Bild-URLs in Prioritätsreihenfolge.
+
+    Returns:
+        Die rohen Bild-Bytes oder ``None``, wenn keine URL erreichbar/erlaubt war.
+    """
+    for url in urls:
+        if not url:
+            continue
+        if not _is_allowed_thumbnail_url(url):
+            logger.warning("Thumbnail-URL nicht erlaubt (SSRF-Schutz): %s", url)
+            continue
+        try:
+            resp = requests.get(url, timeout=_REQUEST_TIMEOUT)
+            if resp.status_code == 200 and resp.content:
+                return resp.content
+            logger.info(
+                "Thumbnail-URL nicht verfügbar (HTTP %s): %s",
+                resp.status_code, url,
+            )
+        except requests.RequestException as exc:
+            logger.info("Thumbnail-URL fehlgeschlagen (%s): %s", exc, url)
+    return None
+
+
 def publish_post(
     config: WordPressConfig,
     app_password: str,
@@ -449,11 +566,19 @@ def publish_post(
     status: str = DEFAULT_STATUS,
     category_names: Optional[list[str]] = None,
     tag_names: Optional[list[str]] = None,
-) -> tuple[int, str]:
+    featured_image_urls: Optional[list[str]] = None,
+    video_id: str = "",
+) -> tuple[int, str, Optional[str]]:
     """Konvertiert Markdown, löst Taxonomien auf und postet (blockierend).
 
     Diese Funktion bündelt alle Netzwerk-Operationen, damit sie als Einheit im
     Worker-Thread laufen kann.
+
+    Ist ``featured_image_urls`` gesetzt, wird das erste erreichbare Bild geladen,
+    in die Mediathek hochgeladen und als Beitragsbild (featured image) gesetzt.
+    Das ist **nicht fatal**: Schlägt Laden oder Upload fehl, wird der Beitrag
+    trotzdem (ohne Beitragsbild) gepostet und eine Warnung zurückgegeben — der
+    Text ist wichtiger als das Bild.
 
     Args:
         config: WordPress-Konfiguration.
@@ -463,22 +588,50 @@ def publish_post(
         status: Beitragsstatus.
         category_names: Optionale Kategorie-Namen.
         tag_names: Optionale Tag-Namen.
+        featured_image_urls: Optionale Bild-URLs in Fallback-Reihenfolge
+            (z.B. ``[maxres, hq, sd]``) für das Beitragsbild.
+        video_id: Optionale Video-ID für einen sprechenden Media-Dateinamen.
 
     Returns:
-        Tupel ``(post_id, link)``.
+        Tupel ``(post_id, link, image_warning)``. ``image_warning`` ist ``None``
+        bei Erfolg (oder wenn kein Bild gewünscht war), sonst eine Klartext-
+        Warnung, dass das Beitragsbild nicht gesetzt werden konnte.
 
     Raises:
-        WordPressError: Bei API-/Netzwerkfehlern.
+        WordPressError: Bei API-/Netzwerkfehlern beim Beitrag selbst.
         RuntimeError: Wenn das ``markdown``-Paket fehlt.
     """
     client = WordPressClient(config, app_password)
     html = markdown_to_html(markdown_content)
     category_ids = client.resolve_terms(category_names or [], "categories")
     tag_ids = client.resolve_terms(tag_names or [], "tags")
-    return client.post(
+
+    # Beitragsbild (optional, nicht fatal): Bild laden -> Mediathek -> media_id.
+    featured_media: Optional[int] = None
+    image_warning: Optional[str] = None
+    if featured_image_urls:
+        try:
+            image_bytes = _download_thumbnail(featured_image_urls)
+            if image_bytes is None:
+                image_warning = (
+                    "Beitragsbild übersprungen: kein Thumbnail erreichbar."
+                )
+                logger.warning(image_warning)
+            else:
+                filename = f"somas-thumbnail-{video_id or 'video'}.jpg"
+                featured_media = client.upload_media(image_bytes, filename)
+        except WordPressError as exc:
+            # Upload-Fehler (z.B. fehlende upload_files-Rechte) nicht fatal.
+            featured_media = None
+            image_warning = f"Beitragsbild konnte nicht gesetzt werden: {exc}"
+            logger.warning(image_warning)
+
+    post_id, link = client.post(
         title=title,
         html_content=html,
         status=status,
         category_ids=category_ids or None,
         tag_ids=tag_ids or None,
+        featured_media=featured_media,
     )
+    return post_id, link, image_warning

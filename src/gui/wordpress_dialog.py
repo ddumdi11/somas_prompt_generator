@@ -14,7 +14,7 @@ from PyQt6.QtCore import QUrl
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, QLineEdit,
     QTextEdit, QComboBox, QPushButton, QGroupBox, QMessageBox, QWidget,
-    QApplication,
+    QApplication, QCheckBox,
 )
 
 from src.core.wordpress_client import (
@@ -42,6 +42,8 @@ class WordPressSendDialog(QDialog):
         self,
         analysis_md: str,
         suggested_title: str = "",
+        thumbnail_urls: Optional[list[str]] = None,
+        video_id: str = "",
         parent: Optional[QWidget] = None,
     ) -> None:
         """Initialisiert den Sende-Dialog.
@@ -49,6 +51,10 @@ class WordPressSendDialog(QDialog):
         Args:
             analysis_md: Die Analyse als Markdown (vorbefüllt, editierbar).
             suggested_title: Vorschlag für den Beitragstitel (z.B. Videotitel).
+            thumbnail_urls: Optionale YouTube-Thumbnail-URLs in Fallback-Reihenfolge
+                (``[maxres, hq, sd]``) für das Beitragsbild. Leer/None im
+                Transkript-Modus → keine Beitragsbild-Option.
+            video_id: Optionale Video-ID für einen sprechenden Media-Dateinamen.
             parent: Optionales Parent-Widget.
         """
         super().__init__(parent)
@@ -59,6 +65,8 @@ class WordPressSendDialog(QDialog):
         self._last_link: str = ""
         self._pending_status: str = ""
         self._send_worker: Optional[WordPressWorker] = None
+        self._thumbnail_urls: list[str] = list(thumbnail_urls or [])
+        self._video_id: str = video_id
 
         self._setup_ui(analysis_md, suggested_title)
 
@@ -169,6 +177,22 @@ class WordPressSendDialog(QDialog):
         self.tags_input.setPlaceholderText("Tag1, Tag2, … (optional)")
         grid.addRow("Tags:", self.tags_input)
 
+        # Beitragsbild (nur bei vorhandenem YouTube-Thumbnail).
+        self.featured_image_checkbox = QCheckBox(
+            "YouTube-Thumbnail als Beitragsbild verwenden"
+        )
+        has_thumbnail = bool(self._thumbnail_urls)
+        self.featured_image_checkbox.setChecked(has_thumbnail)
+        if has_thumbnail:
+            self.featured_image_checkbox.setToolTip(
+                "Lädt das Thumbnail in die Mediathek und setzt es als Beitragsbild "
+                "(featured image). Der Beitragstext bleibt unverändert."
+            )
+            grid.addRow("Beitragsbild:", self.featured_image_checkbox)
+        else:
+            # Transkript-Modus / kein Video → Option ausblenden (kein Bild, kein Fehler).
+            self.featured_image_checkbox.setVisible(False)
+
         return group
 
     @staticmethod
@@ -234,6 +258,12 @@ class WordPressSendDialog(QDialog):
         category_names = [self.category_input.text().strip()] if self.category_input.text().strip() else []
         tag_names = [t.strip() for t in self.tags_input.text().split(",") if t.strip()]
 
+        # Beitragsbild nur, wenn Checkbox aktiv UND Thumbnail vorhanden.
+        use_featured = (
+            self._thumbnail_urls and self.featured_image_checkbox.isChecked()
+        )
+        featured_image_urls = self._thumbnail_urls if use_featured else None
+
         self._pending_status = status
         self.btn_send.setEnabled(False)
         self._set_status("Sende an WordPress…", error=False)
@@ -244,6 +274,7 @@ class WordPressSendDialog(QDialog):
             publish_post,
             self._config, app_password, title, self._assembled_markdown(),
             status, category_names, tag_names,
+            featured_image_urls, self._video_id,
         )
         self._send_worker.succeeded.connect(self._on_send_result)
         self._send_worker.failed.connect(self._on_send_failed)
@@ -253,16 +284,21 @@ class WordPressSendDialog(QDialog):
     def _on_send_result(self, result: tuple) -> None:
         """Verarbeitet das erfolgreiche Senden (Main-Thread)."""
         QApplication.restoreOverrideCursor()
-        post_id, link = result
+        # publish_post liefert (post_id, link, image_warning). image_warning ist
+        # None bei Erfolg; sonst konnte nur das Beitragsbild nicht gesetzt werden
+        # (der Beitrag selbst wurde trotzdem gepostet).
+        post_id, link, image_warning = result
         self._last_link = link
         self.btn_open.setEnabled(bool(link))
         status_word = _STATUS_LABELS.get(self._pending_status, self._pending_status)
-        self._set_status(
-            f"Gesendet ✓ (Beitrag #{post_id}, Status: {status_word}).",
-            error=False,
-        )
+        message = f"Gesendet ✓ (Beitrag #{post_id}, Status: {status_word})."
+        if image_warning:
+            message += f"\n⚠ {image_warning}"
+        self._set_status(message, error=False)
         self.btn_send.setEnabled(True)
         logger.info("WordPress-Beitrag #%s erstellt (%s)", post_id, self._pending_status)
+        if image_warning:
+            logger.warning("Beitragsbild-Hinweis: %s", image_warning)
 
     @pyqtSlot(str)
     def _on_send_failed(self, message: str) -> None:
