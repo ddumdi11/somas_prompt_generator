@@ -35,7 +35,8 @@ somas_prompt_generator/
 │   │   ├── transcript_widget.py # Transkript-Eingabewidget
 │   │   ├── batch_dialog.py     # Batch-Verarbeitung (2-5 URLs, non-modaler Dialog)
 │   │   ├── prompt_edit_dialog.py # Prompt-Anpassungsdialog (System-Prompt + Modul)
-│   │   └── provider_model_picker.py # Provider+Modell-Auswahl (3× im Modellvergleich)
+│   │   ├── provider_model_picker.py # Provider+Modell-Auswahl (3× im Modellvergleich)
+│   │   └── wordpress_dialog.py  # WordPress-Sende-Dialog (Intro/Analyse/Outro, Beitragsbild)
 │   │
 │   ├── core/               # Business-Logik
 │   │   ├── youtube_client.py   # Metadaten via yt-dlp
@@ -57,7 +58,9 @@ somas_prompt_generator/
 │   │   ├── comparison_worker.py # QThread-Worker: 2 Analysen + Synthese + Layout-Render
 │   │   ├── verification_item.py # VerificationConfig/VerificationResult (Faktencheck Stufe 2)
 │   │   ├── verification_worker.py # QThread-Worker: Behauptungen verifizieren (Verdikt + Quelle)
-│   │   └── debug_logger.py     # Debug-Logging mit Version/Session-Info
+│   │   ├── debug_logger.py     # Debug-Logging mit Version/Session-Info
+│   │   ├── wordpress_client.py # WordPress-REST-Client (Beitrag, Taxonomien, Media-Upload)
+│   │   └── wordpress_worker.py # QThread-Worker für blockierende WordPress-Operationen
 │   │
 │   └── config/             # Konfiguration
 │       ├── defaults.py         # SOMAS-Defaults (VideoInfo, SomasConfig, TimeRange)
@@ -379,6 +382,31 @@ wurde abgeschnitten. Spec: `SOMAS_v0.11.0_SPEC_reasoning_leak_haertung.md`.
   Verifikation (Stufe 2) nur auf gültiger Analyse
 - [x] Iran-Fixture + `tests/test_reasoning_leak_validator.py` (Leak/Trunkierung ungültig,
   Clean gültig, False-Positive-Guards)
+
+### Phase 14: WordPress-Anbindung ✅
+
+Sendet eine SOMAS-Analyse als Beitrag an eine selbstgehostete WordPress-Seite über
+die REST-API (`/wp-json/wp/v2/`). Desktop-App → kein CORS; HTTP Basic Auth mit
+**Application Password**. Voraussetzungen: WP-User mit Veröffentlichungsrecht
+(fürs Beitragsbild zusätzlich `upload_files`, also Autor/Admin) und ein gültiges
+Application Password. **Wordfence-Hinweis:** Wordfence (o.ä. Security-Plugins)
+können REST-/App-Password-Requests blocken → ggf. XML-RPC/REST bzw. Application
+Passwords in Wordfence freigeben.
+
+- [x] Basis (PR #43, Variante A): `wordpress_client.py` (Config/Keyring-Passwort,
+  `markdown_to_html`, `resolve_terms`, `WordPressClient.post`, `publish_post`),
+  `wordpress_worker.py` (QThread), `wordpress_dialog.py` (Intro/Analyse/Outro,
+  Status/Kategorie/Tags, HTML-Vorschau). Passwort im OS-Keyring, Config in
+  `user_preferences.json`.
+- [x] Beitragsbild (featured image): YouTube-Thumbnail des Videos als **echtes
+  Beitragsbild** (nicht inline). `WordPressClient.upload_media` (POST `/media`),
+  `post(featured_media=…)`, `publish_post(featured_image_urls=[maxres,hq,sd],
+  video_id=…)` mit Fallback-Kette; **nicht fatal** (scheitert Laden/Upload, wird
+  der Text trotzdem gepostet + Warnung im Rückgabewert). Dialog-Checkbox
+  „YouTube-Thumbnail als Beitragsbild verwenden" (aktiv bei Video, ausgeblendet im
+  Transkript-Modus). Tests: `tests/test_wordpress_media.py`.
+- [ ] Backlog: Media-Dedup (vorhandenes Thumbnail per Suche wiederverwenden statt
+  bei jedem Senden neu hochzuladen → vermeidet Media-Dubletten).
 
 ### Backlog
 

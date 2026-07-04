@@ -26,6 +26,15 @@ Behebt einen realen **Final-Answer-Leak**: Ein Modell kippte statt der Analyse s
 - **Ein sichtbarer Auto-Retry** – Bei Leak/Trunkierung/fehlender Struktur wird **einmal** automatisch neu angefordert (abbrechbar). Bleibt es fehlerhaft, erscheint ein offener **„Modelllauf fehlgeschlagen"** – bewusst **keine** kosmetisch reparierte Scheinanalyse
 - **Sauberer Faktencheck-Prompt** – Der erzwungene FAKTENCHECK-Modus enthält keinen Widerspruch mehr (volle Analyse **+** FAKTENCHECK als 5. Abschnitt); ein Final-Only-Zaun hält Arbeitsnotizen aus dem Output. Die Web-Verifikation (Stufe 2) startet **nur** auf einer gültigen, nicht-trunkierten Analyse
 
+### WordPress-Anbindung — Analyse als Beitrag senden
+
+Sendet eine fertige SOMAS-Analyse direkt als Beitrag an eine selbstgehostete WordPress-Seite (REST-API). Da SOMAS eine Desktop-App ist, genügt HTTP Basic Auth mit einem **Application Password** – kein CORS, kein Plugin nötig.
+
+- **Sende-Dialog** – Getrennte Felder für Intro / Analyse / Outro (Markdown), einstellbarer Status (Entwurf/Privat/Veröffentlichen/Ausstehend), Kategorie und Tags, plus HTML-Vorschau. Der Default-Status („Entwurf") kommt aus den Einstellungen
+- **YouTube-Thumbnail als Beitragsbild** – Das Thumbnail des analysierten Videos wird in die Mediathek hochgeladen und als **echtes Beitragsbild** (featured image) gesetzt – nicht inline. Checkbox „YouTube-Thumbnail als Beitragsbild verwenden" (aktiv bei Video, ausgeblendet im Transkript-Modus). **Nicht fatal:** Schlägt der Bild-Upload fehl (z. B. fehlende Rechte), wird der Beitrag trotzdem gepostet – der Text ist wichtiger als das Bild
+- **Sicher & lokal** – URL/Benutzer/Defaults in den Einstellungen, das Application Password im OS-Credential-Manager (wie die API-Keys)
+- **Voraussetzungen** – WP-Benutzer mit Veröffentlichungsrecht (fürs Beitragsbild zusätzlich `upload_files`, also Autor/Admin) und ein Application Password. Security-Plugins wie **Wordfence** ggf. für REST-/Application-Password-Requests freischalten
+
 ### Seit v0.10.1 — Faktencheck-Verifikation (gehärtet)
 
 - **Zweistufige Faktenprüfung** – Das FAKTENCHECK-Modul trennt jetzt strikt **Meinungen**, **Interpretationen** und **überprüfbare Behauptungen** (relevanz-sortiert). Optional prüft danach ein web-fähiges Modell **nur die nackten Behauptungen** und liefert pro Behauptung **Verdikt + Quelle**
