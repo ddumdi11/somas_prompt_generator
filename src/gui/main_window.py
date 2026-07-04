@@ -1505,10 +1505,16 @@ class MainWindow(QMainWindow):
         suggested_title = self.video_info.title if self.video_info else ""
 
         # Beitragsbild: YouTube-Thumbnail als Fallback-Kette [maxres, hq, sd].
-        # Nur bei echtem YouTube-Video (Transkript-Modus → kein Bild).
+        # Nur bei echter YouTube-Quelle: video_info_source explizit prüfen, damit
+        # ein im Transkript-Feld eingetragener YouTube-Link NICHT versehentlich ein
+        # Beitragsbild erzeugt (Transkript-Modus → kein Bild).
         thumbnail_urls: list[str] = []
         video_id = ""
-        if self.video_info and self.video_info.url:
+        if (
+            self.video_info_source == "youtube"
+            and self.video_info
+            and self.video_info.url
+        ):
             video_id = extract_video_id(self.video_info.url) or ""
             if video_id:
                 thumb = build_thumbnail_urls(video_id)

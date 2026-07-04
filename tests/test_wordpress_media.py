@@ -15,9 +15,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.core import wordpress_client as wp
 from src.core.wordpress_client import (
     WordPressClient, WordPressConfig, WordPressError, publish_post,
+    _download_thumbnail, _is_allowed_thumbnail_url,
 )
 
 _CONFIG = WordPressConfig(url="https://example.test", username="user")
+
+# Gültige Thumbnail-URLs (Allowlist-Host i.ytimg.com).
+_MAXRES = "https://i.ytimg.com/vi/abc123/maxresdefault.jpg"
+_HQ = "https://i.ytimg.com/vi/abc123/hqdefault.jpg"
 
 
 def _resp(status=200, json_data=None, content=b"") -> MagicMock:
@@ -98,7 +103,7 @@ def test_publish_post_sets_featured_media() -> None:
             patch.object(wp.requests, "get", return_value=_resp(content=b"IMG")):
         post_id, link, warning = publish_post(
             _CONFIG, "pw", "Titel", "# Analyse\ntext",
-            featured_image_urls=["https://img/maxres.jpg"], video_id="abc123",
+            featured_image_urls=[_MAXRES], video_id="abc123",
         )
     assert (post_id, warning) == (5, None)
     upload_mock.assert_called_once()
@@ -115,7 +120,7 @@ def test_publish_post_download_fails_non_fatal() -> None:
             patch.object(wp.requests, "get", return_value=_resp(status=404)):
         post_id, link, warning = publish_post(
             _CONFIG, "pw", "Titel", "text",
-            featured_image_urls=["https://img/maxres.jpg", "https://img/hq.jpg"],
+            featured_image_urls=[_MAXRES, _HQ],
         )
     assert post_id == 5
     assert warning is not None and "übersprungen" in warning
@@ -134,7 +139,7 @@ def test_publish_post_upload_fails_non_fatal() -> None:
             patch.object(wp.requests, "get", return_value=_resp(content=b"IMG")):
         post_id, link, warning = publish_post(
             _CONFIG, "pw", "Titel", "text",
-            featured_image_urls=["https://img/maxres.jpg"],
+            featured_image_urls=[_MAXRES],
         )
     assert post_id == 5
     assert warning is not None and "403" in warning
@@ -155,6 +160,26 @@ def test_publish_post_no_thumbnail_transcript() -> None:
     print("  publish_post_no_thumbnail_transcript: sauber ohne Bild OK")
 
 
+def test_thumbnail_url_allowlist() -> None:
+    """_is_allowed_thumbnail_url: nur https auf bekannten YouTube-Hosts."""
+    assert _is_allowed_thumbnail_url(_MAXRES)
+    assert _is_allowed_thumbnail_url("https://img.youtube.com/vi/x/0.jpg")
+    # Fremder Host, internes Ziel, falsches Schema -> abgelehnt (SSRF-Schutz).
+    assert not _is_allowed_thumbnail_url("http://i.ytimg.com/vi/x/0.jpg")  # kein https
+    assert not _is_allowed_thumbnail_url("https://evil.example/x.jpg")
+    assert not _is_allowed_thumbnail_url("https://169.254.169.254/latest/meta-data")
+    print("  thumbnail_url_allowlist: nur https + YouTube-Hosts erlaubt OK")
+
+
+def test_download_thumbnail_ssrf_blocked() -> None:
+    """_download_thumbnail lädt keine URL außerhalb der Allowlist (kein requests.get)."""
+    with patch.object(wp.requests, "get") as get_mock:
+        result = _download_thumbnail(["https://169.254.169.254/x.jpg", "http://evil/x"])
+    assert result is None
+    get_mock.assert_not_called()
+    print("  download_thumbnail_ssrf_blocked: fremde/interne URL nicht geladen OK")
+
+
 def main() -> None:
     """Führt alle WordPress-Beitragsbild-Tests aus."""
     print("WordPress-Beitragsbild-Tests:")
@@ -165,6 +190,8 @@ def main() -> None:
     test_publish_post_download_fails_non_fatal()
     test_publish_post_upload_fails_non_fatal()
     test_publish_post_no_thumbnail_transcript()
+    test_thumbnail_url_allowlist()
+    test_download_thumbnail_ssrf_blocked()
     print("ALLE TESTS OK")
 
 

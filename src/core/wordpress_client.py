@@ -16,6 +16,7 @@ speichert.
 import logging
 from dataclasses import dataclass
 from typing import Optional
+from urllib.parse import urlparse
 
 import keyring
 import requests
@@ -45,6 +46,11 @@ WP_STATUSES = ("draft", "private", "publish", "pending")
 DEFAULT_STATUS = "draft"
 
 _REQUEST_TIMEOUT = 30
+
+#: Erlaubte Hosts für den Beitragsbild-Download (SSRF-Schutz). Aktuell liefert nur
+#: ``build_thumbnail_urls`` die URLs (i.ytimg.com); die Allowlist verhindert, dass
+#: ein künftiger Aufrufer den Client zu beliebigen internen Adressen schickt.
+_ALLOWED_THUMBNAIL_HOSTS = frozenset({"i.ytimg.com", "img.youtube.com"})
 
 
 # --------------------------------------------------------------------------- #
@@ -498,20 +504,46 @@ def run_connection_test(config: WordPressConfig, app_password: str) -> tuple[boo
     return WordPressClient(config, app_password).test_connection()
 
 
+def _is_allowed_thumbnail_url(url: str) -> bool:
+    """Prüft, ob eine URL für den Beitragsbild-Download zugelassen ist (SSRF-Schutz).
+
+    Erlaubt nur ``https`` auf einem der bekannten YouTube-Thumbnail-Hosts, damit
+    der Client nicht zu beliebigen (z.B. internen) Adressen gelenkt werden kann.
+
+    Args:
+        url: Die zu prüfende URL.
+
+    Returns:
+        True, wenn Schema und Host in der Allowlist stehen.
+    """
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    return (
+        parsed.scheme == "https"
+        and (parsed.hostname or "").lower() in _ALLOWED_THUMBNAIL_HOSTS
+    )
+
+
 def _download_thumbnail(urls: list[str]) -> Optional[bytes]:
     """Lädt das erste erreichbare Bild aus einer Fallback-Kette von URLs.
 
     YouTube liefert nicht für jedes Video ein ``maxresdefault.jpg`` (404); daher
-    wird die Liste (typisch maxres → hq → sd) der Reihe nach durchprobiert.
+    wird die Liste (typisch maxres → hq → sd) der Reihe nach durchprobiert. Aus
+    Sicherheitsgründen werden nur URLs auf der Host-Allowlist geladen (SSRF-Schutz).
 
     Args:
         urls: Bild-URLs in Prioritätsreihenfolge.
 
     Returns:
-        Die rohen Bild-Bytes oder ``None``, wenn keine URL erreichbar war.
+        Die rohen Bild-Bytes oder ``None``, wenn keine URL erreichbar/erlaubt war.
     """
     for url in urls:
         if not url:
+            continue
+        if not _is_allowed_thumbnail_url(url):
+            logger.warning("Thumbnail-URL nicht erlaubt (SSRF-Schutz): %s", url)
             continue
         try:
             resp = requests.get(url, timeout=_REQUEST_TIMEOUT)
