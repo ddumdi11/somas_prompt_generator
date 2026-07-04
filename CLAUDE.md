@@ -7,7 +7,7 @@
 ## 🎯 Projektkontext
 
 **Name:** SOMAS Prompt Generator
-**Version:** 0.11.0
+**Version:** 0.12.0
 **Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
 **Sprache:** Python 3.11+
 **GUI-Framework:** PyQt6
@@ -383,7 +383,7 @@ wurde abgeschnitten. Spec: `SOMAS_v0.11.0_SPEC_reasoning_leak_haertung.md`.
 - [x] Iran-Fixture + `tests/test_reasoning_leak_validator.py` (Leak/Trunkierung ungültig,
   Clean gültig, False-Positive-Guards)
 
-### Phase 14: WordPress-Anbindung ✅
+### Phase 14: WordPress-Anbindung ✅ (v0.12.0)
 
 Sendet eine SOMAS-Analyse als Beitrag an eine selbstgehostete WordPress-Seite über
 die REST-API (`/wp-json/wp/v2/`). Desktop-App → kein CORS; HTTP Basic Auth mit
