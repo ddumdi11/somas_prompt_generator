@@ -1500,9 +1500,24 @@ class MainWindow(QMainWindow):
             return
 
         from src.gui.wordpress_dialog import WordPressSendDialog
+        from src.core.youtube_client import extract_video_id, build_thumbnail_urls
 
         suggested_title = self.video_info.title if self.video_info else ""
-        dialog = WordPressSendDialog(result, suggested_title, parent=self)
+
+        # Beitragsbild: YouTube-Thumbnail als Fallback-Kette [maxres, hq, sd].
+        # Nur bei echtem YouTube-Video (Transkript-Modus → kein Bild).
+        thumbnail_urls: list[str] = []
+        video_id = ""
+        if self.video_info and self.video_info.url:
+            video_id = extract_video_id(self.video_info.url) or ""
+            if video_id:
+                thumb = build_thumbnail_urls(video_id)
+                thumbnail_urls = [thumb["maxres"], thumb["hq"], thumb["sd"]]
+
+        dialog = WordPressSendDialog(
+            result, suggested_title,
+            thumbnail_urls=thumbnail_urls, video_id=video_id, parent=self,
+        )
         dialog.exec()
 
     def _export_comparison_markdown(self, content: str) -> None:
