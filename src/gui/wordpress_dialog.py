@@ -253,16 +253,21 @@ class WordPressSendDialog(QDialog):
     def _on_send_result(self, result: tuple) -> None:
         """Verarbeitet das erfolgreiche Senden (Main-Thread)."""
         QApplication.restoreOverrideCursor()
-        post_id, link = result
+        # publish_post liefert (post_id, link, image_warning). image_warning ist
+        # None bei Erfolg; sonst konnte nur das Beitragsbild nicht gesetzt werden
+        # (der Beitrag selbst wurde trotzdem gepostet).
+        post_id, link, image_warning = result
         self._last_link = link
         self.btn_open.setEnabled(bool(link))
         status_word = _STATUS_LABELS.get(self._pending_status, self._pending_status)
-        self._set_status(
-            f"Gesendet ✓ (Beitrag #{post_id}, Status: {status_word}).",
-            error=False,
-        )
+        message = f"Gesendet ✓ (Beitrag #{post_id}, Status: {status_word})."
+        if image_warning:
+            message += f"\n⚠ {image_warning}"
+        self._set_status(message, error=False)
         self.btn_send.setEnabled(True)
         logger.info("WordPress-Beitrag #%s erstellt (%s)", post_id, self._pending_status)
+        if image_warning:
+            logger.warning("Beitragsbild-Hinweis: %s", image_warning)
 
     @pyqtSlot(str)
     def _on_send_failed(self, message: str) -> None:

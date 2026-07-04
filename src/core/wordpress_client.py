@@ -498,6 +498,34 @@ def run_connection_test(config: WordPressConfig, app_password: str) -> tuple[boo
     return WordPressClient(config, app_password).test_connection()
 
 
+def _download_thumbnail(urls: list[str]) -> Optional[bytes]:
+    """Lädt das erste erreichbare Bild aus einer Fallback-Kette von URLs.
+
+    YouTube liefert nicht für jedes Video ein ``maxresdefault.jpg`` (404); daher
+    wird die Liste (typisch maxres → hq → sd) der Reihe nach durchprobiert.
+
+    Args:
+        urls: Bild-URLs in Prioritätsreihenfolge.
+
+    Returns:
+        Die rohen Bild-Bytes oder ``None``, wenn keine URL erreichbar war.
+    """
+    for url in urls:
+        if not url:
+            continue
+        try:
+            resp = requests.get(url, timeout=_REQUEST_TIMEOUT)
+            if resp.status_code == 200 and resp.content:
+                return resp.content
+            logger.info(
+                "Thumbnail-URL nicht verfügbar (HTTP %s): %s",
+                resp.status_code, url,
+            )
+        except requests.RequestException as exc:
+            logger.info("Thumbnail-URL fehlgeschlagen (%s): %s", exc, url)
+    return None
+
+
 def publish_post(
     config: WordPressConfig,
     app_password: str,
@@ -506,11 +534,19 @@ def publish_post(
     status: str = DEFAULT_STATUS,
     category_names: Optional[list[str]] = None,
     tag_names: Optional[list[str]] = None,
-) -> tuple[int, str]:
+    featured_image_urls: Optional[list[str]] = None,
+    video_id: str = "",
+) -> tuple[int, str, Optional[str]]:
     """Konvertiert Markdown, löst Taxonomien auf und postet (blockierend).
 
     Diese Funktion bündelt alle Netzwerk-Operationen, damit sie als Einheit im
     Worker-Thread laufen kann.
+
+    Ist ``featured_image_urls`` gesetzt, wird das erste erreichbare Bild geladen,
+    in die Mediathek hochgeladen und als Beitragsbild (featured image) gesetzt.
+    Das ist **nicht fatal**: Schlägt Laden oder Upload fehl, wird der Beitrag
+    trotzdem (ohne Beitragsbild) gepostet und eine Warnung zurückgegeben — der
+    Text ist wichtiger als das Bild.
 
     Args:
         config: WordPress-Konfiguration.
@@ -520,22 +556,50 @@ def publish_post(
         status: Beitragsstatus.
         category_names: Optionale Kategorie-Namen.
         tag_names: Optionale Tag-Namen.
+        featured_image_urls: Optionale Bild-URLs in Fallback-Reihenfolge
+            (z.B. ``[maxres, hq, sd]``) für das Beitragsbild.
+        video_id: Optionale Video-ID für einen sprechenden Media-Dateinamen.
 
     Returns:
-        Tupel ``(post_id, link)``.
+        Tupel ``(post_id, link, image_warning)``. ``image_warning`` ist ``None``
+        bei Erfolg (oder wenn kein Bild gewünscht war), sonst eine Klartext-
+        Warnung, dass das Beitragsbild nicht gesetzt werden konnte.
 
     Raises:
-        WordPressError: Bei API-/Netzwerkfehlern.
+        WordPressError: Bei API-/Netzwerkfehlern beim Beitrag selbst.
         RuntimeError: Wenn das ``markdown``-Paket fehlt.
     """
     client = WordPressClient(config, app_password)
     html = markdown_to_html(markdown_content)
     category_ids = client.resolve_terms(category_names or [], "categories")
     tag_ids = client.resolve_terms(tag_names or [], "tags")
-    return client.post(
+
+    # Beitragsbild (optional, nicht fatal): Bild laden -> Mediathek -> media_id.
+    featured_media: Optional[int] = None
+    image_warning: Optional[str] = None
+    if featured_image_urls:
+        try:
+            image_bytes = _download_thumbnail(featured_image_urls)
+            if image_bytes is None:
+                image_warning = (
+                    "Beitragsbild übersprungen: kein Thumbnail erreichbar."
+                )
+                logger.warning(image_warning)
+            else:
+                filename = f"somas-thumbnail-{video_id or 'video'}.jpg"
+                featured_media = client.upload_media(image_bytes, filename)
+        except WordPressError as exc:
+            # Upload-Fehler (z.B. fehlende upload_files-Rechte) nicht fatal.
+            featured_media = None
+            image_warning = f"Beitragsbild konnte nicht gesetzt werden: {exc}"
+            logger.warning(image_warning)
+
+    post_id, link = client.post(
         title=title,
         html_content=html,
         status=status,
         category_ids=category_ids or None,
         tag_ids=tag_ids or None,
+        featured_media=featured_media,
     )
+    return post_id, link, image_warning
