@@ -7,7 +7,7 @@
 ## 🎯 Projektkontext
 
 **Name:** SOMAS Prompt Generator
-**Version:** 0.12.0
+**Version:** 0.12.1
 **Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
 **Sprache:** Python 3.11+
 **GUI-Framework:** PyQt6
@@ -407,6 +407,23 @@ Passwords in Wordfence freigeben.
   Transkript-Modus). Tests: `tests/test_wordpress_media.py`.
 - [ ] Backlog: Media-Dedup (vorhandenes Thumbnail per Suche wiederverwenden statt
   bei jedem Senden neu hochzuladen → vermeidet Media-Dubletten).
+
+### Phase 15: Zeitanker im Prompt ✅ (v0.12.1)
+
+Behebt eine „Real-als-Fiktion"-Fehlrahmung: `deepseek/deepseek-v4-pro` (Cutoff ~2024)
+stufte ein reales 2026-Nachrichtenvideo (Khamenei-Begräbnis) in der FRAMING als
+„fiktives/dystopisches Szenario" ein, weil dem Prompt jeder Zeitbezug fehlte.
+
+- [x] `_build_temporal_anchor(current_date, video_published=None)` + locale-sicheres
+  `_format_german_date` (deutsche Monats-Map, kein `strftime("%B")`-Verlass) +
+  `_prepend_temporal_anchor` — zentral vor `_apply_custom_overrides` in **beiden**
+  Build-Pfaden (forget-proof, preset-/template-unabhängig)
+- [x] Anti-Fiktions-Leitplanke mit „es sei denn, der Beitrag kennzeichnet sich SELBST
+  … als Fiktion/Satire/Spekulation" (bewahrt echte Fiktion + Musikanalysen)
+- [x] Tests `tests/test_temporal_anchor.py` (beide Pfade, alle 7 Presets, locale-sicher,
+  Transkript ohne `video_published`, Koexistenz mit erzwungenem FAKTENCHECK)
+- [ ] Follow-up: Veröffentlichungsdatum in den Anker (`video_published`) — braucht ein
+  Upload-/Publish-Datum in `VideoInfo` (yt-dlp `upload_date`); für v1 weggelassen
 
 ### Backlog
 

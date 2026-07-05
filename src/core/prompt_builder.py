@@ -10,6 +10,7 @@ Changelog v0.5.1:
 
 import json
 import re
+from datetime import datetime
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
@@ -279,6 +280,83 @@ _CHARLIMIT_LINE_RE = re.compile(
 )
 
 
+# --- Zeitanker (v0.12.x): gegen "Real-als-Fiktion"-Fehlrahmung ---
+
+# Deutsche Monatsnamen: locale-sicher (Windows hat oft keine deutsche Locale;
+# strftime("%B") wäre unzuverlässig).
+_GERMAN_MONTHS = {
+    1: "Januar", 2: "Februar", 3: "März", 4: "April", 5: "Mai", 6: "Juni",
+    7: "Juli", 8: "August", 9: "September", 10: "Oktober", 11: "November",
+    12: "Dezember",
+}
+
+
+def _format_german_date(dt: datetime) -> str:
+    """Formatiert ein Datum locale-sicher als ``"4. Juli 2026"``.
+
+    Args:
+        dt: Das zu formatierende Datum.
+
+    Returns:
+        Deutscher Datums-String (Tag ohne führende Null, Monatsname, Jahr).
+    """
+    return f"{dt.day}. {_GERMAN_MONTHS[dt.month]} {dt.year}"
+
+
+def _build_temporal_anchor(
+    current_date: str, video_published: Optional[str] = None
+) -> str:
+    """Baut den Zeitanker-Block für den Prompt.
+
+    Gibt dem Modell das aktuelle Datum + eine Anti-Fiktions-Leitplanke mit, damit
+    Modelle mit älterem Wissensstand reale, aktuelle Ereignisse nicht als erfunden/
+    dystopisch einstufen (realer DeepSeek-V4-Pro-Fehler: 2026-Nachrichtenvideo als
+    „fiktives Szenario"). Der Anker verleiht KEIN Wissen über Ereignisse nach dem
+    Cutoff — er verhindert nur die Fehl-Rahmung. Die „es sei denn"-Klausel bewahrt
+    echte Fiktion/Satire/Spekulation (und Musikanalysen).
+
+    Args:
+        current_date: Das aktuelle Datum (bereits formatiert, z.B. ``"4. Juli 2026"``).
+        video_published: Optionales Veröffentlichungsdatum des Beitrags.
+
+    Returns:
+        Der ZEITLICHER-RAHMEN-Block als Text.
+    """
+    lines = ["ZEITLICHER RAHMEN:", f"- Heute ist der {current_date}."]
+    if video_published:
+        lines.append(f"- Der Beitrag wurde am {video_published} veröffentlicht.")
+    lines.append(
+        "Behandle die im Beitrag geschilderten Ereignisse grundsätzlich als REALE, "
+        "aktuelle Berichterstattung — auch wenn sie zeitlich nach deinem Wissensstand "
+        "liegen. Stufe sie NICHT als fiktives, hypothetisches oder spekulatives "
+        "Szenario ein, es sei denn, der Beitrag kennzeichnet sich SELBST ausdrücklich "
+        "als Fiktion, Satire oder Spekulation."
+    )
+    return "\n".join(lines)
+
+
+def _prepend_temporal_anchor(
+    rendered: str, video_published: Optional[str] = None
+) -> str:
+    """Stellt dem gerenderten Prompt den Zeitanker mit aktuellem Datum voran.
+
+    Zentral in beiden Build-Pfaden genutzt (forget-proof), unabhängig vom
+    Preset/Template. Das aktuelle Datum wird hier aus ``datetime.now()`` gebildet,
+    damit der Anker immer taggenau ist.
+
+    Args:
+        rendered: Der bereits gerenderte Template-Prompt.
+        video_published: Optionales Veröffentlichungsdatum des Beitrags.
+
+    Returns:
+        Prompt mit vorangestelltem Zeitanker.
+    """
+    anchor = _build_temporal_anchor(
+        _format_german_date(datetime.now()), video_published
+    )
+    return f"{anchor}\n\n{rendered}"
+
+
 def _apply_custom_overrides(
     rendered: str,
     custom_system_prompt: Optional[str] = None,
@@ -402,6 +480,7 @@ def build_prompt(
         anti_monotony_hint=effective_hint,
     )
 
+    rendered = _prepend_temporal_anchor(rendered)
     return _apply_custom_overrides(rendered, custom_system_prompt, custom_module)
 
 
@@ -492,6 +571,7 @@ def build_prompt_from_transcript(
         anti_monotony_hint=effective_hint,
     )
 
+    rendered = _prepend_temporal_anchor(rendered)
     return _apply_custom_overrides(rendered, custom_system_prompt, custom_module)
 
 
