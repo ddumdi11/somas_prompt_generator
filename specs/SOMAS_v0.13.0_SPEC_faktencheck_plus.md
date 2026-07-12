@@ -101,6 +101,54 @@ Quoten, Budget. Der Scorer implementiert:
 
 → Vollständig offline testbar; Kern der Regressionstests.
 
+**Policy-Schema (festgezurrt für PR 1; Zahlwerte = Startwerte, Tuning nach
+Realtests):**
+
+```json
+{
+  "policy_version": "relevance-de-v1",
+  "rating_scale": [0, 5],
+  "weights": {
+    "importance": {
+      "thesis_proximity": 1.0,
+      "conclusion_dependency": 1.0,
+      "harm_potential": 1.0,
+      "reach_mobilization": 0.75,
+      "concreteness": 0.5
+    },
+    "research_value": {
+      "non_triviality": 1.0,
+      "recency": 1.0,
+      "contestedness": 1.0,
+      "source_access": 1.0,
+      "evidence_gap": 1.0,
+      "discrepancy_potential": 1.0
+    }
+  },
+  "gates": {
+    "exclude_claim_types": ["opinion", "interpretation"],
+    "basisfakt_route": "skip_listed_only",
+    "triviality_skip_at": 4,
+    "under_specified_route": "flag_not_research"
+  },
+  "quotas": {
+    "core_claims_share": 0.6,
+    "supporting_share": 0.3,
+    "context_max_claims": 2
+  },
+  "budget": {
+    "deep_research_default": 8
+  }
+}
+```
+
+Rechenweg: `importance` und `research_value` = gewichtete Summe der 0–5-Ratings
+aus S2, jeweils auf 0–1 normiert; `priority = importance × research_value ×
+checkability` (checkability 0–1 aus S1-Feldern: Entität/Zeitraum/Metrik
+vorhanden?). Auswahl klassenweise nach Quoten (A vor B vor C), innerhalb der
+Klasse absteigend nach `priority`. Feldnamen sind verbindlich (JSON-Schema);
+Gewichte/Schwellen sind Konfiguration, kein Code.
+
 ### S4 — ResearchPlanner (LLM → JSON)
 
 Für die ≤ Budget selektierten Claims **eine** Recherchekarte je Claim

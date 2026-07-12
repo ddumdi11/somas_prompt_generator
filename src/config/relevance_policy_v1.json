@@ -1,0 +1,35 @@
+{
+  "policy_version": "relevance-de-v1",
+  "rating_scale": [0, 5],
+  "weights": {
+    "importance": {
+      "thesis_proximity": 1.0,
+      "conclusion_dependency": 1.0,
+      "harm_potential": 1.0,
+      "reach_mobilization": 0.75,
+      "concreteness": 0.5
+    },
+    "research_value": {
+      "non_triviality": 1.0,
+      "recency": 1.0,
+      "contestedness": 1.0,
+      "source_access": 1.0,
+      "evidence_gap": 1.0,
+      "discrepancy_potential": 1.0
+    }
+  },
+  "gates": {
+    "exclude_claim_types": ["opinion", "interpretation"],
+    "basisfakt_route": "skip_listed_only",
+    "triviality_skip_at": 4,
+    "under_specified_route": "flag_not_research"
+  },
+  "quotas": {
+    "core_claims_share": 0.6,
+    "supporting_share": 0.3,
+    "context_max_claims": 2
+  },
+  "budget": {
+    "deep_research_default": 8
+  }
+}
