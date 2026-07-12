@@ -82,14 +82,29 @@
       "default_model": "claude-sonnet-4-6",
       "models": [
         {
-          "id": "claude-opus-4-6",
-          "name": "Claude Opus 4.6",
-          "description": "Leistungsstärkstes Modell – komplex, langsam"
+          "id": "claude-fable-5",
+          "name": "Claude Fable 5",
+          "description": "Flaggschiff – höchste Leistung, langsam & am teuersten"
+        },
+        {
+          "id": "claude-opus-4-8",
+          "name": "Claude Opus 4.8",
+          "description": "Sehr leistungsstark – komplexe Analysen"
+        },
+        {
+          "id": "claude-sonnet-5",
+          "name": "Claude Sonnet 5",
+          "description": "Neu – beste Balance aus Tempo und Intelligenz"
         },
         {
           "id": "claude-sonnet-4-6",
           "name": "Claude Sonnet 4.6",
-          "description": "Balanciert – empfohlen für SOMAS"
+          "description": "Balanciert – bewährt/empfohlen für SOMAS (Default)"
+        },
+        {
+          "id": "claude-opus-4-6",
+          "name": "Claude Opus 4.6",
+          "description": "Stark – bisheriges Flaggschiff (Vorgänger)"
         },
         {
           "id": "claude-haiku-4-5-20251001",

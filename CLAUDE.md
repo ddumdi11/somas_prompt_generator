@@ -7,7 +7,7 @@
 ## 🎯 Projektkontext
 
 **Name:** SOMAS Prompt Generator
-**Version:** 0.12.1
+**Version:** 0.12.2
 **Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
 **Sprache:** Python 3.11+
 **GUI-Framework:** PyQt6
@@ -466,6 +466,19 @@ seit v0.11.0 einen sichtbaren Ein-Retry bekommt.
   (`reasoning: {"max_tokens": 4096, "exclude": true}`) — würde die Ursache adressieren,
   aber `reasoning.max_tokens` wird nicht von allen Modellen gestützt (effort- vs.
   token-basiert); Risiko, andere Modelle zu stören → separater PR nach Recherche
+
+### Phase 18: Anthropic-Direktmodelle aktualisieren ✅ (v0.12.2)
+
+- [x] `anthropic_client.MODELS` + `api_providers.json` (`anthropic`-Block) synchron auf 6
+  Modelle: Fable 5, Opus 4.8, Sonnet 5, Sonnet 4.6 (Default), Opus 4.6, Haiku 4.5
+  (4.6er bleiben als Kontinuität, PO-Wunsch); `default_model` = `claude-sonnet-4-6`
+- [x] Konsistenztest `tests/test_model_lists_consistency.py` (IDs/Namen/Beschreibungen/
+  Reihenfolge + Default beider Listen identisch) — schützt vor künftigem Drift
+- [x] `APP_VERSION` → 0.12.2; „Unreleased"-Changelog (#52/#53) in 0.12.2 überführt +
+  README-Features-Prosa entlagt (WordPress → „Seit v0.12.0", neuer „Aktuell (v0.12.2)")
+- [ ] OpenRouter-Fallback-Slugs (`anthropic/claude-*` in `openrouter_client.FALLBACK_MODELS`
+  + OpenRouter-Block in `api_providers.json`) bewusst NICHT geändert — nicht gegen die
+  Live-Liste verifizierbar (Startprompt: keine geratenen Slugs); OpenRouter lädt dynamisch
 
 ### Backlog
 
