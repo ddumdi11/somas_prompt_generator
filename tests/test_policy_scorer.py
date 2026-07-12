@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.core.factcheck_plus import (
     ArgumentMapping, MappedClaim, PolicyScorer, RefinedClaim, SchemaError,
-    join_claims, load_policy,
+    SelectionResult, join_claims, load_policy,
 )
 from src.core.factcheck_plus.schemas import IMPORTANCE_DIMS, RESEARCH_VALUE_DIMS
 
@@ -26,9 +26,10 @@ from src.core.factcheck_plus.schemas import IMPORTANCE_DIMS, RESEARCH_VALUE_DIMS
 # --- Fixture-Helfer (simulieren S1/S2, LLM-frei) --------------------------
 
 def _claim(
-    cid, role="core_claim", claim_type="quantitative",
-    entities=("Entität",), timeframe="2025", metric="Prozent",
-    importance=4, research=4, parent_id=None, **rating_overrides,
+    cid: str, role: str = "core_claim", claim_type: str = "quantitative",
+    entities: tuple[str, ...] = ("Entität",), timeframe: str | None = "2025",
+    metric: str | None = "Prozent", importance: int = 4, research: int = 4,
+    parent_id: str | None = None, **rating_overrides: int,
 ) -> MappedClaim:
     refined = RefinedClaim(
         claim_id=cid, original_text=f"o-{cid}", normalized_claim=f"n-{cid}",
@@ -49,7 +50,7 @@ def _scorer() -> PolicyScorer:
     return PolicyScorer.from_file()
 
 
-def _classes(result, ids):
+def _classes(result: SelectionResult, ids: list[str]) -> list[str]:
     by_id = {a.claim_id: a for a in result.audits}
     return [by_id[i].claim_class for i in ids]
 
@@ -217,11 +218,13 @@ def test_refined_claim_from_dict_valid_and_invalid():
     rc = RefinedClaim.from_dict(_valid_refined_dict())
     assert rc.claim_id == "c1" and rc.entities == ["X"]
     # ungültiger claim_type
-    bad = _valid_refined_dict(); bad["claim_type"] = "banana"
+    bad = _valid_refined_dict()
+    bad["claim_type"] = "banana"
     with pytest.raises(SchemaError):
         RefinedClaim.from_dict(bad)
     # Pflichtfeld fehlt
-    missing = _valid_refined_dict(); del missing["normalized_claim"]
+    missing = _valid_refined_dict()
+    del missing["normalized_claim"]
     with pytest.raises(SchemaError):
         RefinedClaim.from_dict(missing)
     print("  refined_claim_from_dict_valid_and_invalid OK")
@@ -231,15 +234,18 @@ def test_argument_mapping_from_dict_validates_ratings():
     am = ArgumentMapping.from_dict(_valid_mapping_dict())
     assert am.argument_role == "core_claim"
     # Rating außerhalb 0–5
-    bad = _valid_mapping_dict(); bad["ratings"]["recency"] = 9
+    bad = _valid_mapping_dict()
+    bad["ratings"]["recency"] = 9
     with pytest.raises(SchemaError):
         ArgumentMapping.from_dict(bad)
     # Rating-Dimension fehlt
-    missing = _valid_mapping_dict(); del missing["ratings"]["harm_potential"]
+    missing = _valid_mapping_dict()
+    del missing["ratings"]["harm_potential"]
     with pytest.raises(SchemaError):
         ArgumentMapping.from_dict(missing)
     # ungültige Rolle
-    role = _valid_mapping_dict(); role["argument_role"] = "boss"
+    role = _valid_mapping_dict()
+    role["argument_role"] = "boss"
     with pytest.raises(SchemaError):
         ArgumentMapping.from_dict(role)
     print("  argument_mapping_from_dict_validates_ratings OK")
@@ -258,6 +264,39 @@ def test_join_claims_matches_and_reports_mismatch():
 
 
 # --- Policy-Datei ---------------------------------------------------------
+
+def test_unsupported_gate_route_raises():
+    import copy
+    base = load_policy()
+    bad_basis = copy.deepcopy(base)
+    bad_basis["gates"]["basisfakt_route"] = "delete_everything"
+    with pytest.raises(ValueError):
+        PolicyScorer(bad_basis)
+    bad_us = copy.deepcopy(base)
+    bad_us["gates"]["under_specified_route"] = "yolo"
+    with pytest.raises(ValueError):
+        PolicyScorer(bad_us)
+    print("  unsupported_gate_route_raises OK")
+
+
+def test_rating_scale_mismatch_raises():
+    import copy
+    base = load_policy()
+    bad = copy.deepcopy(base)
+    bad["rating_scale"] = [0, 4]  # passt nicht zu den Schema-Grenzen [0, 5]
+    with pytest.raises(ValueError):
+        PolicyScorer(bad)
+    print("  rating_scale_mismatch_raises OK")
+
+
+def test_join_duplicate_refined_raises():
+    a = RefinedClaim.from_dict(_valid_refined_dict())
+    b = RefinedClaim.from_dict(_valid_refined_dict())  # gleiche claim_id 'c1'
+    mapping = ArgumentMapping.from_dict(_valid_mapping_dict())
+    with pytest.raises(ValueError):
+        join_claims([a, b], [mapping])
+    print("  join_duplicate_refined_raises OK")
+
 
 def test_policy_file_encodes_po_decisions():
     policy = load_policy()
@@ -287,6 +326,9 @@ def main():
     test_refined_claim_from_dict_valid_and_invalid()
     test_argument_mapping_from_dict_validates_ratings()
     test_join_claims_matches_and_reports_mismatch()
+    test_unsupported_gate_route_raises()
+    test_rating_scale_mismatch_raises()
+    test_join_duplicate_refined_raises()
     test_policy_file_encodes_po_decisions()
     print("ALLE TESTS OK")
 

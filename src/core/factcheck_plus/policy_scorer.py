@@ -25,15 +25,51 @@ from .models import (
     STATUS_BASISFAKT_SKIPPED, STATUS_EXCLUDED_OPINION, STATUS_NOT_SELECTED_BUDGET,
     STATUS_SELECTED, STATUS_UNDER_SPECIFIED,
 )
-from .schemas import IMPORTANCE_DIMS, RESEARCH_VALUE_DIMS
+from .schemas import IMPORTANCE_DIMS, RATING_MAX, RATING_MIN, RESEARCH_VALUE_DIMS
 
 DEFAULT_POLICY_PATH = (
     Path(__file__).resolve().parent.parent.parent / "config" / "relevance_policy_v1.json"
 )
 
+# Unterstützte Gate-Routen → Audit-Status. Die Policy-Felder `basisfakt_route` /
+# `under_specified_route` sind damit wirksam (nicht dekorativ): ein unbekannter
+# Wert schlägt bei der Konstruktion fehl, statt still ignoriert zu werden. Weitere
+# Routen (z.B. eigene Schnellprüfung) hängen sich hier an.
+_BASISFAKT_ROUTE_STATUS = {"skip_listed_only": STATUS_BASISFAKT_SKIPPED}
+_UNDER_SPECIFIED_ROUTE_STATUS = {"flag_not_research": STATUS_UNDER_SPECIFIED}
+
+
+def _resolve_route(route_map: dict, value: str | None, field: str) -> str:
+    """Löst einen konfigurierten Gate-Routen-Wert in seinen Audit-Status auf.
+
+    Args:
+        route_map: Zulässige Routen → Status.
+        value: Der in der Policy konfigurierte Routen-Wert.
+        field: Feldname (für die Fehlermeldung).
+
+    Returns:
+        Der Audit-Status für diese Route.
+
+    Raises:
+        ValueError: Wenn ``value`` keine unterstützte Route ist.
+    """
+    if value not in route_map:
+        raise ValueError(
+            f"Unbekannte {field}={value!r}; unterstützt: {sorted(route_map)}"
+        )
+    return route_map[value]
+
 
 def load_policy(path: str | Path | None = None) -> dict:
-    """Lädt eine Policy-Datei (Default: ``src/config/relevance_policy_v1.json``)."""
+    """Lädt eine Policy-Datei.
+
+    Args:
+        path: Pfad zur Policy-JSON (``str`` oder ``Path``). ``None`` (Default) nutzt
+            ``src/config/relevance_policy_v1.json`` (``DEFAULT_POLICY_PATH``).
+
+    Returns:
+        Die geparste Policy als ``dict``.
+    """
     p = Path(path) if path is not None else DEFAULT_POLICY_PATH
     return json.loads(p.read_text(encoding="utf-8"))
 
@@ -42,13 +78,39 @@ class PolicyScorer:
     """Wählt aus gejointen Claims (S1+S2) deterministisch die Deep-Research-Menge."""
 
     def __init__(self, policy: dict) -> None:
-        """Args: policy: geladene Policy-Konfiguration (s. ``load_policy``)."""
+        """Initialisiert den Scorer aus einer geladenen Policy.
+
+        Args:
+            policy: Policy-Konfiguration (s. :func:`load_policy`) mit
+                ``rating_scale``, ``weights``, ``gates``, ``quotas`` und ``budget``.
+
+        Raises:
+            ValueError: Wenn ``rating_scale`` nicht zu den Schema-Grenzen
+                (``RATING_MIN``/``RATING_MAX``) passt oder eine Gate-Route
+                (``basisfakt_route`` / ``under_specified_route``) unbekannt ist.
+        """
         self._policy = policy
-        self._scale_max = float(policy["rating_scale"][1])
+        # Rating-Skala EINE Quelle: muss zu den Schema-Grenzen passen, damit
+        # Validierung (Schema) und Scoring dieselben Min/Max nutzen.
+        scale = [int(policy["rating_scale"][0]), int(policy["rating_scale"][1])]
+        if scale != [RATING_MIN, RATING_MAX]:
+            raise ValueError(
+                f"rating_scale {scale} passt nicht zu Schema-Grenzen "
+                f"[{RATING_MIN}, {RATING_MAX}]"
+            )
+        self._scale_max = float(RATING_MAX)
         self._w_importance = policy["weights"]["importance"]
         self._w_research = policy["weights"]["research_value"]
         self._gates = policy["gates"]
         self._quotas = policy["quotas"]
+        # Gate-Routen aus der Config auflösen (unbekannter Wert → sofortiger Fehler).
+        self._basisfakt_status = _resolve_route(
+            _BASISFAKT_ROUTE_STATUS, self._gates.get("basisfakt_route"), "basisfakt_route"
+        )
+        self._under_specified_status = _resolve_route(
+            _UNDER_SPECIFIED_ROUTE_STATUS,
+            self._gates.get("under_specified_route"), "under_specified_route",
+        )
 
     @classmethod
     def from_file(cls, path: str | Path | None = None) -> "PolicyScorer":
@@ -57,6 +119,7 @@ class PolicyScorer:
 
     @property
     def policy_version(self) -> str:
+        """Gibt die Versionskennung der aktiven Policy zurück (z.B. ``relevance-de-v1``)."""
         return self._policy["policy_version"]
 
     # --- Scores ------------------------------------------------------------
@@ -81,34 +144,40 @@ class PolicyScorer:
 
     # --- Gates (Reihenfolge semantisch, Theorie §4.2) ----------------------
 
-    def _gate_status(self, claim: MappedClaim, checkability: float) -> str | None:
+    def _gate_status(
+        self, claim: MappedClaim, claim_class: ClaimClass, checkability: float,
+    ) -> str | None:
         """Wendet die harten Gates an; gibt einen Ausschluss-Status oder ``None``
-        (= eligible) zurück. ``None`` bedeutet: geht ins Scoring/Quotenauswahl."""
+        (= eligible) zurück. ``None`` bedeutet: geht ins Scoring/Quotenauswahl.
+
+        Args:
+            claim: Der gejointe Claim (S1+S2).
+            claim_class: Bereits im Aufrufer bestimmte Arbeitsklasse (A/B/C/D).
+            checkability: Vorab berechnete Checkability (0–1).
+        """
         claim_type = claim.refined.claim_type
-        role = claim.mapping.argument_role
-        claim_class = ROLE_TO_CLASS.get(role, ClaimClass.C)
 
         # Gate 1 — Meinung/Deutung: gar nicht recherchieren.
         if claim_type in self._gates.get("exclude_claim_types", []):
             return STATUS_EXCLUDED_OPINION
 
-        # Gate 3 — Basisfakt (Metadaten-Rolle) ODER trivial: nur listen, nicht
-        # recherchieren. Trivialität = (Skalenmax − non_triviality); ab
-        # `triviality_skip_at` gilt der Claim als trivial. (Gate 2 = Kontext hat
+        # Gate 3 — Basisfakt (Metadaten-Rolle) ODER trivial: gemäß `basisfakt_route`
+        # nur listen, nicht recherchieren. Trivialität = (Skalenmax − non_triviality);
+        # ab `triviality_skip_at` gilt der Claim als trivial. (Gate 2 = Kontext hat
         # keinen Drop, sondern eine eigene kleine Quote in der Auswahl.)
         if claim_class == ClaimClass.D:
-            return STATUS_BASISFAKT_SKIPPED
+            return self._basisfakt_status
         triviality = self._scale_max - float(claim.mapping.ratings.get("non_triviality", 0))
         if triviality >= self._gates.get("triviality_skip_at", self._scale_max + 1):
-            return STATUS_BASISFAKT_SKIPPED
+            return self._basisfakt_status
 
         # Gate 4 — Attribution: kommt aus S1 bereits als eigener Claim gesplittet;
         # hier keine Sonderbehandlung nötig.
 
         # Gate 5 — zu vage: keinerlei prüfbare Anker (Entität/Zeitraum/Metrik) →
-        # flaggen, nicht recherchieren.
+        # gemäß `under_specified_route` flaggen, nicht recherchieren.
         if checkability <= 0.0:
-            return STATUS_UNDER_SPECIFIED
+            return self._under_specified_status
 
         return None
 
@@ -152,7 +221,7 @@ class PolicyScorer:
                 claim.mapping.argument_role, ClaimClass.C
             )
 
-            status = self._gate_status(claim, checkability)
+            status = self._gate_status(claim, claim_class, checkability)
             audit_by_id[claim.claim_id] = ClaimAudit(
                 claim_id=claim.claim_id,
                 claim_class=claim_class.value,

@@ -10,14 +10,17 @@ Kein Qt-Import in diesem Package (extrahierbar als ``factcheck_core``, Spec §2.
 from .models import (
     ArgumentMapping, ClaimAudit, ClaimClass, MappedClaim, RefinedClaim,
     ROLE_TO_CLASS, SelectionResult, join_claims,
+    STATUS_BASISFAKT_SKIPPED, STATUS_EXCLUDED_OPINION, STATUS_NOT_SELECTED_BUDGET,
+    STATUS_SELECTED, STATUS_UNDER_SPECIFIED,
 )
 from .policy_scorer import DEFAULT_POLICY_PATH, PolicyScorer, load_policy
 from .schemas import (
-    ARGUMENT_MAPPING_SCHEMA, RATING_DIMS, REFINED_CLAIM_SCHEMA, SchemaError,
-    validate,
+    ARGUMENT_MAPPING_SCHEMA, ARGUMENT_ROLES, CLAIM_TYPES, IMPORTANCE_DIMS,
+    RATING_DIMS, REFINED_CLAIM_SCHEMA, RESEARCH_VALUE_DIMS, SchemaError, validate,
 )
 
 __all__ = [
+    # Datenmodelle
     "ArgumentMapping",
     "ClaimAudit",
     "ClaimClass",
@@ -26,12 +29,24 @@ __all__ = [
     "ROLE_TO_CLASS",
     "SelectionResult",
     "join_claims",
+    # Auswahl-/Ausschluss-Status
+    "STATUS_SELECTED",
+    "STATUS_EXCLUDED_OPINION",
+    "STATUS_BASISFAKT_SKIPPED",
+    "STATUS_UNDER_SPECIFIED",
+    "STATUS_NOT_SELECTED_BUDGET",
+    # Scorer
     "PolicyScorer",
     "load_policy",
     "DEFAULT_POLICY_PATH",
+    # Verträge / Wertemengen
     "ARGUMENT_MAPPING_SCHEMA",
     "REFINED_CLAIM_SCHEMA",
     "RATING_DIMS",
+    "IMPORTANCE_DIMS",
+    "RESEARCH_VALUE_DIMS",
+    "CLAIM_TYPES",
+    "ARGUMENT_ROLES",
     "SchemaError",
     "validate",
 ]

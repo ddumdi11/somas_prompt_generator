@@ -32,6 +32,12 @@ RESEARCH_VALUE_DIMS = (
 )
 RATING_DIMS = IMPORTANCE_DIMS + RESEARCH_VALUE_DIMS
 
+# Rating-Skala (0–5) als EINE benannte Quelle: das Schema (unten) und der
+# PolicyScorer (der policy["rating_scale"] dagegen prüft) teilen sich diese
+# Grenzen, statt 0/5 mehrfach hartzukodieren.
+RATING_MIN = 0
+RATING_MAX = 5
+
 
 # --- Schemas (JSON-Schema-Teilmenge) --------------------------------------
 
@@ -63,7 +69,7 @@ ARGUMENT_MAPPING_SCHEMA: dict = {
             "type": "object",
             "required": list(RATING_DIMS),
             "properties": {
-                dim: {"type": "integer", "minimum": 0, "maximum": 5}
+                dim: {"type": "integer", "minimum": RATING_MIN, "maximum": RATING_MAX}
                 for dim in RATING_DIMS
             },
         },

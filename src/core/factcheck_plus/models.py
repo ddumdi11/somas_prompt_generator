@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from .schemas import (
-    ARGUMENT_MAPPING_SCHEMA, REFINED_CLAIM_SCHEMA, validate,
+    ARGUMENT_MAPPING_SCHEMA, ARGUMENT_ROLES, REFINED_CLAIM_SCHEMA, validate,
 )
 
 
@@ -36,6 +36,14 @@ ROLE_TO_CLASS: dict[str, ClaimClass] = {
     "example": ClaimClass.C,
     "metadata": ClaimClass.D,
 }
+
+# Konsistenzriegel zur Importzeit: jede im S2-Vertrag erlaubte Argumentrolle muss
+# hier auf eine Klasse abgebildet sein (fängt Drift zwischen Schema und Mapping).
+# Der `.get(..., ClaimClass.C)`-Fallback im Scorer bleibt als Laufzeit-Sicherheitsnetz.
+assert set(ROLE_TO_CLASS) == set(ARGUMENT_ROLES), (
+    "ROLE_TO_CLASS deckt nicht exakt ARGUMENT_ROLES ab: "
+    f"{set(ROLE_TO_CLASS) ^ set(ARGUMENT_ROLES)}"
+)
 
 
 @dataclass
@@ -116,6 +124,11 @@ def join_claims(
     Raises:
         ValueError: Wenn ein Claim kein Gegenstück in der jeweils anderen Liste hat.
     """
+    refined_ids = [rc.claim_id for rc in refined]
+    if len(set(refined_ids)) != len(refined_ids):
+        seen: set[str] = set()
+        dupes = sorted({cid for cid in refined_ids if cid in seen or seen.add(cid)})
+        raise ValueError(f"Doppelte claim_id in den RefinedClaims: {dupes}")
     by_id = {m.claim_id: m for m in mappings}
     if len(by_id) != len(mappings):
         raise ValueError("Doppelte claim_id in den ArgumentMappings")
