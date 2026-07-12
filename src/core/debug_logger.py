@@ -14,7 +14,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-APP_VERSION = "0.12.1"
+APP_VERSION = "0.12.2"
 
 
 class DebugLogger:
