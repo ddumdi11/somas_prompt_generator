@@ -108,11 +108,12 @@ class APIWorker(QThread):
                 self.status_changed.emit(APIStatus.ERROR.value)
                 self.error_occurred.emit(response.error_message)
                 logger.error(f"API-Worker Fehler: {response.error_message}")
-                # Debug: Fehler-Response loggen
+                # Debug: Fehler-Response loggen. Echten HTTP-Status durchreichen
+                # (ein Leer-Inhalt-Fehler kam über HTTP 200) statt pauschal 500.
                 if self._debug_logger:
                     self._debug_logger.log_response(
                         log_dir=log_dir,
-                        status_code=500,
+                        status_code=response.http_status if response.http_status is not None else 500,
                         content=response.content,
                         tokens={"total": response.tokens_used},
                         duration=duration,

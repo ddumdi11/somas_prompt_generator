@@ -23,7 +23,7 @@ from src.core.linkedin_formatter import format_for_linkedin
 from src.core.export import (
     export_to_markdown, get_suggested_filename, save_markdown, get_default_save_dir,
 )
-from src.core.api_client import APIResponse, APIStatus
+from src.core.api_client import APIResponse, APIStatus, is_empty_content_error
 from src.core.api_worker import APIWorker
 from src.core.debug_logger import DebugLogger, APP_VERSION
 from src.core.rating_store import RatingStore, AnalysisRecord
@@ -2131,7 +2131,14 @@ class MainWindow(QMainWindow):
         Args:
             reason: Kurzbegründung (Trunkierung oder Validator-Grund).
         """
-        if self._analysis_retry_count < 1 and self._analysis_prompt:
+        # Guard: kein Auto-Retry, wenn der Lauf abgebrochen wurde (active_id == 0,
+        # _analysis_prompt geleert). Defense-in-depth zusätzlich zum Request-ID-Riegel
+        # in _on_api_response/_on_api_error.
+        if (
+            self._analysis_retry_count < 1
+            and self._analysis_prompt
+            and self._api_active_request_id != 0
+        ):
             self._analysis_retry_count += 1
             logger.warning(
                 f"Analyse ungültig ({reason}) — automatischer Retry "
@@ -2177,6 +2184,9 @@ class MainWindow(QMainWindow):
         self.api_status_label.setText(
             "Modelllauf fehlgeschlagen — anderes Modell wählen"
         )
+        # Terminaler Zustand: Abbrechen aus (der Leer-Inhalt-Pfad deaktiviert ihn
+        # nicht vorab, der Trunkierungspfad schon — hier zentral für beide).
+        self.btn_api_cancel.setEnabled(False)
         self._update_generate_enabled()
         self.btn_generate.setText("Generate Prompt")
         self.btn_rework.setEnabled(True)
@@ -2197,9 +2207,12 @@ class MainWindow(QMainWindow):
             logger.info("Analyse-Call vom Benutzer abgebrochen")
         # Aktiven Lauf invalidieren: eine evtl. schon gequeuedte Antwort/Fehler
         # wird in _on_api_response/_on_api_error verworfen. Weitere Auto-Retries
-        # für diesen Lauf unterbinden.
+        # für diesen Lauf unterbinden — Retry-Kontext vollständig neutralisieren,
+        # damit weder eine verspätete Antwort noch eine Eskalation einen neuen
+        # Auto-Retry auslöst (auch während des laufenden Auto-Retrys wirksam).
         self._api_active_request_id = 0
         self._analysis_retry_count = 1
+        self._analysis_prompt = ""
         self.btn_api_cancel.setEnabled(False)
         self.api_status_label.setText("Abgebrochen")
         self._update_generate_enabled()
@@ -2220,6 +2233,17 @@ class MainWindow(QMainWindow):
         if request_id is not None and request_id != self._api_active_request_id:
             logger.info("Verwerfe verspäteten/abgebrochenen API-Fehler")
             return
+
+        # Leer-Inhalt (HTTP 200, aber Content leer — Reasoning fraß das Budget) ist
+        # DERSELBE Fehlermodus wie eine Trunkierung. Statt hartem Dialog denselben
+        # Eskalationspfad wie ungültige/trunkierte Analysen: 1× sichtbarer Auto-Retry,
+        # dann offener „Modelllauf fehlgeschlagen" (Fehlertext inkl. finish_reason
+        # bleibt als Grund erhalten). Nur für frische Analysen, nicht für Rework.
+        if not self._is_rework and is_empty_content_error(error_message):
+            logger.warning(f"Leer-Inhalt → Eskalationspfad: {error_message}")
+            self._escalate_failed_analysis(error_message)
+            return
+
         logger.error(f"API-Fehler: {error_message}")
         self.api_status_label.setText(f"Fehler: {error_message[:50]}")
         self.btn_api_cancel.setEnabled(False)

@@ -9,7 +9,10 @@ from typing import ClassVar
 
 import requests
 
-from .api_client import DEFAULT_MAX_TOKENS, APIResponse, APIStatus, LLMClient
+from .api_client import (
+    DEFAULT_MAX_TOKENS, APIResponse, APIStatus, LLMClient,
+    build_empty_content_error,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -115,10 +118,11 @@ class PerplexityClient(LLMClient):
                     )
                     return APIResponse(
                         status=APIStatus.ERROR,
-                        error_message=(
-                            f"Modell lieferte leeren Inhalt "
-                            f"(finish_reason={finish_reason})"
+                        error_message=build_empty_content_error(
+                            "finish_reason", finish_reason
                         ),
+                        finish_reason=self._normalize_finish_reason(finish_reason),
+                        http_status=200,
                     )
 
                 tokens = data.get("usage", {}).get("total_tokens", 0)

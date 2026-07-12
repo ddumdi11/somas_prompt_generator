@@ -7,7 +7,10 @@ Statische Modellliste, kein Web-Search.
 import logging
 from typing import ClassVar
 
-from .api_client import DEFAULT_MAX_TOKENS, APIResponse, APIStatus, LLMClient
+from .api_client import (
+    DEFAULT_MAX_TOKENS, APIResponse, APIStatus, LLMClient,
+    build_empty_content_error,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -89,10 +92,13 @@ class AnthropicClient(LLMClient):
                 )
                 return APIResponse(
                     status=APIStatus.ERROR,
-                    error_message=(
-                        f"Modell lieferte leeren Inhalt "
-                        f"(stop_reason={stop_reason})"
+                    error_message=build_empty_content_error(
+                        "stop_reason", stop_reason
                     ),
+                    finish_reason=self._normalize_finish_reason(
+                        stop_reason, {"max_tokens": "length"}
+                    ),
+                    http_status=200,
                 )
 
             tokens_used = 0
