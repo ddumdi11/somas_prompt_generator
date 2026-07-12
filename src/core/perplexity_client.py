@@ -56,6 +56,12 @@ class PerplexityClient(LLMClient):
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
+        # Such-Tiefe für inhaltliche Calls. Perplexity-Default wäre "low" (die
+        # oberflächlichste Stufe); "high" zieht deutlich mehr Quellen pro Anfrage —
+        # gezielt für die Verifikation, wo Belegtiefe zählt. Höhere Tiefe = mehr
+        # Quellen = höhere Request-Gebühr (nur inhaltliche Calls, gut vertretbar).
+        # Programmatisch überschreibbar; eine UI-Einstellung ist Follow-up (Backlog).
+        self._search_context_size = "high"
 
     def get_available_models(self) -> list[dict]:
         """Gibt Liste der verfügbaren Modelle zurück.
@@ -86,6 +92,11 @@ class PerplexityClient(LLMClient):
                     # max_tokens explizit setzen (analog OpenRouter/Anthropic/OpenAI),
                     # um Worst-Case-Pre-Auth zu vermeiden.
                     "max_tokens": DEFAULT_MAX_TOKENS,
+                    # Such-Tiefe hochsetzen (Default wäre "low") — mehr Quellen pro
+                    # Anfrage, spürbar bessere Belegtiefe in der Verifikation.
+                    "web_search_options": {
+                        "search_context_size": self._search_context_size
+                    },
                 },
                 timeout=120,
             )

@@ -7,7 +7,7 @@
 ## 🎯 Projektkontext
 
 **Name:** SOMAS Prompt Generator
-**Version:** 0.12.2
+**Version:** 0.12.3
 **Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
 **Sprache:** Python 3.11+
 **GUI-Framework:** PyQt6
@@ -479,6 +479,26 @@ seit v0.11.0 einen sichtbaren Ein-Retry bekommt.
 - [ ] OpenRouter-Fallback-Slugs (`anthropic/claude-*` in `openrouter_client.FALLBACK_MODELS`
   + OpenRouter-Block in `api_providers.json`) bewusst NICHT geändert — nicht gegen die
   Live-Liste verifizierbar (Startprompt: keine geratenen Slugs); OpenRouter lädt dynamisch
+
+### Phase 19: Perplexity in der Verifikation konkurrenzfähig ✅ (v0.12.3)
+
+Sonar wich in der Verifikation öfter auf „nicht überprüfbar" aus, wo GPT-5.3-Codex
+Belege fand und differenzierte. Zwei kleine Ursachen, beide behoben.
+
+- [x] Teil A: `perplexity_client` setzt `web_search_options.search_context_size`
+  (Attribut `self._search_context_size`, Default „high"; Perplexity-Default wäre „low")
+  in **inhaltlichen** Calls; `validate_key` (Verbindungstest) bleibt schlank
+- [x] Teil B: Verdikt-Leitplanke in `build_verification_prompt` — „Kern belegt, Detail
+  offen → teilweise bestätigt" (Kern + offenes Detail benennen) statt pauschal „nicht
+  überprüfbar"; bestehende Riegel + exakt 4 Verdikt-Werte unverändert
+- [x] Tests: `tests/test_perplexity_search_context.py` (Payload „high", Verbindungstest
+  ohne Parameter, Attribut steuerbar) + Leitplanken-Test in `tests/test_faktencheck_parser.py`
+- [x] `APP_VERSION` → 0.12.3; README-Changelog + „Aktuell"-Spotlight
+- [ ] Follow-up: `search_context_size` als vollwertige UI-Einstellung
+  (`perplexity_search_context`, low/medium/high) — derzeit Default „high" fest,
+  programmatisch überschreibbar
+- [ ] Backlog (Startprompt): Claim-Atomisierung in Stufe 1 (gebündelte Behauptungen
+  splitten) — tieferer Umbau, separat (Teil von Faktencheck Plus, v0.13.0)
 
 ### Backlog
 
