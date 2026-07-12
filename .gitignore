@@ -57,6 +57,9 @@ examples/
 # Local archive for old/unused files
 Archiv/
 
+# Zwischennotizen bleiben lokal (PO-Entscheidung 2026-07-12)
+notizen/
+
 # Local launcher (machine-specific, not for GitHub)
 start.bat
 
