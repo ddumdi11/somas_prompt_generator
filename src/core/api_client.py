@@ -115,6 +115,33 @@ class LLMClient(ABC):
             return extra_map[value]
         return value
 
+    def _build_empty_content_response(
+        self, reason_label: str, reason_value: str | None,
+        extra_map: dict[str, str] | None = None,
+    ) -> "APIResponse":
+        """Baut die einheitliche Leer-Inhalt-Fehlerantwort für alle Clients.
+
+        Kapselt den identischen Block (Meldung, normalisierter finish_reason,
+        ``http_status=200``), damit HTTP 200 + leerer Content über alle Provider
+        konsistent als retrybarer Leer-Inhalt-Fehlermodus gemeldet wird (siehe
+        :func:`is_empty_content_error`).
+
+        Args:
+            reason_label: ``"finish_reason"`` oder ``"stop_reason"`` (provider-abhängig).
+            reason_value: Der rohe Stopp-Grund (kann ``None`` sein).
+            extra_map: Optionale Aliasse für :meth:`_normalize_finish_reason`
+                (z.B. ``{"max_tokens": "length"}`` bei Anthropic).
+
+        Returns:
+            Die fertige :class:`APIResponse` mit Status ERROR.
+        """
+        return APIResponse(
+            status=APIStatus.ERROR,
+            error_message=build_empty_content_error(reason_label, reason_value),
+            finish_reason=self._normalize_finish_reason(reason_value, extra_map),
+            http_status=200,
+        )
+
     @abstractmethod
     def get_available_models(self) -> list[dict]:
         """Gibt Liste der verfügbaren Modelle zurück.

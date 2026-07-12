@@ -7,10 +7,7 @@ Statische Modellliste, kein Web-Search.
 import logging
 from typing import ClassVar
 
-from .api_client import (
-    DEFAULT_MAX_TOKENS, APIResponse, APIStatus, LLMClient,
-    build_empty_content_error,
-)
+from .api_client import DEFAULT_MAX_TOKENS, APIResponse, APIStatus, LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -94,13 +91,8 @@ class OpenAIClient(LLMClient):
                 logger.error(
                     f"OpenAI: leerer Inhalt (finish_reason={finish_reason})"
                 )
-                return APIResponse(
-                    status=APIStatus.ERROR,
-                    error_message=build_empty_content_error(
-                        "finish_reason", finish_reason
-                    ),
-                    finish_reason=self._normalize_finish_reason(finish_reason),
-                    http_status=200,
+                return self._build_empty_content_response(
+                    "finish_reason", finish_reason
                 )
 
             tokens_used = response.usage.total_tokens if response.usage else 0
