@@ -425,6 +425,21 @@ stufte ein reales 2026-Nachrichtenvideo (Khamenei-Begräbnis) in der FRAMING als
 - [ ] Follow-up: Veröffentlichungsdatum in den Anker (`video_published`) — braucht ein
   Upload-/Publish-Datum in `VideoInfo` (yt-dlp `upload_date`); für v1 weggelassen
 
+### Phase 16: Faktencheck Stufe 1 – Basisfakt-Sortierung ✅ (Quick Win, kein Versions-Bump)
+
+Behebt „prüfbar ≠ prüfwürdig" (Grundlage: `specs/FAKTENCHECK_THEORIE.md` §3): Leicht
+prüfbare Basisfakten verdrängten tragende strittige Claims unter die Cap-Grenze.
+
+- [x] `FAKTENCHECK_FORMAT`: Behauptungen nach argumentativem Gewicht/Recherchewert ordnen
+  (nicht nach Prüfbarkeit) + Basisfakt-Suffix `[Basisfakt]` ans Listenende + Attributions-
+  Hinweis; Meinungen/Interpretationen-Sortierregel unverändert
+- [x] `FAKTENCHECK_NO_LIMIT_HINT` entschärft (Vollständigkeit nicht zulasten der Priorisierung)
+- [x] `strip_basisfakt_marker` (tolerant, bracket-gebunden gegen False Positives) + `cap_claims`
+  schließt Basisfakten aus (auch bei `0 = unbegrenzt`), zählen nicht in `total`;
+  `extract_claims_from_faktencheck` unangetastet; Stufe 2 unberührt
+- [x] Tests erweitert (`tests/test_faktencheck_parser.py`): Suffix/Toleranz/Cap-Ausschluss +
+  Regression (ohne Suffix unverändert)
+
 ### Backlog
 
 - [ ] A4-Feinschliff: erzwungenes Modul aus der `MODUL-AUSWAHL`-Liste entfernen
@@ -436,6 +451,25 @@ stufte ein reales 2026-Nachrichtenvideo (Khamenei-Begräbnis) in der FRAMING als
 - [ ] PDF-Export (auch für Modellvergleich)
 - [ ] Crash-Recovery-Persistenz für Modellvergleich (analog Batch)
 - [ ] N-Wege-Vergleich (mehr als zwei Analyse-Modelle)
+- [ ] GitHub-Issue #6: `user_preferences.json` ins User-Datenverzeichnis verschieben
+  (`%APPDATA%/somas_prompt_generator/`, appdirs) — Nutzerdatei liegt derzeit im Repo,
+  wird bei Updates überschrieben; relevant spätestens bei Distribution/Installern
+- [ ] GitHub-Issue #7: Synchrone HTTP-Calls im UI-Thread async machen
+  (`_load_dynamic_models`, `_on_test_key` → QThread-Worker) — niedrige Priorität
+
+---
+
+## 🗒️ Zwischennotizen (`notizen/`)
+
+Jeder Projekt-Chat pflegt **eine fortgeschriebene** Zwischennotiz (Versionszähler +
+Änderungsvermerk) in `notizen/`. Vorlagen: `Vorlage_Zwischennotiz.md` (Einzelchats)
+und `Vorlage_Projekt-Zwischennotiz_Hauptchat.md` (Hauptchat, konsolidiert den
+Projektstand). Bei Chat-Abschluss wird die Notiz zur **Übergabenotiz** (Status
+ABGESCHLOSSEN, Abschnitte 3/4 auflösen, Wiedereinstiegspunkt → „Übergabe an: …").
+
+**Chat-Lebenszyklus:** Spezialisierte Chats werden abgeschlossen, sobald ihr Ziel
+erreicht ist. Angestrebt: ein aktiver Hauptstrang (übergibt bei Bedarf an einen
+Nachfolge-Chat) plus wenige aktive Nebenstränge.
 
 ---
 
@@ -455,4 +489,4 @@ Bei Unklarheiten: Frag nach! Lieber einmal zu viel als eine falsche Annahme tref
 
 ---
 
-Letzte Aktualisierung: 2026-06-14
+Letzte Aktualisierung: 2026-07-12

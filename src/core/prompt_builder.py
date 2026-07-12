@@ -246,9 +246,17 @@ FAKTENCHECK_FORMAT = (
     "**Behauptungen (überprüfbar):** je eine einzelne, in sich abgeschlossene, falsifizierbare\n"
     "Tatsachenaussage pro Punkt, nummeriert; neutral und kontextfrei formuliert (ohne\n"
     "Meinungswörter); KEIN Urteil über Wahr/Falsch.\n"
-    "Ordne JEDEN Block nach Relevanz absteigend (wichtigste zuerst): zentral für Kernthese/\n"
-    "Hauptthema und/oder strittig bzw. folgenreich im Diskurs. Triviale Selbstverständlichkeiten\n"
-    "NICHT auflisten bzw. ans Ende stellen.\n"
+    "Ordne Meinungen und Interpretationen nach Relevanz absteigend (wichtigste zuerst); "
+    "triviale Selbstverständlichkeiten ans Ende stellen.\n"
+    "Ordne die BEHAUPTUNGEN nach argumentativem Gewicht und Recherchewert, NICHT nach "
+    "Prüfbarkeit: Eine Behauptung steht umso höher, je stärker ihre Widerlegung oder fehlende "
+    "Belegbarkeit die Kernthese des Beitrags materiell schwächen würde und je mehr eine externe "
+    "Recherche dazu echten Erkenntnisgewinn verspricht.\n"
+    "Biografische, lexikalische, institutionelle und allgemein bekannte Basisfakten: am "
+    "Listenende einordnen und mit dem Suffix „ [Basisfakt]“ kennzeichnen — niemals unter den "
+    "obersten Prüfkandidaten.\n"
+    "Attributionsaussagen („X behauptet/erklärt, dass …“) als solche formulieren und nicht mit "
+    "der Sachaussage selbst verschmelzen.\n"
     "Schreibe JEDEN nummerierten Punkt auf eine EIGENE Zeile (Zeilenumbruch nach jedem Punkt); "
     "KEINE Inline-Aufzählung mehrerer Punkte in einer Zeile."
 )
@@ -256,8 +264,11 @@ FAKTENCHECK_FORMAT = (
 # Positiver Vollständigkeits-Hinweis für den erzwungenen FAKTENCHECK-Lauf. Die
 # eigentlichen Zeichenlimit-Zeilen werden bei FAKTENCHECK aus dem Prompt ENTFERNT
 # (s. _apply_custom_overrides), daher kein "aufgehoben"-Framing mehr nötig.
+# Vollständigkeit darf die Priorisierung NICHT verwässern (sonst lange Listen
+# gleichrangiger Neben-Claims ohne Prioritätssignal → wichtige Claims fallen unter die Cap).
 FAKTENCHECK_NO_LIMIT_HINT = (
-    "Liste die Behauptungen VOLLSTÄNDIG auf — Vollständigkeit hat Vorrang vor Kürze."
+    "Erfasse alle überprüfbaren Behauptungen — Vollständigkeit geht nicht zulasten der "
+    "Priorisierung: Die Reihenfolge bildet argumentatives Gewicht und Recherchewert ab."
 )
 
 # v0.11.0 (A4): Final-Only-Zaun. Hält Arbeitsnotizen/Selbstanweisungen aus dem
@@ -1083,22 +1094,66 @@ def extract_claims_from_faktencheck(analysis_text: str) -> list[str]:
     return _split_consecutive_claims(region)
 
 
-def cap_claims(claims: list[str], max_claims: int) -> tuple[list[str], int]:
-    """Wendet die konfigurierbare Obergrenze deterministisch an.
+# Basisfakt-Marker (Stufe 1): kennzeichnet biografische/lexikalische/institutionelle/
+# allgemein bekannte Basisfakten, die zwar leicht prüfbar, aber nicht prüfWÜRDIG sind
+# (prüfbar ≠ prüfwürdig, s. FAKTENCHECK_THEORIE.md §3). Tolerant gegen Schreibweisen:
+# eckige Klammern ODER runde Klammern, jede Groß/Kleinschreibung, optionaler Punkt.
+# Mindestens EINE Klammer muss vorhanden sein — so wird ein Claim, der das bloße Wort
+# „Basisfakt" enthält, NICHT fälschlich markiert (reine Zusatzheuristik, kein Pflichtfeld).
+_BASISFAKT_MARKER_RE = re.compile(
+    r"\s*(?:[\[(]\s*basisfakt\s*[\])]?|basisfakt\s*[\])])\s*\.?\s*$",
+    re.IGNORECASE,
+)
+
+
+def strip_basisfakt_marker(claim: str) -> tuple[str, bool]:
+    """Erkennt den optionalen ``[Basisfakt]``-Suffix und entfernt ihn.
+
+    Reine Zusatzheuristik: Setzt ein Modell den Suffix nicht, bleibt der Claim
+    exakt unverändert und ``is_basisfakt`` ist ``False`` (kein Pflichtfeld).
+    Toleriert ``[Basisfakt]``, ``(Basisfakt)``, fehlende schließende Klammer und
+    jede Groß-/Kleinschreibung.
 
     Args:
-        claims: Vollständige, relevanz-sortierte Behauptungsliste.
+        claim: Der bereits extrahierte Behauptungs-String (Stufe 1).
+
+    Returns:
+        Tupel ``(claim_ohne_marker, is_basisfakt)``.
+    """
+    stripped = _BASISFAKT_MARKER_RE.sub("", claim)
+    if stripped != claim:
+        return stripped.strip(), True
+    return claim, False
+
+
+def cap_claims(claims: list[str], max_claims: int) -> tuple[list[str], int]:
+    """Wendet die konfigurierbare Obergrenze an und schließt Basisfakten aus.
+
+    Vor der Kappung wird jeder Claim vom optionalen ``[Basisfakt]``-Marker befreit;
+    so markierte Basisfakten werden GRUNDSÄTZLICH von der Verifikation ausgeschlossen
+    — auch bei ``max_claims == 0`` (unbegrenzt). Sie zählen weder gegen das Budget
+    noch in ``total``. Nur die verbleibenden Nicht-Basisfakten werden gekappt; ihre
+    Reihenfolge bleibt erhalten (Stufe 1 sortiert bereits nach argumentativem Gewicht).
+
+    Args:
+        claims: Vollständige, sortierte Behauptungsliste (Stufe 1).
         max_claims: Obergrenze (0 = unbegrenzt).
 
     Returns:
-        Tupel ``(gekappte_liste, total_count)``. Bei ``max_claims == 0`` oder
-        ``len(claims) <= max_claims`` bleibt die Liste unverändert (Kopie). Die
-        App entscheidet anhand ``len(capped) < total``, ob gekappt wurde.
+        Tupel ``(gekappte_liste, total_count)``. ``total_count`` ist die Zahl der
+        prüfbaren Nicht-Basisfakt-Behauptungen. Die App entscheidet anhand
+        ``len(capped) < total``, ob gekappt wurde.
     """
-    total = len(claims)
+    verifiable: list[str] = []
+    for claim in claims:
+        text, is_basisfakt = strip_basisfakt_marker(claim)
+        if is_basisfakt:
+            continue
+        verifiable.append(text)
+    total = len(verifiable)
     if max_claims and max_claims > 0 and total > max_claims:
-        return list(claims[:max_claims]), total
-    return list(claims), total
+        return verifiable[:max_claims], total
+    return verifiable, total
 
 
 def build_verification_prompt(

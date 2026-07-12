@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src.core.prompt_builder import (
     extract_claims_from_faktencheck,
     cap_claims,
+    strip_basisfakt_marker,
     build_verification_prompt,
     clean_verification_output,
     build_prompt,
@@ -173,6 +174,45 @@ def test_cap_claims():
     print("  cap_claims: 14+N10->10/total14, N0->alle, len<=N->unverändert, Reihenfolge OK")
 
 
+def test_strip_basisfakt_marker():
+    # 1) Suffix erkannt, Flag gesetzt, Suffix entfernt
+    text, flag = strip_basisfakt_marker("Das ZDF ist öffentlich-rechtlich. [Basisfakt]")
+    assert flag is True and text == "Das ZDF ist öffentlich-rechtlich.", (text, flag)
+    # 2) Schreibweisen-Toleranz: klein, runde Klammern, fehlende schließende Klammer
+    for variant in ("[basisfakt]", "(Basisfakt)", "[BASISFAKT", "Basisfakt]"):
+        t, f = strip_basisfakt_marker(f"Claim X {variant}")
+        assert f is True and t == "Claim X", (variant, t, f)
+    # Ohne Marker: exakt unverändert, Flag False
+    t0, f0 = strip_basisfakt_marker("Die Inflation lag 2023 bei 5,9 Prozent.")
+    assert f0 is False and t0 == "Die Inflation lag 2023 bei 5,9 Prozent."
+    # Bloßes Wort ohne Klammer -> KEINE Fehlmarkierung (mind. eine Klammer nötig)
+    t1, f1 = strip_basisfakt_marker("Er nannte es einen reinen Basisfakt")
+    assert f1 is False and t1 == "Er nannte es einen reinen Basisfakt"
+    print("  strip_basisfakt_marker: Suffix/Toleranz/Regression/kein-False-Positive OK")
+
+
+def test_cap_claims_excludes_basisfakten():
+    # 2 Basisfakten unter den ersten 5 -> die 3 Slots gehen an Nicht-Basisfakten
+    claims = [
+        "Kernthese-Claim A",
+        "Das ZDF ist öffentlich-rechtlich. [Basisfakt]",
+        "Strittiger Claim B",
+        "Berlin ist die Hauptstadt. [Basisfakt]",
+        "Strittiger Claim C",
+        "Strittiger Claim D",
+    ]
+    capped, total = cap_claims(claims, 3)
+    assert capped == ["Kernthese-Claim A", "Strittiger Claim B", "Strittiger Claim C"], capped
+    assert total == 4, total  # 4 Nicht-Basisfakten insgesamt, Basisfakten zählen nicht
+    # N=0 (unbegrenzt): Basisfakten trotzdem ausgeschlossen, Rest vollständig
+    capped0, total0 = cap_claims(claims, 0)
+    assert capped0 == [
+        "Kernthese-Claim A", "Strittiger Claim B", "Strittiger Claim C", "Strittiger Claim D"
+    ], capped0
+    assert total0 == 4
+    print("  cap_claims_excludes_basisfakten: Top-N + N=0 überspringen Basisfakten OK")
+
+
 def test_build_verification_prompt():
     claims = ["Die Inflation lag 2023 bei 5,9 Prozent.", "Das Gesetz wurde 2021 verabschiedet."]
     prompt = build_verification_prompt(claims, language="Deutsch")
@@ -264,6 +304,8 @@ def main():
     test_extract_mixed_and_quelle_terminator()
     test_extract_edge_cases()
     test_cap_claims()
+    test_strip_basisfakt_marker()
+    test_cap_claims_excludes_basisfakten()
     test_build_verification_prompt()
     test_verification_independence_guard()
     test_clean_verification_output()
