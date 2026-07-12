@@ -87,12 +87,8 @@ class AnthropicClient(LLMClient):
                 logger.error(
                     f"Anthropic: leerer Inhalt (stop_reason={stop_reason})"
                 )
-                return APIResponse(
-                    status=APIStatus.ERROR,
-                    error_message=(
-                        f"Modell lieferte leeren Inhalt "
-                        f"(stop_reason={stop_reason})"
-                    ),
+                return self._build_empty_content_response(
+                    "stop_reason", stop_reason, {"max_tokens": "length"}
                 )
 
             tokens_used = 0

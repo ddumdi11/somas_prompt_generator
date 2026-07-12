@@ -187,12 +187,8 @@ class OpenRouterClient(LLMClient):
                     logger.error(
                         f"OpenRouter: leerer Inhalt (finish_reason={finish_reason})"
                     )
-                    return APIResponse(
-                        status=APIStatus.ERROR,
-                        error_message=(
-                            f"Modell lieferte leeren Inhalt "
-                            f"(finish_reason={finish_reason})"
-                        ),
+                    return self._build_empty_content_response(
+                        "finish_reason", finish_reason
                     )
 
                 tokens = data.get("usage", {}).get("total_tokens", 0)

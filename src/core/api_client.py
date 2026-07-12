@@ -24,6 +24,43 @@ class APIStatus(Enum):
     ERROR = "error"
 
 
+# Einheitliche Leer-Inhalt-Fehlermeldung (alle 4 Clients). Der Präfix ist das
+# Routing-Signal: HTTP 200 erreicht das Modell, aber der sichtbare Content war leer
+# (typisch: Reasoning verbrennt das Token-Budget). Das ist derselbe Fehlermodus wie
+# eine Trunkierung → in main_window durchläuft es den Retry-/Eskalationspfad, NICHT
+# den harten Fehlerdialog. Muss daher wortgleich über alle Clients bleiben.
+EMPTY_CONTENT_ERROR_PREFIX = "Modell lieferte leeren Inhalt"
+
+
+def build_empty_content_error(reason_label: str, reason_value: object) -> str:
+    """Baut die einheitliche Leer-Inhalt-Fehlermeldung.
+
+    Args:
+        reason_label: ``"finish_reason"`` oder ``"stop_reason"`` (provider-abhängig).
+        reason_value: Der zugehörige Wert (kann ``None`` sein).
+
+    Returns:
+        Fehlermeldung mit stabilem Präfix, z.B.
+        ``"Modell lieferte leeren Inhalt (finish_reason=length)"``.
+    """
+    return f"{EMPTY_CONTENT_ERROR_PREFIX} ({reason_label}={reason_value})"
+
+
+def is_empty_content_error(message: str) -> bool:
+    """Erkennt die einheitliche Leer-Inhalt-Fehlermeldung aller Clients.
+
+    Routing-Signal für main_window: ``True`` → retrybarer Leer-Inhalt (wie
+    Trunkierung), ``False`` → harter Transport-/Auth-/HTTP-Fehler.
+
+    Args:
+        message: Der ``error_message``-Text einer :class:`APIResponse`.
+
+    Returns:
+        True, wenn es sich um den Leer-Inhalt-Fehlermodus handelt.
+    """
+    return bool(message) and message.strip().startswith(EMPTY_CONTENT_ERROR_PREFIX)
+
+
 @dataclass
 class APIResponse:
     """Antwort eines LLM-API-Aufrufs."""
@@ -39,6 +76,10 @@ class APIResponse:
     # "length"/"max_tokens"/"truncated" signalisieren eine abgeschnittene Antwort
     # (Trunkierung) und werden im Antwort-Handling als harter Gate ausgewertet.
     finish_reason: str = ""
+    # Tatsächlicher HTTP-Status des Roh-Requests (None = nicht bekannt/SDK-Pfad).
+    # Ein Leer-Inhalt-Fehler trägt hier 200 (HTTP war OK, nur der Content leer) —
+    # der Worker loggt diesen echten Status statt eines Default-500.
+    http_status: int | None = None
 
 
 class LLMClient(ABC):
@@ -73,6 +114,33 @@ class LLMClient(ABC):
         if extra_map and value in extra_map:
             return extra_map[value]
         return value
+
+    def _build_empty_content_response(
+        self, reason_label: str, reason_value: str | None,
+        extra_map: dict[str, str] | None = None,
+    ) -> "APIResponse":
+        """Baut die einheitliche Leer-Inhalt-Fehlerantwort für alle Clients.
+
+        Kapselt den identischen Block (Meldung, normalisierter finish_reason,
+        ``http_status=200``), damit HTTP 200 + leerer Content über alle Provider
+        konsistent als retrybarer Leer-Inhalt-Fehlermodus gemeldet wird (siehe
+        :func:`is_empty_content_error`).
+
+        Args:
+            reason_label: ``"finish_reason"`` oder ``"stop_reason"`` (provider-abhängig).
+            reason_value: Der rohe Stopp-Grund (kann ``None`` sein).
+            extra_map: Optionale Aliasse für :meth:`_normalize_finish_reason`
+                (z.B. ``{"max_tokens": "length"}`` bei Anthropic).
+
+        Returns:
+            Die fertige :class:`APIResponse` mit Status ERROR.
+        """
+        return APIResponse(
+            status=APIStatus.ERROR,
+            error_message=build_empty_content_error(reason_label, reason_value),
+            finish_reason=self._normalize_finish_reason(reason_value, extra_map),
+            http_status=200,
+        )
 
     @abstractmethod
     def get_available_models(self) -> list[dict]:

@@ -440,6 +440,33 @@ prüfbare Basisfakten verdrängten tragende strittige Claims unter die Cap-Grenz
 - [x] Tests erweitert (`tests/test_faktencheck_parser.py`): Suffix/Toleranz/Cap-Ausschluss +
   Regression (ohne Suffix unverändert)
 
+### Phase 17: Leer-Inhalt in den Retry-Pfad + Abbrechen-Fix ✅ (Robustheit, kein Versions-Bump)
+
+Realtest 2026-07-12 (DeepSeek V4 Pro, 24k-Prompt): Leer-Inhalt (`finish_reason=length`,
+Reasoning fraß das 8192-Budget) endete hart ohne Retry — Asymmetrie zur Trunkierung, die
+seit v0.11.0 einen sichtbaren Ein-Retry bekommt.
+
+- [x] Einheitlicher Leer-Inhalt-Marker in `api_client.py` (`EMPTY_CONTENT_ERROR_PREFIX`,
+  `build_empty_content_error`, `is_empty_content_error`); alle 4 Clients nutzen ihn +
+  setzen `finish_reason` und `http_status=200` auf der Leer-Inhalt-`APIResponse`
+- [x] `main_window._on_api_error`: Leer-Inhalt → `_escalate_failed_analysis` (1× sichtbarer
+  Auto-Retry, dann offener „Modelllauf fehlgeschlagen"; Fehlertext inkl. `finish_reason`
+  bleibt als Grund erhalten) statt sofortigem QMessageBox
+- [x] Abbrechen-Härtung: `_on_api_cancel` neutralisiert den Retry-Kontext vollständig
+  (`_analysis_prompt=""`), `_escalate_failed_analysis` mit Guard `active_request_id != 0`
+  → greift auch WÄHREND des Auto-Retrys; verspätete Antworten weiterhin per Request-ID
+  verworfen. Diagnose: Cancel-Handler war korrekt verdrahtet — die eigentliche Lücke war,
+  dass der Leer-Inhalt gar nicht erst in den (abbrechbaren) Retry-Pfad kam
+- [x] `api_worker` loggt echten HTTP-Status (`response.http_status`, 200 bei Leer-Inhalt)
+  statt pauschal 500
+- [x] Tests: `tests/test_analysis_retry_cancel.py` (Leer-Inhalt-Retry, 2. Leer→offener
+  Fehlschlag, Abbruch während Retry, Trunkierungs-Regression, harter Fehler ohne Retry) +
+  Classifier/`http_status` in `tests/test_empty_content.py`
+- [ ] Deferiert (Item 3, PO-Kosten-Tradeoff): OpenRouter-Reasoning-Budget deckeln
+  (`reasoning: {"max_tokens": 4096, "exclude": true}`) — würde die Ursache adressieren,
+  aber `reasoning.max_tokens` wird nicht von allen Modellen gestützt (effort- vs.
+  token-basiert); Risiko, andere Modelle zu stören → separater PR nach Recherche
+
 ### Backlog
 
 - [ ] A4-Feinschliff: erzwungenes Modul aus der `MODUL-AUSWAHL`-Liste entfernen

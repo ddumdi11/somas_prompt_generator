@@ -91,12 +91,8 @@ class OpenAIClient(LLMClient):
                 logger.error(
                     f"OpenAI: leerer Inhalt (finish_reason={finish_reason})"
                 )
-                return APIResponse(
-                    status=APIStatus.ERROR,
-                    error_message=(
-                        f"Modell lieferte leeren Inhalt "
-                        f"(finish_reason={finish_reason})"
-                    ),
+                return self._build_empty_content_response(
+                    "finish_reason", finish_reason
                 )
 
             tokens_used = response.usage.total_tokens if response.usage else 0

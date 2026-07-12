@@ -17,7 +17,10 @@ import pytest
 # Projekt-Root auf den Importpfad legen (Lauf ohne Installation/pytest)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.core.api_client import APIStatus
+from src.core.api_client import (
+    APIStatus, is_empty_content_error, build_empty_content_error,
+    EMPTY_CONTENT_ERROR_PREFIX,
+)
 from src.core.openrouter_client import OpenRouterClient
 from src.core.perplexity_client import PerplexityClient
 
@@ -63,6 +66,39 @@ def test_requests_based(name, cls, module_path):
     r = _run_requests_client(cls, module_path, {"choices": [{}]})
     assert r.status == APIStatus.ERROR, f"{name}: fehlende message -> ERROR"
     print(f"  {name}: OK (None/reasoning/leer/normal/fehlend)")
+
+
+def test_empty_content_classifier():
+    """is_empty_content_error erkennt den Leer-Inhalt-Fehlermodus (retrybar) und
+    weist harte Transport-/HTTP-Fehler ab (Regression: die dürfen NICHT retryen)."""
+    # Von allen 4 Clients erzeugte Meldungen -> True
+    assert is_empty_content_error(build_empty_content_error("finish_reason", "length"))
+    assert is_empty_content_error(build_empty_content_error("stop_reason", "max_tokens"))
+    assert is_empty_content_error(build_empty_content_error("finish_reason", None))
+    assert is_empty_content_error(f"  {EMPTY_CONTENT_ERROR_PREFIX} (finish_reason=error)")
+    # finish_reason bleibt in der Meldung erhalten (fürs Fehlschlag-Framing)
+    assert "finish_reason=length" in build_empty_content_error("finish_reason", "length")
+    # Harte Fehler -> False (kein Auto-Retry)
+    for hard in (
+        "HTTP 402: Insufficient credits",
+        "Timeout: API antwortet nicht innerhalb von 2 Minuten",
+        "Verbindungsfehler: Keine Internetverbindung",
+        "Unerwartete API-Antwort: KeyError",
+        "", "   ",
+    ):
+        assert not is_empty_content_error(hard), hard
+    print("  empty_content_classifier: Leer-Inhalt=True, harte Fehler=False OK")
+
+
+def test_empty_content_http_status_200():
+    """Der Leer-Inhalt-Fehler trägt http_status=200 (HTTP war OK, nur Content leer)
+    → der Worker loggt 200 statt Default-500."""
+    r = _run_requests_client(OpenRouterClient, "src.core.openrouter_client",
+        {"choices": [{"message": {"content": None}, "finish_reason": "length"}]})
+    assert r.status == APIStatus.ERROR and r.http_status == 200, r.http_status
+    # finish_reason ist jetzt auch am Objekt gesetzt (nicht nur in der Meldung)
+    assert r.finish_reason == "length", r.finish_reason
+    print("  empty_content_http_status_200: http_status=200 + finish_reason gesetzt OK")
 
 
 def test_openai():
@@ -120,6 +156,8 @@ def main():
     print("Tests leerer/None-Content:")
     test_requests_based("OpenRouter", OpenRouterClient, "src.core.openrouter_client")
     test_requests_based("Perplexity", PerplexityClient, "src.core.perplexity_client")
+    test_empty_content_classifier()
+    test_empty_content_http_status_200()
     test_openai()
     test_anthropic()
     print("ALLE TESTS OK")
