@@ -1206,6 +1206,11 @@ def build_verification_prompt(
         f"'nicht überprüfbar', Quelle '—'.\n"
         f"- Maßgeblich ist die Frage 'Stimmt die Behauptung?', NICHT 'Wurde sie im "
         f"Video/Transkript gesagt?' (Letzteres ist bereits bekannt).\n"
+        # --- Verdikt-Granularität (v0.12.3): Kern belegt, Details offen ---
+        f"- Wenn der KERN einer Behauptung durch eine unabhängige externe Quelle belegt "
+        f"ist, einzelne DETAILANGABEN (Datum, Zahl, Zusatz) aber nicht, dann vergib "
+        f"'teilweise bestätigt' und benenne konkret den belegten Kern sowie das offene "
+        f"Detail — NICHT pauschal 'nicht überprüfbar'.\n"
         f"{forbidden}"
         f"- Gib pro Behauptung EXAKT dieses Markdown-Format aus (kein Vorspann, "
         f"keine Meta, keine Einleitung):\n"

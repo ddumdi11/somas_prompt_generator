@@ -232,6 +232,23 @@ def test_build_verification_prompt():
     print("  build_verification_prompt: Behauptungen+Skala+Format+Sprache OK")
 
 
+def test_verification_partial_verdict_guardrail() -> None:
+    """Teil B (v0.12.3): Die Leitplanke 'Kern belegt, Details offen → teilweise
+    bestätigt' steht im Prompt, ohne die bestehenden Riegel/Verdikt-Werte zu ändern."""
+    prompt = build_verification_prompt(["Behauptung X."], language="Deutsch")
+    # Kernaussage der Leitplanke vorhanden
+    assert "teilweise bestätigt" in prompt
+    assert "KERN" in prompt and "DETAILANGABEN" in prompt
+    assert "NICHT pauschal 'nicht überprüfbar'" in prompt
+    # Bestehende Riegel unangetastet
+    assert "zählt NICHT als Beleg" in prompt
+    assert "Erfinde KEINE URLs" in prompt
+    # Exakt die 4 Verdikt-Werte weiterhin vollständig
+    for v in VERDICT_VALUES:
+        assert v in prompt, f"Verdikt fehlt: {v}"
+    print("  verification_partial_verdict_guardrail: Leitplanke + Riegel + 4 Verdikte OK")
+
+
 def test_verification_independence_guard() -> None:
     """PR1: Der Unabhängigkeits-Riegel steht im Prompt und die geprüfte Quelle
     (Videotitel/URL) wird als verbotene Eigenquelle durchgereicht."""
@@ -307,6 +324,7 @@ def main():
     test_strip_basisfakt_marker()
     test_cap_claims_excludes_basisfakten()
     test_build_verification_prompt()
+    test_verification_partial_verdict_guardrail()
     test_verification_independence_guard()
     test_clean_verification_output()
     test_charlimit_removed_for_faktencheck()
