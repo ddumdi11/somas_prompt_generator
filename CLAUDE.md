@@ -534,6 +534,40 @@ Offline grün, alles gemockt — kein Netzwerk im Test.
   eine Kausalaussage hat keine), `c01a` sogar ⅔. Beides erst nach Realtests
   entscheiden (zusammen mit dem Gewichte-Tuning).
 
+### Phase 21: Faktencheck Plus PR 3 — ResearchPlanner (S4) + Pro-Claim-Verifikation (S5) ✅ (kein Versions-Bump)
+
+Die Recherche-Hälfte der Pipeline. Offline grün (gemockt); der E2E-Realtest braucht
+die GUI aus PR 4.
+
+- [x] `planner.py` (S4): eine Recherchekarte je selektiertem Claim, ein Call für alle.
+  `research_questions` + `counter_hypotheses` dürfen NIE leer sein (Riegel gegen
+  Bestätigungsfehler — „Ist das wahr?" ist kein Rechercheauftrag, Theorie §5.1).
+  Pflichtfelder `canonical_targets` (direktes Prüfziel statt Suchbegriffen) und
+  `language_hints` (Originalsprache + Transliteration) — anwesend Pflicht, leer erlaubt.
+  Quellenhierarchie (§5.2) und verbotene Abkürzungen als Policy im Prompt.
+- [x] `verifier.py` (S5): **ein Call PRO Claim** (das ist D6a) mit Rechercheauftrag,
+  Scope-Check (§5.3) und den unverändert übernommenen Riegeln des Classic-Wegs.
+  Einzelfehler nicht fatal (sichtbarer „Prüfung fehlgeschlagen"-Vermerk, Rest läuft);
+  `should_cancel`/`on_progress` als Callbacks — PR 4 reicht Button/Fortschritt durch,
+  ohne dass das Package Qt kennt.
+- [x] `verdict.py`: interne 8-stufige Taxonomie (§6.3) → 4 UI-Verdikte, Vollständigkeit
+  per Import-Assertion. Das Mapping ist verlustbehaftet (4 Werte → „nicht überprüfbar"),
+  deshalb ist die Begründungszeile Pflicht und trägt den internen Grund. Leitplanken
+  werden DURCHGESETZT (kein positives Teilverdikt ohne benannten Teilclaim + Quelle),
+  nicht nur im Prompt erbeten. `UI_VERDICTS` bewusst gespiegelt statt importiert —
+  Drift-Schutz per Konsistenztest gegen `prompt_builder.VERDICT_VALUES`.
+- [x] `aggregate.py` + `templates/somas_verification_plus.txt`: Verdikt-Abschnitt,
+  Basisfakt-Titelzeilen (PO §8.2) und Transparenz-Block (§8.7). Package baut nur
+  Daten, Jinja2-Rendering bleibt beim Worker — wie beim Classic-Weg.
+- [x] Tests: `test_verdict_mapping.py` (29), `test_research_planner_contract.py` (21),
+  `test_verification_plus.py` (25). Gesamtsuite 214 grün.
+- [x] Zwei Fehler, die erst der gerenderte Bericht zeigte: `trim_blocks` fraß den
+  Umbruch nach der Quellenzeile (→ `join`-Filter); und ein gescheiterter Call wurde
+  als „unbelegt — keine belastbare Evidenz gefunden" ausgegeben — sachlich falsch,
+  es wurde nichts gesucht. Beides mit Regressionstest.
+- [ ] Offen für PR 4: E2E-Realtest an einem Fall (braucht GUI/Worker); Eskalationsroute
+  für „unbelegt" bei nicht-leerem `canonical_targets` ist laut Spec spätere Ausbaustufe.
+
 ### Backlog
 
 - [ ] A4-Feinschliff: erzwungenes Modul aus der `MODUL-AUSWAHL`-Liste entfernen

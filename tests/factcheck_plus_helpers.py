@@ -77,3 +77,49 @@ class FakeClient:
 def error_response(message: str = "HTTP 500 — Provider nicht erreichbar") -> APIResponse:
     """Baut eine Transport-/API-Fehlerantwort (löst KEINEN Reparatur-Retry aus)."""
     return APIResponse(status=APIStatus.ERROR, error_message=message, http_status=500)
+
+
+def research_card(cid: str, **over) -> dict:
+    """Baut eine schema-gültige Recherchekarte (S4-Output) für Tests.
+
+    Args:
+        cid: Die claim_id.
+        **over: Felder, die überschrieben werden sollen.
+
+    Returns:
+        Das Karten-Dict.
+    """
+    card = {
+        "claim_id": cid,
+        "research_questions": [f"Welche Quelle belegt {cid}?"],
+        "counter_hypotheses": [f"{cid} beruht auf einer Fehlzuschreibung."],
+        "source_priorities": ["Primärquellen", "Fachinstitutionen"],
+        "required_evidence": ["unabhängige Bestätigung"],
+        "forbidden_shortcuts": ["Snippet als Beleg werten"],
+        "canonical_targets": [],
+        "language_hints": [],
+    }
+    card.update(over)
+    return card
+
+
+def claim_verdict(cid: str, **over) -> dict:
+    """Baut ein schema- und leitplanken-gültiges Verdikt (S5-Output) für Tests.
+
+    Args:
+        cid: Die claim_id.
+        **over: Felder, die überschrieben werden sollen.
+
+    Returns:
+        Das Verdikt-Dict.
+    """
+    verdict = {
+        "claim_id": cid,
+        "verdict": "supported",
+        "reason": "Zwei unabhängige Primärquellen stützen die Angabe.",
+        "supported_subclaim": None,
+        "sources": ["https://example.org/primaerquelle"],
+        "open_questions": None,
+    }
+    verdict.update(over)
+    return verdict

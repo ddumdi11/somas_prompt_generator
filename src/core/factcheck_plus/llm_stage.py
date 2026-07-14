@@ -104,18 +104,61 @@ def extract_json_array(text: str) -> list:
     )
 
 
+def extract_json_object(text: str) -> dict:
+    """Liest ein JSON-Objekt aus einer Modellantwort — tolerant gegen Beiwerk.
+
+    Pendant zu :func:`extract_json_array` für die Stufen, die genau ein Objekt
+    liefern (S5: ein Call pro Claim).
+
+    Args:
+        text: Roh-Antwort des Modells.
+
+    Returns:
+        Das geparste Dict.
+
+    Raises:
+        ValueError: Wenn kein JSON-Objekt gefunden bzw. geparst werden kann.
+    """
+    cleaned = strip_code_fences(text)
+    if not cleaned:
+        raise ValueError("Antwort ist leer — erwartet wurde ein JSON-Objekt.")
+
+    candidates = [cleaned]
+    start, end = cleaned.find("{"), cleaned.rfind("}")
+    if start != -1 and end > start:
+        candidates.append(cleaned[start:end + 1])
+
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+        raise ValueError(
+            f"Erwartet wurde ein JSON-Objekt, geliefert wurde "
+            f"{type(parsed).__name__}."
+        )
+
+    raise ValueError(
+        "Antwort enthält kein parsebares JSON-Objekt (kein gültiges JSON gefunden)."
+    )
+
+
 def run_json_stage(
     client: PromptClient,
     model: str,
     prompt: str,
-    parse: Callable[[list], list],
+    parse: Callable,
     stage_name: str,
-) -> list:
+    extract: Callable[[str], object] = extract_json_array,
+):
     """Führt eine LLM-Stufe mit Vertragsprüfung und einem Reparatur-Retry aus.
 
-    Ablauf: Prompt senden → JSON-Array extrahieren → ``parse`` validiert Schema
-    und Stufen-Invarianten (IDs, Bijektion …). Bricht der Vertrag, geht **ein**
-    Reparaturversuch mit der konkreten Fehlermeldung raus. Danach: ``StageError``.
+    Ablauf: Prompt senden → JSON via ``extract`` lesen → ``parse`` validiert
+    Schema und Stufen-Invarianten (IDs, Bijektion, Leitplanken …). Bricht der
+    Vertrag, geht **ein** Reparaturversuch mit der konkreten Fehlermeldung raus.
+    Danach: ``StageError``.
 
     Transport-/API-Fehler (inkl. Leer-Inhalt) lösen KEINEN Reparatur-Retry aus —
     ein Reparaturprompt, der eine leere Antwort zitiert, wäre sinnlos. Sie
@@ -126,12 +169,15 @@ def run_json_stage(
         client: LLM-Client mit ``send_prompt(prompt, model) -> APIResponse``.
         model: Modell-ID (Analyse-Modell; kein eigener Picker, PO-Entscheidung §8.3).
         prompt: Der Stufen-Prompt.
-        parse: Callback, das die Rohliste validiert und Domänenobjekte liefert;
+        parse: Callback, das die Rohdaten validiert und Domänenobjekte liefert;
             wirft ``ValueError``/``SchemaError`` mit sprechender Meldung.
         stage_name: Stufenname für Logging/Fehlertexte (z.B. "ClaimRefiner").
+        extract: Wie das JSON aus der Antwort gelesen wird —
+            :func:`extract_json_array` (Default, Stufen mit Listenoutput) oder
+            :func:`extract_json_object` (S5: ein Call pro Claim).
 
     Returns:
-        Das Ergebnis von ``parse`` (Liste von Domänenobjekten).
+        Das Ergebnis von ``parse``.
 
     Raises:
         StageError: Bei API-Fehler oder nach erschöpften Reparaturversuchen.
@@ -149,7 +195,7 @@ def run_json_stage(
             )
 
         try:
-            raw = extract_json_array(response.content)
+            raw = extract(response.content)
             result = parse(raw)
         except (ValueError, KeyError, TypeError) as exc:
             last_error = str(exc)

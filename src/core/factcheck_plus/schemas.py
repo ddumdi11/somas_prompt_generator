@@ -32,6 +32,29 @@ RESEARCH_VALUE_DIMS = (
 )
 RATING_DIMS = IMPORTANCE_DIMS + RESEARCH_VALUE_DIMS
 
+# --- S4/S5 (PR 3) ---------------------------------------------------------
+
+# Interne Verdikt-Taxonomie (Theorie §6.3). Bewusst feiner als die vier
+# UI-Verdikte: der interne Grund überlebt das Mapping in der Begründungszeile
+# (s. `verdict.map_verdict`).
+INTERNAL_VERDICTS = (
+    "supported", "partially_supported", "unsupported", "contradicted",
+    "under_specified", "attribution_only", "methodologically_unfounded",
+    "mixed_evidence",
+)
+
+# Verdikte, die eine belastbare Quelle ZWINGEND brauchen — sie behaupten einen
+# Rechercheerfolg. Bei den übrigen ist die Quellenliste zulässigerweise leer
+# (bestehende Regel des Classic-Wegs: Quelle nur bei echter Verifikation).
+VERDICTS_REQUIRING_SOURCE = (
+    "supported", "partially_supported", "contradicted", "attribution_only",
+    "mixed_evidence",
+)
+
+# Positive Teilverdikte: ohne explizit benannten belegten Teilclaim unzulässig
+# (harte Leitplanke Theorie §6.3).
+VERDICTS_REQUIRING_SUBCLAIM = ("partially_supported", "attribution_only")
+
 # Rating-Skala (0–5) als EINE benannte Quelle: das Schema (unten) und der
 # PolicyScorer (der policy["rating_scale"] dagegen prüft) teilen sich diese
 # Grenzen, statt 0/5 mehrfach hartzukodieren.
@@ -74,6 +97,46 @@ ARGUMENT_MAPPING_SCHEMA: dict = {
             },
         },
         "reason": {"type": "string"},
+    },
+}
+
+
+RESEARCH_CARD_SCHEMA: dict = {
+    "type": "object",
+    "required": [
+        "claim_id", "research_questions", "counter_hypotheses",
+        "source_priorities", "required_evidence", "canonical_targets",
+        "language_hints",
+    ],
+    "properties": {
+        "claim_id": {"type": "string"},
+        # Konkrete Rechercheaufträge statt „Ist das wahr?" (Theorie §5.1).
+        "research_questions": {"type": "array", "items": {"type": "string"}},
+        # Gegenhypothesen sind Pflicht — sie sind der Riegel gegen Bestätigungsfehler.
+        "counter_hypotheses": {"type": "array", "items": {"type": "string"}},
+        "source_priorities": {"type": "array", "items": {"type": "string"}},
+        "required_evidence": {"type": "array", "items": {"type": "string"}},
+        "forbidden_shortcuts": {"type": "array", "items": {"type": "string"}},
+        # Pflichtfeld (Theorie §5.1 v0.3): direktes Prüfziel statt Suchbegriffen,
+        # wenn der Claim auf ein benennbares Artefakt zeigt. Leer = existiert keins.
+        "canonical_targets": {"type": "array", "items": {"type": "string"}},
+        # Pflichtfeld (Theorie §5.1 v0.2): Originalsprache + Transliteration bei
+        # fremdsprachigem Gegenstand. Leer = deutsch-/englischsprachiger Raum.
+        "language_hints": {"type": "array", "items": {"type": "string"}},
+    },
+}
+
+CLAIM_VERDICT_SCHEMA: dict = {
+    "type": "object",
+    "required": ["claim_id", "verdict", "reason"],
+    "properties": {
+        "claim_id": {"type": "string"},
+        "verdict": {"enum": list(INTERNAL_VERDICTS)},
+        "reason": {"type": "string"},
+        # Der belegte Teilclaim — Pflicht bei positiven Teilverdikten (§6.3).
+        "supported_subclaim": {"type": ["string", "null"]},
+        "sources": {"type": "array", "items": {"type": "string"}},
+        "open_questions": {"type": ["string", "null"]},
     },
 }
 

@@ -1,0 +1,47 @@
+---
+
+### FAKTENCHECK · VERIFIKATION PLUS
+*Geprüft mit {{ model_name }} ({{ provider_name }}){% if date %} am {{ date }}{% endif %}*
+{% if web_unverified %}
+
+> ⚠️ Verifikationsmodell ohne bestätigten Web-Zugriff — Quellen ungeprüft, können unzuverlässig oder erfunden sein.
+{% endif %}
+{% if cancelled_early %}
+
+> ⚠️ Lauf vorzeitig abgebrochen — geprüft wurden {{ verdicts | length }} von {{ selected_count }} ausgewählten Behauptungen.
+{% endif %}
+{% for v in verdicts %}
+
+**{{ loop.index }}. „{{ v.claim }}"**
+- **Verdikt:** {{ v.verdict }}
+- **Begründung:** {{ v.reason_line }}
+{% if v.sources %}
+- **Quelle{% if v.sources | length > 1 %}n{% endif %}:** {{ v.sources | join(' · ') }}
+{% else %}
+- **Quelle:** —
+{% endif %}
+{% if v.open_questions %}
+- **Offen:** {{ v.open_questions }}
+{% endif %}
+{% endfor %}
+{% if skipped %}
+
+#### Nicht recherchierte Basisfakten
+*Leicht prüfbar, aber ohne Erkenntnisgewinn für die Argumentation — nur gelistet.*
+{% for s in skipped %}
+- {{ s.claim }}
+{% endfor %}
+{% endif %}
+
+#### Transparenz
+{{ transparency.extracted }} Behauptung{% if transparency.extracted != 1 %}en{% endif %} extrahiert → {{ transparency.atomised }} atomisiert
+- {{ transparency.researched }} deep-recherchiert{% if failed_count %} (davon {{ failed_count }} fehlgeschlagen){% endif %} · {{ transparency.skipped_basisfakt }} Schnellprüfung übersprungen (Basisfakten)
+- {{ transparency.documented_context }} als Kontext dokumentiert, nicht recherchiert
+{% if transparency.excluded_opinion %}
+- {{ transparency.excluded_opinion }} als Meinung/Deutung markiert, nicht geprüft
+{% endif %}
+{% if transparency.under_specified %}
+- {{ transparency.under_specified }} als nicht ausreichend präzise ausgewiesen
+{% endif %}
+
+Policy: {{ transparency.policy_version }} · Budget: {{ transparency.budget }}

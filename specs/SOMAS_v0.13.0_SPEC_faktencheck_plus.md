@@ -149,12 +149,39 @@ vorhanden?). Auswahl klassenweise nach Quoten (A vor B vor C), innerhalb der
 Klasse absteigend nach `priority`. Feldnamen sind verbindlich (JSON-Schema);
 Gewichte/Schwellen sind Konfiguration, kein Code.
 
+**Bekannte Tuning-Kandidaten (Stand PR 2, 2026-07-14 — beide „Ist-Zustand per
+Test dokumentiert", Entscheidung nach Realtests zusammen mit Gewichte-Tuning):**
+
+1. `checkability = Anker/3` benachteiligt nicht-quantitative Claims systematisch
+   (hard_fact ohne Metrik ≤ 2/3). Jetzt quantifiziert (IRGC-Fixture): die
+   Kausalzurechnung `c01d` verliert ⅓ (Kausalaussagen haben keine Metrik), die
+   Quellenexistenz `c01a` ⅔. Fix-Richtung: claim-typ-abhängige Anker-Erwartung
+   (Metrik nur bei `quantitative`/`methodological` einfordern).
+2. Klassen-Quoten wirken bei kleinem Budget als **Obergrenze** statt Richtwert:
+   bei Budget 2 bekommt Klasse A nur `round(2 × 0.6) = 1` Slot — ein B-Claim
+   (priority 0.433) verdrängt dann einen A-Claim (0.489). Bei Default-Budget 8
+   ohne Wirkung. Fix-Richtung: Shares als garantierte **Minima** interpretieren,
+   Restbudget klassenübergreifend (nur A/B) nach globaler priority füllen;
+   `context_max_claims` bleibt harter Cap.
+
 ### S4 — ResearchPlanner (LLM → JSON)
 
 Für die ≤ Budget selektierten Claims **eine** Recherchekarte je Claim
 (Theorie §5.1): konkrete Recherchefragen, **Gegenhypothesen**, Quellenprioritäten
 (Hierarchie §5.2), geforderte Evidenzarten, verbotene Abkürzungen. Ein Call für
 alle selektierten Claims (JSON-Array).
+
+Zwei Pflichtfelder aus Theorie §5.1 (Stand v0.3): **`canonical_targets`** —
+verweist der Claim auf ein benennbares Artefakt (Paper, Repo, offizielles
+Dokument, Register), nennt die Karte das direkte Prüfziel (arXiv-ID, GitHub-Repo,
+Doku-URL) statt nur Suchbegriffe (empirisch: generische Such-Checks verfehlen
+solche Belege — 7/10-Befund Querprojekt 14.07.2026); leer, wenn keins existiert.
+**`language_hints`** — bei fremdsprachigem Claim-Gegenstand Suchbegriffe in
+Originalsprache + Transliteration.
+
+*Spätere Ausbaustufe (nicht v0.13.0):* Eskalationsroute — „unbelegt/nicht
+überprüfbar"-Verdikte bei Claims mit nicht-leerem `canonical_targets` bekommen
+einen gezielten Zweitversuch, bevor das Verdikt final wird.
 
 ### S5 — Recherche + Verdikt (pro Claim ein Call)
 

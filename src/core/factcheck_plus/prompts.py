@@ -15,8 +15,8 @@ Auswahl und Gewichtung macht ausschließlich der deterministische PolicyScorer
 from __future__ import annotations
 
 from .schemas import (
-    ARGUMENT_ROLES, COUNTERFACTUAL_IMPACT, IMPORTANCE_DIMS, RATING_MAX,
-    RATING_MIN, RESEARCH_VALUE_DIMS,
+    ARGUMENT_ROLES, COUNTERFACTUAL_IMPACT, IMPORTANCE_DIMS, INTERNAL_VERDICTS,
+    RATING_MAX, RATING_MIN, RESEARCH_VALUE_DIMS,
 )
 
 # Claim-Typen, die S1 vergeben DARF. Bewusst enger als `schemas.CLAIM_TYPES`:
@@ -294,6 +294,217 @@ def build_repair_prompt(original_prompt: str, raw_response: str, error: str) -> 
         "\n"
         "--- URSPRÜNGLICHE AUFGABE ---\n"
         f"{original_prompt}"
+    )
+
+
+# --- S4: ResearchPlanner --------------------------------------------------
+
+# Quellenhierarchie (Theorie §5.2) — Policy, nicht Modellermessen.
+SOURCE_HIERARCHY = (
+    "1. Primärquellen (Gesetze, amtliche Statistik, Gerichtsentscheidungen, Originalstudien)",
+    "2. Fachinstitutionen (Institute, Metaanalysen, internationale Organisationen)",
+    "3. Qualitätsjournalismus mit transparenter Primärquellenbasis",
+    "4. Vorhandene Faktenchecks als Recherchehinweis, NICHT als alleiniger Beweis",
+    "5. Sekundärmaterial, Social Media, Such-Snippets nur zur Hypothesenbildung",
+)
+
+# Verbotene Abkürzungen (Theorie §5.1) — feste Policy, die der Planner in jede
+# Karte übernimmt, statt sie sich je Claim neu auszudenken.
+FORBIDDEN_SHORTCUTS = (
+    "Ein Such-Snippet als Beleg werten, ohne die Quelle selbst zu öffnen",
+    "Eine unbelegte Sekundärquelle als alleinige Evidenz nehmen",
+    "Eine ähnliche Zahl mit anderem Zeitraum/Scope als Teilbeleg werten",
+)
+
+
+def build_planner_prompt(cards_input: list[dict], core_thesis: str = "") -> str:
+    """Baut den S4-Prompt: je selektiertem Claim eine Recherchekarte.
+
+    Args:
+        cards_input: Selektierte Claims als Dicts (`claim_id`, `normalized_claim`,
+            `claim_type`, `entities`, `timeframe`, `metric`).
+        core_thesis: SOMAS-Kernthese — nur Kontext.
+
+    Returns:
+        Der fertige Prompt-String; erwartet ein JSON-Array als Antwort.
+    """
+    listed = "\n".join(
+        f"{c['claim_id']} [{c.get('claim_type', '?')}]: {c.get('normalized_claim', '')}\n"
+        f"    Entitäten: {', '.join(c.get('entities') or []) or '—'} · "
+        f"Zeitraum: {c.get('timeframe') or '—'} · Metrik: {c.get('metric') or '—'}"
+        for c in cards_input
+    )
+    ids = ", ".join(f"'{c['claim_id']}'" for c in cards_input)
+    hierarchy = "\n".join(f"  {line}" for line in SOURCE_HIERARCHY)
+    shortcuts = "\n".join(f"  - {s}" for s in FORBIDDEN_SHORTCUTS)
+
+    return (
+        "Du bist ein Research-Planner in einer Faktencheck-Pipeline. Deine "
+        "EINZIGE Aufgabe: für jede vorgelegte Behauptung einen konkreten "
+        "RECHERCHEAUFTRAG schreiben. Antworte auf Deutsch.\n"
+        "\n"
+        # --- Nicht-Zuständigkeiten (Theorie §8.5) — harte Verbote ---
+        "DEINE NICHT-ZUSTÄNDIGKEITEN (strikt einhalten):\n"
+        "- Du RECHERCHIERST NICHT und beantwortest die Fragen NICHT. Du planst "
+        "nur, wie geprüft werden muss.\n"
+        "- Du bewertest NICHT, ob eine Behauptung wahr oder falsch ist, und "
+        "nimmst kein Verdikt vorweg — auch nicht andeutungsweise.\n"
+        "- Du erfindest KEINE Quellen, URLs, Studien oder IDs. Nenne ein "
+        "konkretes Prüfziel nur, wenn du dir seiner Existenz sicher bist.\n"
+        "\n"
+        "GRUNDREGEL (Theorie §5.1): Ein Rechercheauftrag ist NICHT die Frage "
+        "„Ist das wahr?\" — offene Wahrheitsfragen erzeugen Bestätigungsfehler. "
+        "Formuliere gezielte Teilfragen, die eine Quelle beantworten KANN.\n"
+        "\n"
+        "PFLICHTFELDER JE KARTE:\n"
+        "- `research_questions`: 2–4 konkrete, einzeln beantwortbare Teilfragen.\n"
+        "- `counter_hypotheses`: 1–3 Gegenhypothesen — was müsste zutreffen, "
+        "damit die Behauptung NICHT stimmt? (Riegel gegen Bestätigungsfehler; "
+        "niemals leer.)\n"
+        "- `source_priorities`: bevorzugte Quellenklassen für DIESEN Claim, "
+        "abgeleitet aus dieser Hierarchie:\n"
+        f"{hierarchy}\n"
+        "- `required_evidence`: welche Evidenzarten den Claim tragen würden "
+        "(z. B. Methode, Abgrenzung, Zurechnung, unabhängige Bestätigung).\n"
+        "- `canonical_targets`: Zeigt der Claim auf ein benennbares Artefakt "
+        "(Forschungsarbeit, Code-Repository, offizielles Dokument, Gesetzestext, "
+        "Register, Originalclip)? Dann nenne das DIREKTE Prüfziel (arXiv-ID, "
+        "GitHub-Repo, Doku-/Register-URL, Fundstelle) statt bloßer Suchbegriffe — "
+        "generische Suchen verfehlen solche Belege systematisch. Existiert kein "
+        "solches Artefakt: leere Liste `[]`.\n"
+        "- `language_hints`: Liegt der Gegenstand außerhalb des deutsch-/"
+        "englischsprachigen Raums, gib Suchbegriffe in der ORIGINALSPRACHE samt "
+        "Transliteration an (sonst bleiben die einschlägigen Quellen unsichtbar). "
+        "Andernfalls: leere Liste `[]`.\n"
+        "- `forbidden_shortcuts`: übernimm diese Verbote unverändert:\n"
+        f"{shortcuts}\n"
+        "\n"
+        "ID-REGEL (verbindlich): Gib GENAU die vorgelegten IDs zurück — jede "
+        "genau einmal, keine zusätzlichen, keine ausgelassenen.\n"
+        f"Erwartete IDs: {ids}\n"
+        "\n"
+        "AUSGABEFORMAT: NUR ein JSON-Array, kein Vorspann, kein Markdown, keine "
+        "Code-Fences. Jedes Element:\n"
+        "{\n"
+        '  "claim_id": "c01a",\n'
+        '  "research_questions": ["…"],\n'
+        '  "counter_hypotheses": ["…"],\n'
+        '  "source_priorities": ["…"],\n'
+        '  "required_evidence": ["…"],\n'
+        '  "forbidden_shortcuts": ["…"],\n'
+        '  "canonical_targets": [],\n'
+        '  "language_hints": []\n'
+        "}\n"
+        "\n"
+        f"{_context_block(core_thesis, '', 'nur zur Einordnung, NICHT zu bewerten')}"
+        "ZU PLANENDE BEHAUPTUNGEN:\n"
+        f"{listed}\n"
+    )
+
+
+# --- S5: Recherche + Verdikt (ein Call PRO Claim) -------------------------
+
+def _card_block(card: dict) -> str:
+    """Rendert die Recherchekarte als Auftragsblock für den S5-Prompt."""
+    def _lines(key: str, label: str) -> str:
+        items = card.get(key) or []
+        if not items:
+            return ""
+        body = "\n".join(f"  - {sanitize_context(str(i), 400)}" for i in items)
+        return f"{label}:\n{body}\n"
+
+    parts = [
+        _lines("research_questions", "ZU BEANTWORTENDE TEILFRAGEN"),
+        _lines("counter_hypotheses", "GEGENHYPOTHESEN (aktiv mitprüfen)"),
+        _lines("canonical_targets", "DIREKTE PRÜFZIELE (zuerst hier nachsehen)"),
+        _lines("language_hints", "SUCHBEGRIFFE IN ORIGINALSPRACHE (mitverwenden)"),
+        _lines("source_priorities", "BEVORZUGTE QUELLENKLASSEN"),
+        _lines("required_evidence", "GEFORDERTE EVIDENZARTEN"),
+        _lines("forbidden_shortcuts", "VERBOTENE ABKÜRZUNGEN"),
+    ]
+    return "".join(p for p in parts if p)
+
+
+def build_claim_verification_prompt(
+    claim: dict, card: dict, language: str = "Deutsch", source_hint: str = "",
+) -> str:
+    """Baut den S5-Prompt für EINEN Claim (eigener Call, eigenes Token-Budget).
+
+    Übernimmt die bewährten Riegel des Classic-Wegs unverändert: Unabhängigkeits-
+    Riegel (das geprüfte Video zählt nie als Beleg), Verbot erfundener URLs,
+    ``source_hint``-Sanitisierung. Neu sind der Rechercheauftrag aus S4, der
+    Scope-Check (Theorie §5.3) und die interne 8-stufige Verdikt-Skala.
+
+    Args:
+        claim: Der Claim als Dict (`claim_id`, `normalized_claim`, `claim_type`,
+            `entities`, `timeframe`, `metric`, `original_text`).
+        card: Die Recherchekarte aus S4 (Dict).
+        language: Ausgabesprache.
+        source_hint: Identität der GEPRÜFTEN Quelle — verbotene Eigenquelle.
+
+    Returns:
+        Der fertige Prompt-String; erwartet EIN JSON-Objekt als Antwort.
+    """
+    verdicts = " | ".join(INTERNAL_VERDICTS)
+    safe_hint = sanitize_context(source_hint, 300)
+    forbidden = (
+        f"- Die GEPRÜFTE Quelle selbst darf NICHT als Beleg dienen (weder in der "
+        f"Begründung noch als Quelle): {safe_hint}\n"
+        if safe_hint else ""
+    )
+    entities = ", ".join(claim.get("entities") or []) or "—"
+
+    return (
+        f"Du bist ein sorgfältiger Faktenprüfer. Führe den folgenden "
+        f"RECHERCHEAUFTRAG aus und beurteile GENAU EINE Behauptung gegen "
+        f"UNABHÄNGIGE, EXTERNE Quellen (Websuche). Antworte in {language}.\n"
+        "\n"
+        "ZU PRÜFENDE BEHAUPTUNG:\n"
+        f"{sanitize_context(claim.get('normalized_claim', ''), 1000)}\n"
+        f"  Typ: {claim.get('claim_type', '?')} · Entitäten: {entities} · "
+        f"Zeitraum: {claim.get('timeframe') or '—'} · "
+        f"Metrik: {claim.get('metric') or '—'}\n"
+        "\n"
+        f"{_card_block(card)}"
+        "\n"
+        "REGELN:\n"
+        # --- Unabhängigkeits-Riegel (unverändert aus v0.10.1) ---
+        "- Das analysierte Video/Transkript zählt NICHT als Beleg. Die Behauptung "
+        "gilt nur dann als gestützt oder widerlegt, wenn eine davon UNABHÄNGIGE, "
+        "EXTERNE Quelle sie stützt bzw. widerlegt.\n"
+        "- Maßgeblich ist 'Stimmt die Behauptung?', NICHT 'Wurde sie im Video "
+        "gesagt?' (Letzteres ist bereits bekannt).\n"
+        f"{forbidden}"
+        "- Gib NUR Quellen an, die du tatsächlich abgerufen hast. Erfinde KEINE "
+        "URLs.\n"
+        # --- Scope-Check (Theorie §5.3) ---
+        "- SCOPE-CHECK: Gleiche Akteur, Metrik, Geografie und Zeitraum EINZELN "
+        "gegen die Quelle ab. Eine Quelle kann korrekt sein und trotzdem nicht "
+        "passen — eine zufällig ähnliche Zahl mit anderem Zeitraum oder anderer "
+        "Messgröße ist KEIN Teilbeleg.\n"
+        # --- Retrieval-Grenze ≠ Prüfbarkeits-Grenze (Theorie §5.1) ---
+        "- Findest du trotz Auftrag nichts: Verdikt 'unsupported' (unbelegt). "
+        "'under_specified' ist NUR richtig, wenn die Behauptung selbst zu vage "
+        "ist, um überhaupt geprüft zu werden. Verwechsle 'nicht gefunden' nicht "
+        "mit 'nicht prüfbar'.\n"
+        "- Ist NUR belegt, dass jemand etwas geäußert hat, der Sachverhalt selbst "
+        "aber offen: Verdikt 'attribution_only'.\n"
+        # --- Leitplanke §6.3 ---
+        "- Ein positives Teilverdikt ('partially_supported', 'attribution_only') "
+        "ist NUR zulässig mit konkret benanntem belegtem Teilclaim in "
+        "'supported_subclaim' UND mindestens einer Quelle.\n"
+        "\n"
+        f"VERDIKT — EXAKT einer dieser Werte:\n{verdicts}\n"
+        "\n"
+        "AUSGABEFORMAT: NUR ein JSON-Objekt, kein Vorspann, keine Code-Fences:\n"
+        "{\n"
+        f'  "claim_id": "{claim.get("claim_id", "")}",\n'
+        f'  "verdict": "<{verdicts}>",\n'
+        '  "reason": "<1–2 Sätze, inhaltlich begründet>",\n'
+        '  "supported_subclaim": "<welcher Teil ist belegt — oder null>",\n'
+        '  "sources": ["<URL oder Titel>"],\n'
+        '  "open_questions": "<was bleibt offen — oder null>"\n'
+        "}\n"
     )
 
 
