@@ -565,8 +565,20 @@ die GUI aus PR 4.
   Umbruch nach der Quellenzeile (→ `join`-Filter); und ein gescheiterter Call wurde
   als „unbelegt — keine belastbare Evidenz gefunden" ausgegeben — sachlich falsch,
   es wurde nichts gesucht. Beides mit Regressionstest.
+- [x] Review-Härtung (#59): **Unabhängigkeits-Riegel jetzt server-seitig** — `source_hint`
+  wird gegen jede gemeldete Quelle geprüft (Video-ID, URL, Titelrest; fängt auch
+  `youtu.be` vs. `youtube.com` und Tracking-Suffixe), Eigenbeleg → Reparatur-Retry.
+  Bis dahin war der Riegel nur Prompt-Text — Widerspruch zur eigenen §6.3-Linie.
+  Dazu: alle S1-Felder sanitisiert (`_claim_fields`), Prompt-Verdiktlisten aus
+  `VERDICTS_REQUIRING_SOURCE/_SUBCLAIM` statt handgepflegt, `forbidden_shortcuts`
+  deterministisch vom Code gesetzt statt vom Modell geechot (Theorie §8.4),
+  Reparatur-Prompt fordert das Format der jeweiligen Stufe (Objekt vs. Array),
+  `build_skipped_rows` meldet kaputte Zuordnungen statt still zu filtern.
 - [ ] Offen für PR 4: E2E-Realtest an einem Fall (braucht GUI/Worker); Eskalationsroute
   für „unbelegt" bei nicht-leerem `canonical_targets` ist laut Spec spätere Ausbaustufe.
+- [ ] Design-Spannung für PO: „unbelegt" hat in den 4 UI-Verdikten kein Zuhause
+  (§5.1 unterscheidet es von „nicht überprüfbar"); lebt derzeit nur in der
+  Begründungszeile. Sauber wäre ein 5. UI-Verdikt — berührt den Classic-Weg.
 
 ### Backlog
 

@@ -16,7 +16,8 @@ from __future__ import annotations
 
 from .schemas import (
     ARGUMENT_ROLES, COUNTERFACTUAL_IMPACT, IMPORTANCE_DIMS, INTERNAL_VERDICTS,
-    RATING_MAX, RATING_MIN, RESEARCH_VALUE_DIMS,
+    RATING_MAX, RATING_MIN, RESEARCH_VALUE_DIMS, VERDICTS_REQUIRING_SOURCE,
+    VERDICTS_REQUIRING_SUBCLAIM,
 )
 
 # Claim-Typen, die S1 vergeben DARF. Bewusst enger als `schemas.CLAIM_TYPES`:
@@ -262,7 +263,10 @@ def build_mapper_prompt(refined: list[dict], core_thesis: str = "") -> str:
 
 # --- Reparatur-Retry ------------------------------------------------------
 
-def build_repair_prompt(original_prompt: str, raw_response: str, error: str) -> str:
+def build_repair_prompt(
+    original_prompt: str, raw_response: str, error: str,
+    json_format: str = "Array",
+) -> str:
     """Baut den Reparatur-Prompt für den EINEN erlaubten Retry (v0.11-Linie).
 
     Übergibt dem Modell die konkrete Schema-/Vertragsverletzung, statt blind
@@ -273,6 +277,9 @@ def build_repair_prompt(original_prompt: str, raw_response: str, error: str) -> 
         original_prompt: Der ursprüngliche Stufen-Prompt (Regeln bleiben gültig).
         raw_response: Die fehlerhafte Roh-Antwort des Modells.
         error: Die konkrete Fehlermeldung (Schema-Pfad, ID-Abweichung, …).
+        json_format: Das erwartete Format — ``"Array"`` (Stufen mit Listenoutput)
+            oder ``"Objekt"`` (S5, ein Call pro Claim). Muss zur Extraktion der
+            Stufe passen, sonst fordert die Reparatur das falsche Format an.
 
     Returns:
         Der fertige Reparatur-Prompt.
@@ -288,9 +295,9 @@ def build_repair_prompt(original_prompt: str, raw_response: str, error: str) -> 
         f"{excerpt}\n"
         "\n"
         "Korrigiere GENAU diesen Fehler und gib die VOLLSTÄNDIGE Antwort erneut "
-        "aus — als reines JSON-Array, ohne Code-Fences, ohne Vorspann, ohne "
-        "Entschuldigung und ohne Kommentar. Alle ursprünglichen Regeln gelten "
-        "unverändert weiter:\n"
+        f"aus — als reines JSON-{json_format}, ohne Code-Fences, ohne Vorspann, "
+        "ohne Entschuldigung und ohne Kommentar. Alle ursprünglichen Regeln "
+        "gelten unverändert weiter:\n"
         "\n"
         "--- URSPRÜNGLICHE AUFGABE ---\n"
         f"{original_prompt}"
@@ -317,6 +324,43 @@ FORBIDDEN_SHORTCUTS = (
 )
 
 
+def _claim_fields(claim: dict) -> dict[str, str]:
+    """Saniert ALLE Skalarfelder eines Claims für die Prompt-Einbettung.
+
+    Die S1-Felder sind LLM-Output über gegnerisches Material und wandern in die
+    S2-/S4-/S5-Prompts — eingebettete Zeilenumbrüche oder Anweisungen dürfen dort
+    nicht durchschlagen. ``claim_id``/``claim_type`` sind zwar bereits regex- bzw.
+    enum-validiert; sie werden aus Konsistenz mit saniert (kostet nichts).
+
+    Args:
+        claim: Das Claim-Dict aus S1.
+
+    Returns:
+        Dict mit den fertig sanierten Anzeigewerten (Fallback „—"/„?").
+    """
+    entities = [
+        sanitize_context(str(e), 120) for e in (claim.get("entities") or [])
+    ]
+    return {
+        "claim_id": sanitize_context(str(claim.get("claim_id", "")), 40),
+        "claim_type": sanitize_context(str(claim.get("claim_type") or "?"), 40),
+        "normalized_claim": sanitize_context(str(claim.get("normalized_claim") or ""), 1000),
+        "entities": ", ".join(e for e in entities if e) or "—",
+        "timeframe": sanitize_context(str(claim.get("timeframe") or "—"), 120),
+        "metric": sanitize_context(str(claim.get("metric") or "—"), 120),
+    }
+
+
+def _format_claim_line(claim: dict) -> str:
+    """Rendert einen Claim samt Ankern als zweizeiligen Prompt-Eintrag."""
+    f = _claim_fields(claim)
+    return (
+        f"{f['claim_id']} [{f['claim_type']}]: {f['normalized_claim']}\n"
+        f"    Entitäten: {f['entities']} · Zeitraum: {f['timeframe']} · "
+        f"Metrik: {f['metric']}"
+    )
+
+
 def build_planner_prompt(cards_input: list[dict], core_thesis: str = "") -> str:
     """Baut den S4-Prompt: je selektiertem Claim eine Recherchekarte.
 
@@ -328,15 +372,9 @@ def build_planner_prompt(cards_input: list[dict], core_thesis: str = "") -> str:
     Returns:
         Der fertige Prompt-String; erwartet ein JSON-Array als Antwort.
     """
-    listed = "\n".join(
-        f"{c['claim_id']} [{c.get('claim_type', '?')}]: {c.get('normalized_claim', '')}\n"
-        f"    Entitäten: {', '.join(c.get('entities') or []) or '—'} · "
-        f"Zeitraum: {c.get('timeframe') or '—'} · Metrik: {c.get('metric') or '—'}"
-        for c in cards_input
-    )
-    ids = ", ".join(f"'{c['claim_id']}'" for c in cards_input)
+    listed = "\n".join(_format_claim_line(c) for c in cards_input)
+    ids = ", ".join(f"'{sanitize_context(str(c['claim_id']), 40)}'" for c in cards_input)
     hierarchy = "\n".join(f"  {line}" for line in SOURCE_HIERARCHY)
-    shortcuts = "\n".join(f"  - {s}" for s in FORBIDDEN_SHORTCUTS)
 
     return (
         "Du bist ein Research-Planner in einer Faktencheck-Pipeline. Deine "
@@ -376,8 +414,6 @@ def build_planner_prompt(cards_input: list[dict], core_thesis: str = "") -> str:
         "englischsprachigen Raums, gib Suchbegriffe in der ORIGINALSPRACHE samt "
         "Transliteration an (sonst bleiben die einschlägigen Quellen unsichtbar). "
         "Andernfalls: leere Liste `[]`.\n"
-        "- `forbidden_shortcuts`: übernimm diese Verbote unverändert:\n"
-        f"{shortcuts}\n"
         "\n"
         "ID-REGEL (verbindlich): Gib GENAU die vorgelegten IDs zurück — jede "
         "genau einmal, keine zusätzlichen, keine ausgelassenen.\n"
@@ -391,7 +427,6 @@ def build_planner_prompt(cards_input: list[dict], core_thesis: str = "") -> str:
         '  "counter_hypotheses": ["…"],\n'
         '  "source_priorities": ["…"],\n'
         '  "required_evidence": ["…"],\n'
-        '  "forbidden_shortcuts": ["…"],\n'
         '  "canonical_targets": [],\n'
         '  "language_hints": []\n'
         "}\n"
@@ -446,13 +481,17 @@ def build_claim_verification_prompt(
         Der fertige Prompt-String; erwartet EIN JSON-Objekt als Antwort.
     """
     verdicts = " | ".join(INTERNAL_VERDICTS)
+    # Aus dem Vertrag abgeleitet, nicht handgepflegt: so können Prompt und
+    # Laufzeit-Validator (`verdict.check_verdict_guardrails`) nicht auseinanderdriften.
+    source_verdicts = ", ".join(f"'{v}'" for v in VERDICTS_REQUIRING_SOURCE)
+    subclaim_verdicts = ", ".join(f"'{v}'" for v in VERDICTS_REQUIRING_SUBCLAIM)
     safe_hint = sanitize_context(source_hint, 300)
     forbidden = (
         f"- Die GEPRÜFTE Quelle selbst darf NICHT als Beleg dienen (weder in der "
         f"Begründung noch als Quelle): {safe_hint}\n"
         if safe_hint else ""
     )
-    entities = ", ".join(claim.get("entities") or []) or "—"
+    f = _claim_fields(claim)
 
     return (
         f"Du bist ein sorgfältiger Faktenprüfer. Führe den folgenden "
@@ -460,10 +499,9 @@ def build_claim_verification_prompt(
         f"UNABHÄNGIGE, EXTERNE Quellen (Websuche). Antworte in {language}.\n"
         "\n"
         "ZU PRÜFENDE BEHAUPTUNG:\n"
-        f"{sanitize_context(claim.get('normalized_claim', ''), 1000)}\n"
-        f"  Typ: {claim.get('claim_type', '?')} · Entitäten: {entities} · "
-        f"Zeitraum: {claim.get('timeframe') or '—'} · "
-        f"Metrik: {claim.get('metric') or '—'}\n"
+        f"{f['normalized_claim']}\n"
+        f"  Typ: {f['claim_type']} · Entitäten: {f['entities']} · "
+        f"Zeitraum: {f['timeframe']} · Metrik: {f['metric']}\n"
         "\n"
         f"{_card_block(card)}"
         "\n"
@@ -489,16 +527,18 @@ def build_claim_verification_prompt(
         "mit 'nicht prüfbar'.\n"
         "- Ist NUR belegt, dass jemand etwas geäußert hat, der Sachverhalt selbst "
         "aber offen: Verdikt 'attribution_only'.\n"
-        # --- Leitplanke §6.3 ---
-        "- Ein positives Teilverdikt ('partially_supported', 'attribution_only') "
-        "ist NUR zulässig mit konkret benanntem belegtem Teilclaim in "
-        "'supported_subclaim' UND mindestens einer Quelle.\n"
+        # --- Leitplanken §6.3 (Werte aus dem Vertrag, nicht handgepflegt) ---
+        f"- Ein positives Teilverdikt ({subclaim_verdicts}) ist NUR zulässig mit "
+        f"konkret benanntem belegtem Teilclaim in 'supported_subclaim'.\n"
+        f"- Diese Verdikte behaupten einen Rechercheerfolg und brauchen daher "
+        f"ZWINGEND mindestens eine Quelle: {source_verdicts}. Kannst du keine "
+        f"belastbare Quelle nennen, ist 'unsupported' das richtige Verdikt.\n"
         "\n"
         f"VERDIKT — EXAKT einer dieser Werte:\n{verdicts}\n"
         "\n"
         "AUSGABEFORMAT: NUR ein JSON-Objekt, kein Vorspann, keine Code-Fences:\n"
         "{\n"
-        f'  "claim_id": "{claim.get("claim_id", "")}",\n'
+        f'  "claim_id": "{f["claim_id"]}",\n'
         f'  "verdict": "<{verdicts}>",\n'
         '  "reason": "<1–2 Sätze, inhaltlich begründet>",\n'
         '  "supported_subclaim": "<welcher Teil ist belegt — oder null>",\n'

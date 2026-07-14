@@ -24,24 +24,29 @@ from .llm_stage import (
 )
 from .models import ClaimVerdict
 from .prompts import build_claim_verification_prompt
-from .verdict import FAILED_REASON_PREFIX, check_verdict_guardrails
+from .verdict import (
+    FAILED_REASON_PREFIX, check_forbidden_sources, check_verdict_guardrails,
+)
 
 logger = logging.getLogger(__name__)
 
 STAGE_NAME = "ClaimVerifier"
 
 
-def validate_verdict(raw: dict, expected_id: str) -> ClaimVerdict:
+def validate_verdict(raw: dict, expected_id: str, source_hint: str = "") -> ClaimVerdict:
     """Validiert einen S5-Rohoutput gegen Schema **und** Taxonomie-Leitplanken.
 
     Die Leitplanken aus Theorie §6.3 werden hier durchgesetzt, nicht nur im
     Prompt erbeten: kein positives Teilverdikt ohne benannten belegten Teilclaim,
-    keine Rechercheerfolg-Behauptung ohne Quelle. Ein Verstoß ist ein
-    Vertragsbruch und geht in den Reparatur-Retry.
+    keine Rechercheerfolg-Behauptung ohne Quelle — und **kein Eigenbeleg**: der
+    Unabhängigkeits-Riegel gilt auch dann, wenn das Modell die Prompt-Regel
+    ignoriert. Jeder Verstoß ist ein Vertragsbruch und geht in den Reparatur-Retry.
 
     Args:
         raw: Geparstes JSON-Objekt aus der Modellantwort.
         expected_id: Die claim_id, die zurückkommen muss.
+        source_hint: Identität der geprüften Quelle ("Titel URL"). Leer = der
+            Eigenbeleg-Riegel kann nicht greifen (keine Referenz zum Vergleichen).
 
     Returns:
         Das validierte :class:`ClaimVerdict`.
@@ -61,6 +66,7 @@ def validate_verdict(raw: dict, expected_id: str) -> ClaimVerdict:
             f"Verdikt '{verdict.verdict}' ohne Begründung: `reason` ist Pflicht "
             f"(1–2 Sätze, inhaltlich begründet)."
         )
+    check_forbidden_sources(verdict.sources, source_hint)
     check_verdict_guardrails(
         verdict.verdict, verdict.supported_subclaim, verdict.sources,
     )
@@ -136,7 +142,7 @@ class ClaimVerifier:
             client=self.client,
             model=self.model,
             prompt=prompt,
-            parse=lambda raw: validate_verdict(raw, claim_id),
+            parse=lambda raw: validate_verdict(raw, claim_id, self.source_hint),
             stage_name=f"{STAGE_NAME}[{claim_id}]",
             extract=extract_json_object,
         )

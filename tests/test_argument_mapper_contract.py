@@ -57,7 +57,7 @@ def _mapping(cid: str, **over) -> dict:
 
 # --- Prompt-Vertrag: Nicht-Zuständigkeiten (Theorie §8.5) ------------------
 
-def test_mapper_prompt_forbids_selection_and_weighting():
+def test_mapper_prompt_forbids_selection_and_weighting() -> None:
     """Auswahl und Gewichtung sind Policy/Code — das Modell darf sie nicht anfassen."""
     prompt = build_mapper_prompt(IRGC["refiner_response"], IRGC["core_thesis"])
     assert "NICHT-ZUSTÄNDIGKEITEN" in prompt
@@ -67,20 +67,20 @@ def test_mapper_prompt_forbids_selection_and_weighting():
     assert "Die Gewichte kennst du nicht" in prompt
 
 
-def test_mapper_prompt_forbids_truth_judgement():
+def test_mapper_prompt_forbids_truth_judgement() -> None:
     prompt = build_mapper_prompt(IRGC["refiner_response"])
     assert "WAHR oder FALSCH" in prompt
     assert "kein Zweifel am Wahrheitsgehalt" in prompt
 
 
-def test_mapper_prompt_never_leaks_policy_weights():
+def test_mapper_prompt_never_leaks_policy_weights() -> None:
     """Gegenprobe: Die konkreten Policy-Gewichte tauchen nirgends im Prompt auf."""
     prompt = build_mapper_prompt(IRGC["refiner_response"])
     for forbidden in ("0.75", "0.6", "0.3", "policy", "priority", "Budget"):
         assert forbidden not in prompt, f"Policy-Interna im Prompt geleakt: {forbidden}"
 
 
-def test_mapper_prompt_lists_all_rating_dims_and_expected_ids():
+def test_mapper_prompt_lists_all_rating_dims_and_expected_ids() -> None:
     prompt = build_mapper_prompt(IRGC["refiner_response"])
     for dim in IMPORTANCE_DIMS + RESEARCH_VALUE_DIMS:
         assert dim in prompt, f"Rating-Dimension {dim} fehlt im Prompt"
@@ -88,7 +88,7 @@ def test_mapper_prompt_lists_all_rating_dims_and_expected_ids():
     assert "jede genau einmal" in prompt
 
 
-def test_mapper_context_is_yardstick_not_check_target():
+def test_mapper_context_is_yardstick_not_check_target() -> None:
     """Die Kernthese ist für S2 Bezugspunkt — aber kein Prüfgegenstand."""
     prompt = build_mapper_prompt(IRGC["refiner_response"], IRGC["core_thesis"])
     assert "Bezugspunkt für thesis_proximity — selbst NICHT prüfen" in prompt
@@ -97,7 +97,7 @@ def test_mapper_context_is_yardstick_not_check_target():
 # --- Referenzfälle --------------------------------------------------------
 
 @pytest.mark.parametrize("case", [IRGC, KATAR], ids=["irgc", "katar747"])
-def test_mapper_returns_one_mapping_per_unit(case):
+def test_mapper_returns_one_mapping_per_unit(case) -> None:
     refined = _refined(case)
     mapper, client = _mapper([as_json(case["mapper_response"])])
 
@@ -108,7 +108,7 @@ def test_mapper_returns_one_mapping_per_unit(case):
     assert client.call_count == 1
 
 
-def test_katar_date_is_metadata_and_gift_is_core_claim():
+def test_katar_date_is_metadata_and_gift_is_core_claim() -> None:
     """Prüfbar ≠ prüfwürdig: das leicht prüfbare Datum ist kein Kernclaim."""
     refined = _refined(KATAR)
     mapper, _ = _mapper([as_json(KATAR["mapper_response"])])
@@ -121,27 +121,27 @@ def test_katar_date_is_metadata_and_gift_is_core_claim():
 
 # --- ID-Echo (Anker 4) ----------------------------------------------------
 
-def test_missing_id_is_rejected_with_concrete_message():
+def test_missing_id_is_rejected_with_concrete_message() -> None:
     with pytest.raises(ValueError) as exc:
         validate_mappings([_mapping("c01a")], ["c01a", "c01b"])
     assert "fehlen in der Antwort" in str(exc.value)
     assert "c01b" in str(exc.value)
 
 
-def test_unknown_id_is_rejected():
+def test_unknown_id_is_rejected() -> None:
     with pytest.raises(ValueError) as exc:
         validate_mappings([_mapping("c01a"), _mapping("c99z")], ["c01a"])
     assert "Unbekannte claim_ids" in str(exc.value)
     assert "c99z" in str(exc.value)
 
 
-def test_duplicate_id_is_rejected():
+def test_duplicate_id_is_rejected() -> None:
     with pytest.raises(ValueError) as exc:
         validate_mappings([_mapping("c01a"), _mapping("c01a")], ["c01a"])
     assert "mehrfach" in str(exc.value)
 
 
-def test_empty_mapping_array_is_rejected():
+def test_empty_mapping_array_is_rejected() -> None:
     with pytest.raises(ValueError) as exc:
         validate_mappings([], ["c01a"])
     assert "Leeres Array" in str(exc.value)
@@ -154,12 +154,12 @@ def test_empty_mapping_array_is_rejected():
     {"ratings": {d: -1 for d in RATING_DIMS}},
     {"ratings": {"thesis_proximity": 3}},
 ])
-def test_schema_violations_are_rejected(bad):
+def test_schema_violations_are_rejected(bad) -> None:
     with pytest.raises(SchemaError):
         validate_mappings([_mapping("c01a", **bad)], ["c01a"])
 
 
-def test_empty_refined_list_is_rejected_before_any_call():
+def test_empty_refined_list_is_rejected_before_any_call() -> None:
     mapper, client = _mapper([])
     with pytest.raises(ValueError):
         mapper.map_claims([])
@@ -168,7 +168,7 @@ def test_empty_refined_list_is_rejected_before_any_call():
 
 # --- Reparatur-Retry ------------------------------------------------------
 
-def test_id_mismatch_triggers_repair_retry_before_join_claims():
+def test_id_mismatch_triggers_repair_retry_before_join_claims() -> None:
     """Der ID-Bruch fällt in S2 auf — früh genug für den Retry mit Klartext."""
     refined = _refined(IRGC)
     incomplete = as_json([_mapping("c01a"), _mapping("c01b")])  # c01c/c01d fehlen
@@ -184,7 +184,7 @@ def test_id_mismatch_triggers_repair_retry_before_join_claims():
     assert "WÄHLST NICHT AUS" in repair, "Ursprungsregeln gelten im Retry weiter"
 
 
-def test_second_id_mismatch_escalates_openly():
+def test_second_id_mismatch_escalates_openly() -> None:
     refined = _refined(IRGC)
     incomplete = as_json([_mapping("c01a")])
     mapper, client = _mapper([incomplete, incomplete])
@@ -197,7 +197,7 @@ def test_second_id_mismatch_escalates_openly():
     assert "nach Reparatur-Retry" in str(exc.value)
 
 
-def test_api_error_escalates_without_repair_attempt():
+def test_api_error_escalates_without_repair_attempt() -> None:
     refined = _refined(IRGC)
     mapper, client = _mapper([error_response()])
 
@@ -211,7 +211,7 @@ def test_api_error_escalates_without_repair_attempt():
 # --- Kette S1 → S2 → S3 ---------------------------------------------------
 
 @pytest.mark.parametrize("case", [IRGC, KATAR], ids=["irgc", "katar747"])
-def test_stages_chain_into_policy_scorer(case):
+def test_stages_chain_into_policy_scorer(case) -> None:
     """Der Vertrag hält als Kette: S1-Output + S2-Output → join → Auswahl."""
     refined = _refined(case)
     mapper, _ = _mapper([as_json(case["mapper_response"])])
@@ -225,7 +225,7 @@ def test_stages_chain_into_policy_scorer(case):
     assert len(result.audits) == len(refined), "jede Prüfeinheit bekommt eine Auditspur"
 
 
-def test_katar_metadata_date_never_displaces_the_core_claim():
+def test_katar_metadata_date_never_displaces_the_core_claim() -> None:
     """Regression zur Kernthese des Moduls: prüfbar ≠ prüfwürdig."""
     refined = _refined(KATAR)
     mapper, _ = _mapper([as_json(KATAR["mapper_response"])])
@@ -238,7 +238,7 @@ def test_katar_metadata_date_never_displaces_the_core_claim():
     )
 
 
-def test_irgc_top_core_claim_wins_and_quota_shares_the_rest():
+def test_irgc_top_core_claim_wins_and_quota_shares_the_rest() -> None:
     """Dokumentiert die Quotensemantik bei kleinem Budget (Stand PR 1).
 
     Bei Budget 2 ergibt `core_claims_share: 0.6` genau EINEN A-Platz und
@@ -263,7 +263,7 @@ def test_irgc_top_core_claim_wins_and_quota_shares_the_rest():
     assert by_id["c01d"].priority > by_id["c01b"].priority
 
 
-def test_irgc_default_budget_covers_all_four_units():
+def test_irgc_default_budget_covers_all_four_units() -> None:
     """Beim PO-Default-Budget 8 fällt keine der vier Prüfeinheiten hinten runter."""
     refined = _refined(IRGC)
     mapper, _ = _mapper([as_json(IRGC["mapper_response"])])
@@ -276,7 +276,7 @@ def test_irgc_default_budget_covers_all_four_units():
     assert result.selected_ids[:2] == ["c01c", "c01d"]
 
 
-def main():
+def main() -> None:
     """Führt alle Tests ohne pytest aus (Parametrize-Fälle explizit)."""
     test_mapper_prompt_forbids_selection_and_weighting()
     test_mapper_prompt_forbids_truth_judgement()

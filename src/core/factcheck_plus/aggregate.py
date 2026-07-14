@@ -81,12 +81,23 @@ def build_skipped_rows(
 
     Returns:
         Liste von Dicts mit `claim_id` und `claim`.
+
+    Raises:
+        ValueError: Wenn ein Audit auf einen Claim zeigt, den es nicht gibt.
+            Das wäre ein kaputtes Auswahl-/Claim-Mapping — stilles Filtern würde
+            den Transparenz-Block belügen (er zählt die Basisfakten mit).
     """
     by_id = {c.claim_id: c for c in claims}
     skipped = [a.claim_id for a in selection.audits if a.status == STATUS_BASISFAKT_SKIPPED]
+    missing = [cid for cid in skipped if cid not in by_id]
+    if missing:
+        raise ValueError(
+            f"Kein Claim zu übersprungenem Basisfakt: {sorted(missing)} — "
+            f"Auswahl und Claim-Liste passen nicht zusammen."
+        )
     return [
         {"claim_id": cid, "claim": by_id[cid].normalized_claim}
-        for cid in skipped if cid in by_id
+        for cid in skipped
     ]
 
 

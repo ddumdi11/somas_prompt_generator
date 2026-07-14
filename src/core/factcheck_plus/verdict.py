@@ -13,6 +13,8 @@ Grenze ≠ Prüfbarkeits-Grenze).
 """
 from __future__ import annotations
 
+import re
+
 from .schemas import (
     INTERNAL_VERDICTS, VERDICTS_REQUIRING_SOURCE, VERDICTS_REQUIRING_SUBCLAIM,
 )
@@ -114,6 +116,94 @@ def check_verdict_guardrails(
             f"Verdikt '{internal}' ohne Quelle: Ein Verdikt, das einen "
             f"Rechercheerfolg behauptet, braucht mindestens eine belastbare "
             f"Quelle. Ohne Beleg ist 'unsupported' das richtige Verdikt."
+        )
+
+
+# --- Unabhängigkeits-Riegel, server-seitig --------------------------------
+
+# URL und YouTube-Video-ID aus dem `source_hint` (Format: "Titel URL", s.
+# `verification_worker`). Beide Teile werden getrennt geprüft: Ein Ganzstring-
+# Vergleich ginge ins Leere, weil der Hint Titel UND URL enthält, eine Quelle
+# aber typischerweise nur eines von beidem nennt.
+_URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
+_YT_ID_RE = re.compile(
+    r"(?:youtu\.be/|youtube\.com/(?:watch\?v=|shorts/|embed/))([A-Za-z0-9_-]{11})",
+    re.IGNORECASE,
+)
+
+# Mindestlänge, ab der ein Titelrest als Fingerabdruck taugt. Kurze Titel wie
+# „ZDF" würden sonst jede seriöse Quelle mit diesem Wort fälschlich sperren.
+_MIN_TITLE_FINGERPRINT = 12
+
+
+def _normalize_source(text: str) -> str:
+    """Normalisiert eine Quelle/einen Hint für den Vergleich (casefold + Whitespace)."""
+    return " ".join((text or "").split()).casefold().strip(" .,;:/")
+
+
+def is_forbidden_source(source: str, source_hint: str) -> bool:
+    """Prüft, ob eine angegebene Quelle die GEPRÜFTE Quelle selbst ist.
+
+    Der Unabhängigkeits-Riegel (seit v0.10.1, Theorie §6.3) stand bisher nur im
+    Prompt — hier wird er durchgesetzt. Verglichen wird dreifach, weil
+    ``source_hint`` „Titel URL" zusammenfasst, eine Quellenangabe aber meist nur
+    eines davon nennt:
+
+      1. **Video-ID** (fängt ``youtu.be/X`` vs. ``youtube.com/watch?v=X``),
+      2. **volle URL** (in beide Richtungen, gegen Tracking-Suffixe),
+      3. **Titelrest**, sofern lang genug für einen Fingerabdruck.
+
+    Args:
+        source: Die vom Modell angegebene Quelle.
+        source_hint: Identität der geprüften Quelle ("Titel URL").
+
+    Returns:
+        True, wenn die Quelle die geprüfte Quelle selbst ist (Eigenbeleg).
+    """
+    src = _normalize_source(source)
+    hint = _normalize_source(source_hint)
+    if not src or not hint:
+        return False
+
+    # 1) Video-ID — der zuverlässigste Fingerabdruck.
+    hint_ids = {m.group(1).casefold() for m in _YT_ID_RE.finditer(source_hint or "")}
+    src_ids = {m.group(1).casefold() for m in _YT_ID_RE.finditer(source or "")}
+    if hint_ids & src_ids:
+        return True
+    if hint_ids and any(vid in src for vid in hint_ids):
+        return True
+
+    # 2) URL-Teile des Hints.
+    for url in _URL_RE.findall(source_hint or ""):
+        url_norm = _normalize_source(url)
+        if url_norm and (url_norm in src or src in url_norm):
+            return True
+
+    # 3) Titelrest (Hint ohne URLs).
+    title = _normalize_source(_URL_RE.sub(" ", source_hint or ""))
+    if len(title) >= _MIN_TITLE_FINGERPRINT and title in src:
+        return True
+    return False
+
+
+def check_forbidden_sources(sources: list[str], source_hint: str) -> None:
+    """Weist Eigenbelege zurück — die geprüfte Quelle zählt nie als Beleg.
+
+    Args:
+        sources: Die vom Modell angegebenen Quellen.
+        source_hint: Identität der geprüften Quelle ("" = keine Prüfung möglich).
+
+    Raises:
+        VerdictError: Wenn eine Quelle die geprüfte Quelle selbst ist.
+    """
+    if not source_hint:
+        return
+    offending = [s for s in sources if is_forbidden_source(s, source_hint)]
+    if offending:
+        raise VerdictError(
+            f"Eigenbeleg unzulässig: Diese Quelle(n) sind die GEPRÜFTE Quelle "
+            f"selbst und zählen nicht als Beleg: {offending}. Nenne eine davon "
+            f"UNABHÄNGIGE, EXTERNE Quelle — oder vergib 'unsupported'."
         )
 
 

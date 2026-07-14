@@ -184,6 +184,9 @@ def run_json_stage(
     """
     current_prompt = prompt
     last_error = ""
+    # Der Reparatur-Prompt muss dasselbe Format fordern, das die Stufe auch
+    # extrahiert — sonst verlangt er bei S5 ein Array statt eines Objekts.
+    json_format = "Objekt" if extract is extract_json_object else "Array"
 
     for attempt in range(MAX_REPAIR_ATTEMPTS + 1):
         response = client.send_prompt(current_prompt, model)
@@ -205,7 +208,9 @@ def run_json_stage(
                 "%s: Vertragsbruch (Versuch %d/%d) → Reparatur-Retry: %s",
                 stage_name, attempt + 1, MAX_REPAIR_ATTEMPTS + 1, last_error,
             )
-            current_prompt = build_repair_prompt(prompt, response.content, last_error)
+            current_prompt = build_repair_prompt(
+                prompt, response.content, last_error, json_format,
+            )
             continue
 
         if attempt > 0:

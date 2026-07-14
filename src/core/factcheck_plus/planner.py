@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from .llm_stage import PromptClient, run_json_stage
 from .models import ResearchCard
-from .prompts import build_planner_prompt
+from .prompts import FORBIDDEN_SHORTCUTS, build_planner_prompt
 
 STAGE_NAME = "ResearchPlanner"
 
@@ -28,6 +28,11 @@ def validate_cards(raw: list, expected_ids: list[str]) -> list[ResearchCard]:
     zulässigerweise leere Listen — nicht jeder Claim zeigt auf ein Artefakt oder
     einen fremdsprachigen Raum. Das Schema erzwingt ihre Anwesenheit; der Inhalt
     ist claim-abhängig.
+
+    ``forbidden_shortcuts`` wird hier **deterministisch gesetzt**, nicht vom
+    Modell erfragt: Die verbotenen Abkürzungen sind Policy-Konstante (Theorie
+    §8.4 „nicht dem Modell überlassen"). Ein Echo würde nur Token kosten und
+    könnte driften.
 
     Args:
         raw: Geparste JSON-Liste aus der Modellantwort.
@@ -78,6 +83,8 @@ def validate_cards(raw: list, expected_ids: list[str]) -> list[ResearchCard]:
                 f"Gegenhypothesen sind Pflicht (Riegel gegen Bestätigungsfehler) — "
                 f"was müsste zutreffen, damit die Behauptung NICHT stimmt?"
             )
+        # Policy überschreibt, was das Modell hier auch immer geliefert hätte.
+        card.forbidden_shortcuts = list(FORBIDDEN_SHORTCUTS)
     return cards
 
 
