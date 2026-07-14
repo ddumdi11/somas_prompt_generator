@@ -15,12 +15,27 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Callable
+from typing import Callable, Protocol
 
-from ..api_client import APIStatus
+from ..api_client import APIResponse, APIStatus
 from .prompts import build_repair_prompt
 
 logger = logging.getLogger(__name__)
+
+
+class PromptClient(Protocol):
+    """Minimalvertrag, den die Stufen vom LLM-Client brauchen.
+
+    Bewusst ein Protocol statt ``LLMClient``: die Stufenklassen (``ClaimRefiner``,
+    ``ArgumentMapper``) typisieren damit präzise, ohne selbst von ``api_client``
+    abzuhängen — dieses Modul bleibt die einzige Kopplungsnaht des Packages
+    (Spec §2.2). Jeder Client mit passender ``send_prompt``-Signatur erfüllt ihn,
+    auch die Test-Doppelgänger.
+    """
+
+    def send_prompt(self, prompt: str, model: str) -> APIResponse:
+        """Sendet einen Prompt und liefert die Antwort."""
+        ...
 
 # Anzahl der Reparaturversuche nach einem Vertragsbruch. Bewusst 1 (v0.11-Linie):
 # ein gezielter Nachschlag, dann offener Fehler — keine Retry-Schleifen, die
@@ -35,7 +50,15 @@ class StageError(RuntimeError):
 
 
 def strip_code_fences(text: str) -> str:
-    """Entfernt umschließende Markdown-Code-Fences (```json … ```)."""
+    """Entfernt umschließende Markdown-Code-Fences (```json … ```).
+
+    Args:
+        text: Roh-Antwort des Modells; darf ``None``/leer sein.
+
+    Returns:
+        Der Text ohne umschließende Code-Fences und ohne Randwhitespace
+        ("" wenn nichts übrig bleibt).
+    """
     return _FENCE_RE.sub("", (text or "").strip()).strip()
 
 
@@ -82,7 +105,7 @@ def extract_json_array(text: str) -> list:
 
 
 def run_json_stage(
-    client,
+    client: PromptClient,
     model: str,
     prompt: str,
     parse: Callable[[list], list],

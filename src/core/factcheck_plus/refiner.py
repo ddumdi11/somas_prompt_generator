@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 
-from .llm_stage import run_json_stage
+from .llm_stage import PromptClient, run_json_stage
 from .models import RefinedClaim
 from .prompts import build_refiner_prompt, make_claim_id
 
@@ -117,7 +117,7 @@ class ClaimRefiner:
         model: Modell-ID — das Analyse-Modell (kein eigener Picker, Spec §8.3).
     """
 
-    def __init__(self, client, model: str) -> None:
+    def __init__(self, client: PromptClient, model: str) -> None:
         self.client = client
         self.model = model
 

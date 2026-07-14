@@ -9,7 +9,10 @@ Pro-Claim-Verifikation (S5) folgen in späteren PRs.
 Kein Qt-Import in diesem Package (extrahierbar als ``factcheck_core``, Spec §2.2);
 einziger Berührungspunkt zum SOMAS-Client ist ``llm_stage``.
 """
-from .llm_stage import MAX_REPAIR_ATTEMPTS, StageError, extract_json_array, run_json_stage
+from .llm_stage import (
+    MAX_REPAIR_ATTEMPTS, PromptClient, StageError, extract_json_array,
+    run_json_stage, strip_code_fences,
+)
 from .mapper import ArgumentMapper, validate_mappings
 from .models import (
     ArgumentMapping, ClaimAudit, ClaimClass, MappedClaim, RefinedClaim,
@@ -56,9 +59,11 @@ __all__ = [
     "validate_mappings",
     "CLAIM_ID_RE",
     # Stufen-Mechanik
+    "PromptClient",
     "StageError",
     "run_json_stage",
     "extract_json_array",
+    "strip_code_fences",
     "MAX_REPAIR_ATTEMPTS",
     # Prompt-Verträge
     "build_refiner_prompt",
