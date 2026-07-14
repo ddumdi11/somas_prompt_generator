@@ -1,0 +1,102 @@
+{
+  "case": "katar_747",
+  "description": "Referenzfall Buendelung + Attributions-Split (FAKTENCHECK_THEORIE.md §2.2/§2.3). Realtest 07/2026: Der Claim blieb im Classic-Weg gebuendelt, das Verdikt konnte deshalb nur pauschal 'teilweise bestaetigt' lauten. Erwartete Zerlegung: Flugdatum, Geschenk, Boeing-Zitat — wobei das Zitat nochmals in Attributions- und Objekt-Claim zerfaellt (ein bestaetigtes Zitat belegt nie den Sachverhalt). Der Fixture-Inhalt ist eine ZU PRUEFENDE Behauptung, keine Tatsachenaussage.",
+  "core_thesis": "Die Uebergabe des Flugzeugs ist ein aussenpolitisch fragwuerdiger Vorgang.",
+  "source_hint": "Beispielvideo zur Katar-747-Debatte",
+  "raw_claims": [
+    "Katar uebergab den USA am 14. Mai 2025 eine Boeing 747-8 als Geschenk, die kuenftig als Air Force One dienen soll, und Boeing erklaerte, der noetige Umbau werde mehrere Jahre dauern."
+  ],
+  "expected_units": ["Flugdatum", "Geschenk", "Boeing-Zitat (Attribution)", "Umbaudauer (Objekt-Claim)"],
+  "refiner_response": [
+    {
+      "claim_id": "c01a",
+      "parent_id": "c01",
+      "original_text": "Katar uebergab den USA am 14. Mai 2025 eine Boeing 747-8 als Geschenk, die kuenftig als Air Force One dienen soll, und Boeing erklaerte, der noetige Umbau werde mehrere Jahre dauern.",
+      "normalized_claim": "Die Uebergabe des Flugzeugs an die USA fand am 14. Mai 2025 statt.",
+      "claim_type": "hard_fact",
+      "entities": ["Katar", "USA"],
+      "timeframe": "14. Mai 2025",
+      "metric": null
+    },
+    {
+      "claim_id": "c01b",
+      "parent_id": "c01",
+      "original_text": "Katar uebergab den USA am 14. Mai 2025 eine Boeing 747-8 als Geschenk, die kuenftig als Air Force One dienen soll, und Boeing erklaerte, der noetige Umbau werde mehrere Jahre dauern.",
+      "normalized_claim": "Katar uebergab den USA eine Boeing 747-8 unentgeltlich als Geschenk.",
+      "claim_type": "hard_fact",
+      "entities": ["Katar", "USA", "Boeing 747-8"],
+      "timeframe": "2025",
+      "metric": null
+    },
+    {
+      "claim_id": "c01c",
+      "parent_id": "c01",
+      "original_text": "Katar uebergab den USA am 14. Mai 2025 eine Boeing 747-8 als Geschenk, die kuenftig als Air Force One dienen soll, und Boeing erklaerte, der noetige Umbau werde mehrere Jahre dauern.",
+      "normalized_claim": "Boeing hat oeffentlich geaeussert, der Umbau der Maschine werde mehrere Jahre dauern.",
+      "claim_type": "source_attribution",
+      "entities": ["Boeing"],
+      "timeframe": "2025",
+      "metric": null
+    },
+    {
+      "claim_id": "c01d",
+      "parent_id": "c01",
+      "original_text": "Katar uebergab den USA am 14. Mai 2025 eine Boeing 747-8 als Geschenk, die kuenftig als Air Force One dienen soll, und Boeing erklaerte, der noetige Umbau werde mehrere Jahre dauern.",
+      "normalized_claim": "Der Umbau der Maschine zur Air Force One dauert mehrere Jahre.",
+      "claim_type": "prognosis",
+      "entities": ["Boeing 747-8", "Air Force One"],
+      "timeframe": null,
+      "metric": "Jahre"
+    }
+  ],
+  "mapper_response": [
+    {
+      "claim_id": "c01a",
+      "argument_role": "metadata",
+      "counterfactual_impact": "low",
+      "ratings": {
+        "thesis_proximity": 1, "conclusion_dependency": 1, "harm_potential": 0,
+        "reach_mobilization": 1, "concreteness": 5,
+        "non_triviality": 1, "recency": 4, "contestedness": 1,
+        "source_access": 5, "evidence_gap": 1, "discrepancy_potential": 1
+      },
+      "reason": "Das Datum rahmt den Vorgang, traegt die Bewertung aber nicht."
+    },
+    {
+      "claim_id": "c01b",
+      "argument_role": "core_claim",
+      "counterfactual_impact": "high",
+      "ratings": {
+        "thesis_proximity": 5, "conclusion_dependency": 5, "harm_potential": 4,
+        "reach_mobilization": 4, "concreteness": 5,
+        "non_triviality": 4, "recency": 4, "contestedness": 5,
+        "source_access": 4, "evidence_gap": 4, "discrepancy_potential": 4
+      },
+      "reason": "Ob es ein Geschenk war, ist der eigentliche Gegenstand der Kernthese."
+    },
+    {
+      "claim_id": "c01c",
+      "argument_role": "supporting_premise",
+      "counterfactual_impact": "medium",
+      "ratings": {
+        "thesis_proximity": 2, "conclusion_dependency": 3, "harm_potential": 1,
+        "reach_mobilization": 2, "concreteness": 4,
+        "non_triviality": 3, "recency": 4, "contestedness": 2,
+        "source_access": 5, "evidence_gap": 3, "discrepancy_potential": 2
+      },
+      "reason": "Existenz der Boeing-Aussage ist ueber das Originalstatement pruefbar."
+    },
+    {
+      "claim_id": "c01d",
+      "argument_role": "supporting_premise",
+      "counterfactual_impact": "medium",
+      "ratings": {
+        "thesis_proximity": 3, "conclusion_dependency": 3, "harm_potential": 2,
+        "reach_mobilization": 2, "concreteness": 3,
+        "non_triviality": 4, "recency": 3, "contestedness": 3,
+        "source_access": 3, "evidence_gap": 4, "discrepancy_potential": 4
+      },
+      "reason": "Die tatsaechliche Umbaudauer braucht unabhaengige Belege, nicht nur das Zitat."
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "case": "irgc",
+  "description": "Referenzfall Atomisierung (FAKTENCHECK_THEORIE.md §2.2): Ein gebündelter Claim zerfällt in vier unabhängig prüfbare Einheiten — Quellenexistenz, Methodik, Quantität, Kausalzurechnung. Ohne diese Zerlegung entstehen unauflösbare 'teilweise bestätigt'-Verdikte, weil belegte und unbelegte Teile im selben Claim verschmelzen. Der Fixture-Inhalt ist eine ZU PRÜFENDE Behauptung, keine Tatsachenaussage.",
+  "core_thesis": "Die Aktivitaeten der IRGC verursachen in Europa massive volkswirtschaftliche Kosten.",
+  "source_hint": "Beispielvideo zur IRGC-Debatte",
+  "raw_claims": [
+    "Laut der zitierten Analyse verursacht die IRGC in Europa Kosten von 54 bis 120 Milliarden Euro pro Jahr, die genannte Schaetzung liegt bei rund 100 Milliarden Euro."
+  ],
+  "expected_units": ["Quellenexistenz", "Methodik", "Quantitaet", "Kausalzurechnung"],
+  "refiner_response": [
+    {
+      "claim_id": "c01a",
+      "parent_id": "c01",
+      "original_text": "Laut der zitierten Analyse verursacht die IRGC in Europa Kosten von 54 bis 120 Milliarden Euro pro Jahr, die genannte Schaetzung liegt bei rund 100 Milliarden Euro.",
+      "normalized_claim": "Es existiert eine identifizierbare Analyse, die die europaweiten Kosten der IRGC beziffert.",
+      "claim_type": "source_attribution",
+      "entities": ["IRGC", "Europa"],
+      "timeframe": null,
+      "metric": null
+    },
+    {
+      "claim_id": "c01b",
+      "parent_id": "c01",
+      "original_text": "Laut der zitierten Analyse verursacht die IRGC in Europa Kosten von 54 bis 120 Milliarden Euro pro Jahr, die genannte Schaetzung liegt bei rund 100 Milliarden Euro.",
+      "normalized_claim": "Die Methodik dieser Analyse traegt eine jaehrliche Gesamtschaetzung fuer ganz Europa.",
+      "claim_type": "methodological",
+      "entities": ["IRGC", "Europa"],
+      "timeframe": "pro Jahr",
+      "metric": "Euro pro Jahr"
+    },
+    {
+      "claim_id": "c01c",
+      "parent_id": "c01",
+      "original_text": "Laut der zitierten Analyse verursacht die IRGC in Europa Kosten von 54 bis 120 Milliarden Euro pro Jahr, die genannte Schaetzung liegt bei rund 100 Milliarden Euro.",
+      "normalized_claim": "Die Analyse nennt eine Spanne von 54 bis 120 Milliarden Euro pro Jahr und eine Punktschaetzung von rund 100 Milliarden Euro.",
+      "claim_type": "quantitative",
+      "entities": ["IRGC", "Europa"],
+      "timeframe": "pro Jahr",
+      "metric": "Milliarden Euro pro Jahr"
+    },
+    {
+      "claim_id": "c01d",
+      "parent_id": "c01",
+      "original_text": "Laut der zitierten Analyse verursacht die IRGC in Europa Kosten von 54 bis 120 Milliarden Euro pro Jahr, die genannte Schaetzung liegt bei rund 100 Milliarden Euro.",
+      "normalized_claim": "Die genannten Kosten sind ursaechlich der IRGC zurechenbar.",
+      "claim_type": "causal",
+      "entities": ["IRGC", "Europa"],
+      "timeframe": "pro Jahr",
+      "metric": null
+    }
+  ],
+  "mapper_response": [
+    {
+      "claim_id": "c01a",
+      "argument_role": "supporting_premise",
+      "counterfactual_impact": "high",
+      "ratings": {
+        "thesis_proximity": 4, "conclusion_dependency": 5, "harm_potential": 3,
+        "reach_mobilization": 3, "concreteness": 3,
+        "non_triviality": 4, "recency": 3, "contestedness": 4,
+        "source_access": 4, "evidence_gap": 5, "discrepancy_potential": 4
+      },
+      "reason": "Ohne existierende Quelle bricht die gesamte Kostenargumentation weg."
+    },
+    {
+      "claim_id": "c01b",
+      "argument_role": "supporting_premise",
+      "counterfactual_impact": "medium",
+      "ratings": {
+        "thesis_proximity": 3, "conclusion_dependency": 4, "harm_potential": 2,
+        "reach_mobilization": 2, "concreteness": 3,
+        "non_triviality": 5, "recency": 2, "contestedness": 4,
+        "source_access": 3, "evidence_gap": 5, "discrepancy_potential": 4
+      },
+      "reason": "Traegt die Hochrechnung, ist aber nicht die Hauptaussage selbst."
+    },
+    {
+      "claim_id": "c01c",
+      "argument_role": "core_claim",
+      "counterfactual_impact": "high",
+      "ratings": {
+        "thesis_proximity": 5, "conclusion_dependency": 5, "harm_potential": 4,
+        "reach_mobilization": 4, "concreteness": 5,
+        "non_triviality": 4, "recency": 3, "contestedness": 4,
+        "source_access": 4, "evidence_gap": 4, "discrepancy_potential": 4
+      },
+      "reason": "Die Zahl ist der eigentliche Prufgegenstand der Kernthese."
+    },
+    {
+      "claim_id": "c01d",
+      "argument_role": "core_claim",
+      "counterfactual_impact": "high",
+      "ratings": {
+        "thesis_proximity": 5, "conclusion_dependency": 5, "harm_potential": 5,
+        "reach_mobilization": 4, "concreteness": 3,
+        "non_triviality": 5, "recency": 2, "contestedness": 5,
+        "source_access": 2, "evidence_gap": 5, "discrepancy_potential": 5
+      },
+      "reason": "Die Kausalzurechnung traegt die Hauptthese und ist zugleich am staerksten umstritten."
+    }
+  ]
+}

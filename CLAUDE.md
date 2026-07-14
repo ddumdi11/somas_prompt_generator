@@ -500,6 +500,40 @@ Belege fand und differenzierte. Zwei kleine Ursachen, beide behoben.
 - [ ] Backlog (Startprompt): Claim-Atomisierung in Stufe 1 (gebündelte Behauptungen
   splitten) — tieferer Umbau, separat (Teil von Faktencheck Plus, v0.13.0)
 
+### Phase 20: Faktencheck Plus PR 2 — ClaimRefiner (S1) + ArgumentMapper (S2) ✅ (kein Versions-Bump)
+
+Die beiden LLM-Stufen, die den (seit PR 1 vorhandenen) PolicyScorer füttern.
+Offline grün, alles gemockt — kein Netzwerk im Test.
+
+- [x] `prompts.py`: Prompt-Verträge mit den **Nicht-Zuständigkeiten als expliziten
+  Verbotssätzen** (Theorie §8.5) — Refiner bewertet weder Relevanz noch Wahrheit;
+  Mapper wählt nicht aus und gewichtet nicht (kennt die Policy-Gewichte gar nicht,
+  eigener Gegenprobe-Test). Kontext (Kernthese/Quelle) injection-saniert wie
+  `source_hint`; stufenspezifische Kontextnote (S1 ordnet ein, S2 misst daran).
+- [x] `refiner.py` (S1): Atomisierung, **Attributions-Split als Pflicht** (Gate 4
+  des Scorers verlässt sich darauf), Normalisierung, Typisierung. ID-Konvention
+  `c01` → `c01a`/`c01b` + `parent_id` hart validiert inkl. Vollständigkeit (kein
+  Claim verschwindet still). Meinungen werden NICHT gefiltert — dafür ist Gate 1 da.
+- [x] `mapper.py` (S2): Rolle + kontrafaktischer Impact + 0–5-Ratings; ID-Echo
+  (Bijektion) wird VOR `join_claims` geprüft, damit der Bruch noch in den
+  Reparatur-Retry läuft statt in einen nackten ValueError.
+- [x] `llm_stage.py`: Schema-Validierung außerhalb des LLM, **1× Reparatur-Retry**
+  mit konkreter Fehlermeldung, danach offener `StageError` (v0.11-Linie).
+  Transport-/API-Fehler lösen bewusst KEINEN Reparatur-Retry aus. Einzige
+  Kopplungsnaht des Packages zum SOMAS-Client (sonst weiter Qt- und importfrei).
+- [x] Fixtures **eigenständig in `tests/fixtures/`** (kein Verweis auf das
+  gitignorierte `notizen/`): IRGC (1 Claim → 4 Prüfeinheiten) und Katar-747
+  (Flugdatum + Geschenk + Boeing-Zitat, letzteres nochmals attributions-gesplittet)
+- [x] Tests `tests/test_claim_refiner_contract.py` + `tests/test_argument_mapper_contract.py`
+  (57 Fälle) inkl. Kette S1→S2→S3 an beiden Referenzfällen
+- [ ] Befund für PO/Architekt (Policy, nicht Code): Bei kleinem Budget wirken die
+  Klassenkontingente als **Obergrenze** — bei Budget 2 verdrängt im IRGC-Fall der
+  Subclaim `c01b` (priority 0.433) den Kernclaim „Kausalzurechnung" `c01d` (0.489),
+  weil A nur `round(2 × 0.6) = 1` Platz bekommt. Zudem quantifiziert der Fall den
+  bekannten `checkability`-Tuning-Kandidaten: `c01d` verliert ⅓ (kein `metric` —
+  eine Kausalaussage hat keine), `c01a` sogar ⅔. Beides erst nach Realtests
+  entscheiden (zusammen mit dem Gewichte-Tuning).
+
 ### Backlog
 
 - [ ] A4-Feinschliff: erzwungenes Modul aus der `MODUL-AUSWAHL`-Liste entfernen
