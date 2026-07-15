@@ -16,7 +16,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from .schemas import (
-    ARGUMENT_MAPPING_SCHEMA, ARGUMENT_ROLES, REFINED_CLAIM_SCHEMA, validate,
+    ARGUMENT_MAPPING_SCHEMA, ARGUMENT_ROLES, CLAIM_VERDICT_SCHEMA,
+    REFINED_CLAIM_SCHEMA, RESEARCH_CARD_SCHEMA, validate,
 )
 
 
@@ -143,6 +144,73 @@ def join_claims(
             f"ArgumentMapping ohne RefinedClaim: {sorted(by_id)}"
         )
     return joined
+
+
+@dataclass
+class ResearchCard:
+    """Recherchekarte eines selektierten Claims (S4, ResearchPlanner).
+
+    Der Rechercheauftrag statt der offenen Frage „Ist das wahr?" (Theorie §5.1)
+    — offene Wahrheitsfragen erzeugen Bestätigungsfehler.
+    """
+    claim_id: str
+    research_questions: list[str] = field(default_factory=list)
+    counter_hypotheses: list[str] = field(default_factory=list)
+    source_priorities: list[str] = field(default_factory=list)
+    required_evidence: list[str] = field(default_factory=list)
+    forbidden_shortcuts: list[str] = field(default_factory=list)
+    # Direktes Prüfziel (arXiv-ID, Repo, Doku-URL) — leer, wenn der Claim auf
+    # kein benennbares Artefakt zeigt (Theorie §5.1 v0.3).
+    canonical_targets: list[str] = field(default_factory=list)
+    # Suchbegriffe in Originalsprache + Transliteration (Theorie §5.1 v0.2).
+    language_hints: list[str] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ResearchCard":
+        """Validiert gegen ``RESEARCH_CARD_SCHEMA`` und baut die Instanz."""
+        validate(data, RESEARCH_CARD_SCHEMA, "$.research_card")
+        return cls(
+            claim_id=data["claim_id"],
+            research_questions=list(data["research_questions"]),
+            counter_hypotheses=list(data["counter_hypotheses"]),
+            source_priorities=list(data["source_priorities"]),
+            required_evidence=list(data["required_evidence"]),
+            forbidden_shortcuts=list(data.get("forbidden_shortcuts", [])),
+            canonical_targets=list(data["canonical_targets"]),
+            language_hints=list(data["language_hints"]),
+        )
+
+
+@dataclass
+class ClaimVerdict:
+    """Rechercheergebnis + Verdikt eines Claims (S5).
+
+    ``verdict`` ist der INTERNE 8-stufige Wert (Theorie §6.3); die Abbildung auf
+    die vier UI-Verdikte passiert erst beim Rendern (:mod:`verdict`), damit der
+    feine Grund bis in die Begründungszeile überlebt.
+    """
+    claim_id: str
+    verdict: str
+    reason: str
+    supported_subclaim: str | None = None
+    sources: list[str] = field(default_factory=list)
+    open_questions: str | None = None
+    # True, wenn der Claim-Call scheiterte: der Claim wird sichtbar als ungeprüft
+    # ausgewiesen, statt den Lauf zu kippen (Einzelfehler nicht fatal, Spec §3/S5).
+    failed: bool = False
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ClaimVerdict":
+        """Validiert gegen ``CLAIM_VERDICT_SCHEMA`` und baut die Instanz."""
+        validate(data, CLAIM_VERDICT_SCHEMA, "$.claim_verdict")
+        return cls(
+            claim_id=data["claim_id"],
+            verdict=data["verdict"],
+            reason=data["reason"],
+            supported_subclaim=data.get("supported_subclaim"),
+            sources=list(data.get("sources", [])),
+            open_questions=data.get("open_questions"),
+        )
 
 
 @dataclass

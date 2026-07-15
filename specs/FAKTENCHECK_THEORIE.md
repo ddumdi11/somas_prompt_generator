@@ -1,6 +1,6 @@
 # Faktencheck: Theorie & Methodik
 
-**Version:** 0.1 · **Stand:** 2026-07-12 · **Status:** LEBENDES DOKUMENT
+**Version:** 0.3 · **Stand:** 2026-07-14 · **Status:** LEBENDES DOKUMENT
 
 > Referenzdokument für alle Faktencheck-Entscheidungen im SOMAS Prompt Generator.
 > Die Theoriepflege (Begriffsarbeit, Prüflogik, Diskursmethodik) lebt als Nebenstrang
@@ -200,6 +200,28 @@ Recherchefragen, **Gegenhypothesen**, bevorzugte Quellenklassen, verbotene
 Abkürzungen (Snippet als Beleg, unbelegte Sekundärquelle als alleinige Evidenz),
 geforderte Evidenzarten (Methode, Abgrenzung, Zurechnung, unabhängige Bestätigung).
 
+**Sprachdimension:** Liegt der Claim-Gegenstand außerhalb des deutsch-/englisch-
+sprachigen Raums, muss die Recherchekarte Suchbegriffe in der Originalsprache
+samt Transliterationen vorgeben (empirisch: „Amu Lindsey"-Fall 07/2026 — persische
+Quellen für eine englischzentrierte Suche unsichtbar). Analog gilt für wörtliche
+Zitate aus Videos: kanonische Quelle ist der Originalclip; wird er nicht gefunden,
+lautet das Verdikt „unbelegt", nicht „nicht überprüfbar" (Retrieval-Grenze ≠
+Prüfbarkeits-Grenze).
+
+**Kanonische Prüfziele:** Verweist ein Claim auf ein benennbares Artefakt
+(Forschungsarbeit, Code-Repository, offizielles Dokument, Gesetzestext, Datenbank),
+muss die Recherchekarte das **direkte Prüfziel** benennen (arXiv-ID, GitHub-Repo,
+Doku-/Registers-URL) statt nur Suchbegriffe — generische Such-Checks verfehlen
+solche Belege systematisch. Empirischer Beleg (Querprojekt KI-Modellanatomie,
+14.07.2026): 10 von 17 Sonar-Verdikten „nicht überprüfbar", davon ≥ 7 per
+Primärquelle sofort belegbar (arXiv-Papers, GitHub-Systemprompt-Repo, offizielle
+Charakterdokumente, NPR-Berichterstattung). Arbeitsregel: **„Nicht überprüfbar"
+heißt bei generischen Such-Checks oft nur „mit dieser Suchstrategie nicht
+gefunden"** — die Schwäche liegt in der Werkzeugschicht des Prüfsystems, nicht im
+Analysemodell. Konsequenz für die Pipeline: Verdikte „unbelegt/nicht überprüfbar"
+bei Claims MIT kanonischem Prüfziel qualifizieren für einen gezielten Zweitversuch
+(Eskalationsroute), bevor das Verdikt final wird.
+
 ### 5.2 Quellenhierarchie
 
 1. Primärquellen (Gesetze, amtliche Statistik, Gerichtsentscheidungen, Originalstudien)
@@ -341,3 +363,5 @@ Unsicherheiten, Policy-Version.
 | Version | Datum | Änderung |
 | ------- | ----- | -------- |
 | 0.1 | 2026-07-12 | Erstfassung aus Perplexity-Erörterung 2026-07-11 + D-Merkzettel + App-Empirie (Hauptchat) |
+| 0.2 | 2026-07-12 | §5.1 Sprachdimension der Recherchekarte + Zitat-Retrieval („unbelegt" ≠ „nicht überprüfbar"); Anlass: Graham-Testfall (Kasparian-Zitat, „Amu Lindsey") |
+| 0.3 | 2026-07-14 | §5.1 Kanonische Prüfziele + Eskalationsroute für Verdikte ohne Fund; Anlass: Querprojekt KI-Modellanatomie (7/10 „nicht überprüfbar" per Primärquelle belegbar) |
