@@ -117,7 +117,16 @@ def workers(monkeypatch):
     return {"plus": PlusWorker, "classic": ClassicWorker}
 
 
-def _choice(provider="perplexity", model="sonar-pro"):
+def _choice(provider: str = "perplexity", model: str = "sonar-pro") -> mw.ModelChoice:
+    """Baut eine ModelChoice für Tests.
+
+    Args:
+        provider: Provider-ID (Default: web-fähiges Perplexity).
+        model: Modell-ID.
+
+    Returns:
+        Die ModelChoice mit Name = ID.
+    """
     return mw.ModelChoice(
         provider_id=provider, model_id=model,
         model_name=model, provider_name=provider,
@@ -219,7 +228,13 @@ def test_plus_checkbox_lives_inside_the_verify_section(win) -> None:
 
 # --- Start-Pfad -----------------------------------------------------------
 
-def _prepare(win, plus: bool):
+def _prepare(win, plus: bool) -> None:
+    """Versetzt das Fenster in einen startbereiten Verifikations-Zustand.
+
+    Args:
+        win: Das MainWindow.
+        plus: True = Plus-Modus, False = Classic.
+    """
     win._verification_base_text = ANALYSIS_WITH_FAKTENCHECK
     win.verify_checkbox.setChecked(True)
     win.verify_plus_checkbox.setChecked(plus)
@@ -303,21 +318,43 @@ def test_plus_marks_web_unverified_for_non_web_models(win, workers, monkeypatch)
 # steckten zwei Fehler (CodeRabbit, PR #60): ein Aufruf einer nicht existenten
 # ModelSelector-Methode und der Griff auf den falschen Selector.
 
-def _select_provider(win, provider_id: str) -> bool:
-    """Wählt einen Provider in der Combo; False, wenn er nicht angeboten wird."""
+def _select_provider(win: "mw.MainWindow", provider_id: str) -> None:
+    """Wählt einen Provider in der Combo — er MUSS vorhanden sein.
+
+    Bewusst ohne `skip`-Ausweg: Die Provider stammen aus dem versionierten
+    `src/config/api_providers.json`, sind also in jeder Arbeitskopie identisch.
+    Fehlt einer, ist das eine Regression und kein Grund, den Test zu überspringen.
+
+    Args:
+        win: Das MainWindow.
+        provider_id: Die zu wählende Provider-ID.
+
+    Raises:
+        AssertionError: Wenn der Provider nicht angeboten wird.
+    """
     for i in range(win.provider_combo.count()):
         if win.provider_combo.itemData(i) == provider_id:
             win.provider_combo.setCurrentIndex(i)
-            return True
-    return False
+            return
+    raise AssertionError(
+        f"Provider '{provider_id}' fehlt in der Combo — erwartet aus "
+        f"api_providers.json. Angeboten: "
+        f"{[win.provider_combo.itemData(i) for i in range(win.provider_combo.count())]}"
+    )
 
 
 def test_analysis_choice_uses_the_combo_for_non_openrouter(win) -> None:
-    """Nur OpenRouter nutzt den filterbaren Selector — alle anderen die Combo."""
-    if not _select_provider(win, "anthropic"):
-        pytest.skip("Provider 'anthropic' nicht konfiguriert")
-    if win.model_combo.count() == 0:
-        pytest.skip("Keine Anthropic-Modelle konfiguriert")
+    """Nur OpenRouter nutzt den filterbaren Selector — alle anderen die Combo.
+
+    Der Regressionstest zum PR-#60-Blocker: `_current_analysis_choice` griff auf
+    `model_selector` zu, der für Nicht-OpenRouter-Provider `None` liefert — Plus
+    wäre für den Default-Provider Anthropic nie gestartet.
+    """
+    _select_provider(win, "anthropic")
+    assert win.model_combo.count() > 0, (
+        "Anthropic-Modelle fehlen — api_providers.json ist versioniert, das wäre "
+        "eine Regression (siehe tests/test_model_lists_consistency.py)"
+    )
     win.model_combo.setCurrentIndex(0)
     expected_id = win.model_combo.currentData()
 
@@ -327,18 +364,23 @@ def test_analysis_choice_uses_the_combo_for_non_openrouter(win) -> None:
     assert choice.provider_id == "anthropic"
     assert choice.model_id == expected_id
     assert choice.model_name, "Anzeigename darf nicht leer sein"
+    assert choice.model_name != choice.model_id, "Anzeigename statt roher ID erwartet"
 
 
 def test_analysis_choice_returns_none_without_a_model(win, monkeypatch) -> None:
+    """Ohne gewähltes Modell liefert die Auflösung None (statt zu werfen)."""
     monkeypatch.setattr(win, "_get_active_model_id", lambda: None)
     assert win._current_analysis_choice() is None
 
 
 def test_analysis_choice_matches_the_analysis_run(win) -> None:
-    """Plus MUSS dasselbe Modell nehmen, mit dem auch analysiert wird (§8.3)."""
+    """Plus MUSS dasselbe Modell nehmen, mit dem auch analysiert wird (Spec §8.3)."""
+    _select_provider(win, "anthropic")
+    win.model_combo.setCurrentIndex(0)
+
     choice = win._current_analysis_choice()
-    if choice is None:
-        pytest.skip("Kein Modell gewählt")
+
+    assert choice is not None
     assert choice.model_id == win._get_active_model_id()
 
 
@@ -398,7 +440,15 @@ def test_mode_switch_disables_stale_retry(win) -> None:
 
 # --- Verspätete Callbacks (Lauf-ID-Riegel) --------------------------------
 
-def _plus_result(status: str = "done"):
+def _plus_result(status: str = "done") -> mw.FactcheckPlusResult:
+    """Baut ein fertiges Plus-Ergebnis für die Callback-Tests.
+
+    Args:
+        status: Der Lauf-Status ("done" | "cancelled" | "skipped").
+
+    Returns:
+        Ein FactcheckPlusResult mit plausiblen Zählwerten.
+    """
     cfg = mw.FactcheckPlusConfig(
         claims=["x"], analysis_model=_choice("anthropic", "m"),
         research_model=_choice(),
@@ -428,6 +478,7 @@ def test_late_plus_result_is_discarded(win) -> None:
 
 
 def test_late_plus_error_is_discarded(win) -> None:
+    """Auch ein Fehler aus einem toten Lauf darf die neue Analyse nicht anfassen."""
     win.result_text.setPlainText("Neue Analyse")
     win._plus_active_run_id = 5
 
@@ -437,6 +488,7 @@ def test_late_plus_error_is_discarded(win) -> None:
 
 
 def test_current_plus_result_is_applied(win) -> None:
+    """Gegenprobe: Der Riegel darf das AKTUELLE Ergebnis nicht mitverwerfen."""
     win._verification_base_text = "Analyse"
     win._plus_active_run_id = 5
 
