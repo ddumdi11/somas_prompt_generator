@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.core.prompt_builder import (
     extract_claims_from_faktencheck,
+    extract_core_thesis,
     cap_claims,
     strip_basisfakt_marker,
     build_verification_prompt,
@@ -311,8 +312,37 @@ def test_charlimit_strip_preserves_transcript() -> None:
     print("  charlimit_strip_preserves_transcript: Transkript-Zeile bleibt, Kontrollzeilen weg OK")
 
 
+def test_extract_core_thesis() -> None:
+    """Die Kernthese ist der Maßstab für thesis_proximity (Faktencheck Plus, S2)."""
+    analysis = (
+        "### FRAMING\nRahmen.\n\n"
+        "### KERNTHESE\nDie Kosten sind massiv\nund steigen weiter.\n\n"
+        "### ELABORATION\nAnderer Text.\n"
+    )
+    thesis = extract_core_thesis(analysis)
+    assert thesis == "Die Kosten sind massiv und steigen weiter."
+    assert "Anderer Text" not in thesis, "Abschnitt endet am nächsten ###-Header"
+    print("  extract_core_thesis: Abschnitt sauber isoliert OK")
+
+
+def test_extract_core_thesis_edge_cases() -> None:
+    """Fehlt die Kernthese, läuft Plus ohne Kontext weiter — kein harter Fehler."""
+    assert extract_core_thesis("") == ""
+    assert extract_core_thesis("### FRAMING\nNur Rahmen.\n") == ""
+    # Header ohne Leerzeichen (manche Modelle) wird normalisiert.
+    assert extract_core_thesis("###KERNTHESE\nText.\n") == "Text."
+    # Kernthese am Ende ohne Folge-Header.
+    assert extract_core_thesis("### KERNTHESE\nLetzter Abschnitt.") == "Letzter Abschnitt."
+    # Kappung greift.
+    long_thesis = "### KERNTHESE\n" + ("x" * 900)
+    assert len(extract_core_thesis(long_thesis, limit=100)) == 100
+    print("  extract_core_thesis_edge_cases: fehlend/normalisiert/gekappt OK")
+
+
 def main():
     print("Faktencheck-Parser-Tests:")
+    test_extract_core_thesis()
+    test_extract_core_thesis_edge_cases()
     test_extract_standard()
     test_extract_robust()
     test_extract_headings_without_space()
