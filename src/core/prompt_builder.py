@@ -1015,6 +1015,51 @@ def _split_consecutive_claims(region: str) -> list[str]:
     return claims
 
 
+def extract_core_thesis(analysis_text: str, limit: int = 600) -> str:
+    """Extrahiert den ``### KERNTHESE``-Abschnitt als Kontext für Faktencheck Plus.
+
+    Die Kernthese ist der Bezugspunkt, an dem der ArgumentMapper (S2) die
+    These-Nähe misst — ohne sie fehlt der wichtigsten Rating-Dimension der
+    Maßstab. ``KERNTHESE`` ist einer der vier kanonischen SOMAS-Abschnitte
+    (:data:`_CANONICAL_SECTIONS`) und daher in jeder gültigen Analyse vorhanden.
+
+    Bewusst nur eine Kontext-Hilfe: Fehlt der Abschnitt, ist das Ergebnis leer
+    und die Plus-Pipeline läuft ohne Kernthesen-Kontext weiter (die Prompts
+    lassen den Kontextblock dann weg). Kein Grund, einen Lauf zu verweigern.
+
+    Args:
+        analysis_text: Der vollständige SOMAS-Analysetext.
+        limit: Maximale Zeichenzahl des Rückgabewerts.
+
+    Returns:
+        Der Abschnittstext, einzeilig normalisiert und gekappt ("" wenn nicht
+        gefunden).
+    """
+    if not analysis_text:
+        return ""
+
+    normalized = normalize_markdown_headings(analysis_text)
+    lines = normalized.splitlines()
+
+    header_re = re.compile(r"^\s*###\s*KERNTHESE\b", re.IGNORECASE)
+    start = None
+    for i, line in enumerate(lines):
+        if header_re.match(line):
+            start = i
+            break
+    if start is None:
+        return ""
+
+    end = len(lines)
+    for j in range(start + 1, len(lines)):
+        if re.match(r"^\s*###\s", lines[j]):
+            end = j
+            break
+
+    body = " ".join(" ".join(lines[start + 1:end]).split())
+    return body[:limit]
+
+
 def extract_claims_from_faktencheck(analysis_text: str) -> list[str]:
     """Extrahiert NUR die nummerierten Behauptungen aus dem FAKTENCHECK-Block.
 

@@ -1,0 +1,359 @@
+"""GUI-Flow-Tests für Faktencheck Plus (v0.13.0, PR 4).
+
+Deckt Spec §4 ab:
+- Die SpinBox trägt zwei Bedeutungen (Cap vs. Deep-Research-Budget) — Label,
+  Wertebereich und Wert wechseln mit dem Modus, und beide Werte überleben den
+  Wechsel in getrennten Preference-Keys.
+- Der Ausschluss mit dem Modellvergleich gilt auch für Plus (Plus hängt an der
+  Verifikations-Checkbox, die den Ausschluss bereits trägt).
+- Der Start-Pfad verzweigt korrekt: Plus → FactcheckPlusWorker (ungekappt,
+  Analyse-Modell + Recherchemodell), Classic → VerificationWorker (gekappt).
+- Der Race-Schutz kennt BEIDE Worker.
+
+Läuft headless über die Qt-Offscreen-Plattform; Worker-Start und Dialoge sind
+gestubbt — geprüft wird die Entscheidungs- und Zustandslogik in main_window.
+
+Lauf (ohne pytest):  QT_QPA_PLATFORM=offscreen python tests/test_factcheck_plus_gui.py
+"""
+import os
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from PyQt6.QtWidgets import QApplication, QMessageBox
+
+import src.gui.main_window as mw
+from src.gui.main_window import (
+    CLASSIC_SPIN_LABEL, DEFAULT_PLUS_BUDGET, PLUS_BUDGET_RANGE, PLUS_SPIN_LABEL,
+)
+
+ANALYSIS_WITH_FAKTENCHECK = """### FRAMING
+Rahmen.
+
+### KERNTHESE
+Die Aktivitaeten der IRGC verursachen in Europa massive Kosten.
+
+### ELABORATION
+Text.
+
+### IMPLIKATION
+Text.
+
+### FAKTENCHECK
+**Meinungen:** 1. Das ist unverantwortlich.
+**Interpretationen:** 1. Ein politischer Erfolg.
+**Behauptungen (überprüfbar):** 1. Die Kosten liegen bei 100 Mrd. Euro pro Jahr.
+2. Die IRGC ist seit 2023 gelistet. [Basisfakt]
+3. Die Analyse stammt von einem Institut.
+"""
+
+
+@pytest.fixture(scope="module")
+def app():
+    return QApplication.instance() or QApplication([])
+
+
+@pytest.fixture
+def win(app, monkeypatch, tmp_path):
+    """Frisches MainWindow mit isolierten Preferences und stummen Dialogen."""
+    prefs: dict = {}
+    monkeypatch.setattr(mw, "load_preferences", lambda: dict(prefs))
+    monkeypatch.setattr(mw, "save_preferences", lambda p: prefs.update(p))
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: None)
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
+    monkeypatch.setattr(QMessageBox, "critical", lambda *a, **k: None)
+    window = mw.MainWindow()
+    window._prefs_spy = prefs
+    return window
+
+
+class _FakeWorker:
+    """Worker-Doppelgänger: fängt start() ab, damit kein Thread/Netzwerk läuft."""
+
+    instances: list = []
+
+    def __init__(self, config, debug_logger=None):
+        self.config = config
+        self.started = False
+        type(self).instances.append(self)
+
+    def __getattr__(self, name):
+        # status_changed/finished_ok/... — Signale schlucken.
+        class _Sig:
+            def connect(self, *_a, **_k):
+                return None
+        return _Sig()
+
+    def start(self):
+        self.started = True
+
+    def isRunning(self):
+        return self.started
+
+    def cancel(self):
+        self.started = False
+
+    def wait(self, _ms=0):
+        return True
+
+
+@pytest.fixture
+def workers(monkeypatch):
+    """Ersetzt beide Worker durch Doppelgänger und liefert die Instanzlisten."""
+    class PlusWorker(_FakeWorker):
+        instances: list = []
+
+    class ClassicWorker(_FakeWorker):
+        instances: list = []
+
+    monkeypatch.setattr(mw, "FactcheckPlusWorker", PlusWorker)
+    monkeypatch.setattr(mw, "VerificationWorker", ClassicWorker)
+    return {"plus": PlusWorker, "classic": ClassicWorker}
+
+
+def _choice(provider="perplexity", model="sonar-pro"):
+    return mw.ModelChoice(
+        provider_id=provider, model_id=model,
+        model_name=model, provider_name=provider,
+    )
+
+
+# --- SpinBox: zwei Bedeutungen, eine Box ----------------------------------
+
+def test_spin_starts_in_classic_mode(win) -> None:
+    assert win.verify_plus_checkbox.isChecked() is False
+    assert win.verify_max_label.text() == CLASSIC_SPIN_LABEL
+    assert (win.verify_max_spin.minimum(), win.verify_max_spin.maximum()) == (0, 100)
+
+
+def test_plus_toggle_switches_the_spin_meaning(win) -> None:
+    win.verify_max_spin.setValue(25)
+    win.verify_plus_checkbox.setChecked(True)
+
+    assert win.verify_max_label.text() == PLUS_SPIN_LABEL
+    assert (win.verify_max_spin.minimum(), win.verify_max_spin.maximum()) == PLUS_BUDGET_RANGE
+    assert win.verify_max_spin.value() == DEFAULT_PLUS_BUDGET
+
+
+def test_both_values_survive_a_mode_round_trip(win) -> None:
+    """Der Cap darf nicht vom Budget überschrieben werden — und umgekehrt."""
+    win.verify_max_spin.setValue(25)       # Classic-Cap
+    win.verify_plus_checkbox.setChecked(True)
+    win.verify_max_spin.setValue(12)       # Plus-Budget
+    win.verify_plus_checkbox.setChecked(False)
+
+    assert win.verify_max_spin.value() == 25, "Classic-Cap überlebt"
+    win.verify_plus_checkbox.setChecked(True)
+    assert win.verify_max_spin.value() == 12, "Plus-Budget überlebt"
+
+
+def test_values_go_into_separate_preference_keys(win) -> None:
+    win.verify_max_spin.setValue(25)
+    win.verify_plus_checkbox.setChecked(True)
+    win.verify_max_spin.setValue(12)
+
+    prefs = win._prefs_spy
+    assert prefs["verification_max_claims"] == 25
+    assert prefs["factcheck_plus_budget"] == 12
+    assert prefs["factcheck_plus_enabled"] is True
+
+
+def test_mode_switch_does_not_write_the_wrong_key(win) -> None:
+    """Regression: Range/Wert-Umsetzen darf keinen valueChanged-Schreiber auslösen."""
+    win.verify_max_spin.setValue(25)
+    win._prefs_spy.clear()
+    win.verify_plus_checkbox.setChecked(True)
+
+    assert "verification_max_claims" not in win._prefs_spy, (
+        "Der Moduswechsel hat den Classic-Cap überschrieben"
+    )
+    assert win._verification_max_claims == 25
+
+
+def test_plus_preference_is_restored_on_startup(app, monkeypatch) -> None:
+    prefs = {"factcheck_plus_enabled": True, "factcheck_plus_budget": 15,
+             "verification_max_claims": 42}
+    monkeypatch.setattr(mw, "load_preferences", lambda: dict(prefs))
+    monkeypatch.setattr(mw, "save_preferences", lambda p: None)
+    window = mw.MainWindow()
+
+    assert window.verify_plus_checkbox.isChecked() is True
+    assert window.verify_max_label.text() == PLUS_SPIN_LABEL
+    assert window.verify_max_spin.value() == 15
+
+
+# --- Ausschluss mit dem Modellvergleich -----------------------------------
+
+def test_plus_is_excluded_with_comparison_via_the_verify_checkbox(win) -> None:
+    """Plus hängt an der Verify-Checkbox, die den Ausschluss bereits trägt."""
+    win.verify_checkbox.setChecked(True)
+    win.verify_plus_checkbox.setChecked(True)
+    assert win.compare_checkbox.isEnabled() is False
+
+    win.compare_checkbox.setEnabled(True)
+    win.compare_checkbox.setChecked(True)
+    assert win.verify_checkbox.isChecked() is False, "Vergleich schaltet Verifikation ab"
+    # …und damit auch den Plus-Pfad: ohne Verify-Checkbox startet keine Stufe 2.
+
+
+def test_plus_checkbox_lives_inside_the_verify_section(win) -> None:
+    """Sichtbar nur bei aktiver Verifikation (Spec §4).
+
+    Geprüft wird `isHidden()`, nicht `isVisible()`: Ohne gezeigtes Fenster ist
+    headless jedes Widget „unsichtbar", `isHidden()` spiegelt dagegen die
+    explizit gesetzte Sichtbarkeit.
+    """
+    win.verify_checkbox.setChecked(False)
+    assert win.verify_section.isHidden() is True
+    win.verify_checkbox.setChecked(True)
+    assert win.verify_section.isHidden() is False
+    # Der Plus-Schalter sitzt IN der Sektion — er teilt ihr Schicksal.
+    assert win.verify_plus_checkbox.parent() is not None
+
+
+# --- Start-Pfad -----------------------------------------------------------
+
+def _prepare(win, plus: bool):
+    win._verification_base_text = ANALYSIS_WITH_FAKTENCHECK
+    win.verify_checkbox.setChecked(True)
+    win.verify_plus_checkbox.setChecked(plus)
+
+
+def test_plus_mode_starts_the_plus_worker(win, workers, monkeypatch) -> None:
+    _prepare(win, plus=True)
+    monkeypatch.setattr(
+        win, "_current_analysis_choice", lambda: _choice("anthropic", "claude-sonnet-4-6")
+    )
+
+    win._start_verification(_choice())
+
+    assert len(workers["plus"].instances) == 1
+    assert workers["classic"].instances == []
+    cfg = workers["plus"].instances[0].config
+    assert cfg.research_model.model_id == "sonar-pro"
+    assert cfg.analysis_model.model_id == "claude-sonnet-4-6"
+
+
+def test_classic_mode_starts_the_classic_worker(win, workers) -> None:
+    _prepare(win, plus=False)
+
+    win._start_verification(_choice())
+
+    assert len(workers["classic"].instances) == 1
+    assert workers["plus"].instances == []
+
+
+def test_plus_passes_claims_uncapped_but_without_basisfakten(win, workers, monkeypatch) -> None:
+    """Im Plus-Modus wählt der Scorer aus — die GUI kappt nicht (Spec §4)."""
+    _prepare(win, plus=True)
+    win.verify_max_spin.setValue(1)  # Budget 1 — darf die Liste NICHT kappen
+    monkeypatch.setattr(win, "_current_analysis_choice", lambda: _choice("anthropic", "m"))
+
+    win._start_verification(_choice())
+
+    cfg = workers["plus"].instances[0].config
+    assert len(cfg.claims) == 2, "beide Nicht-Basisfakt-Claims, ungekappt"
+    assert cfg.budget == 1
+    assert not any("Basisfakt" in c for c in cfg.claims)
+    assert not any("2023 gelistet" in c for c in cfg.claims), "Basisfakt fliegt raus"
+
+
+def test_plus_extracts_the_core_thesis_as_context(win, workers, monkeypatch) -> None:
+    """Ohne Kernthese fehlt S2 der Maßstab für thesis_proximity."""
+    _prepare(win, plus=True)
+    monkeypatch.setattr(win, "_current_analysis_choice", lambda: _choice("anthropic", "m"))
+
+    win._start_verification(_choice())
+
+    cfg = workers["plus"].instances[0].config
+    assert "IRGC" in cfg.core_thesis
+    assert "massive Kosten" in cfg.core_thesis
+
+
+def test_plus_without_analysis_model_fails_gracefully(win, workers, monkeypatch) -> None:
+    """Kein Analyse-Modell → Hinweis im Abschnitt, kein Absturz, kein Worker."""
+    _prepare(win, plus=True)
+    monkeypatch.setattr(win, "_current_analysis_choice", lambda: None)
+
+    win._start_verification(_choice())
+
+    assert workers["plus"].instances == []
+    assert "Kein Analyse-Modell" in win.result_text.toPlainText()
+
+
+def test_plus_marks_web_unverified_for_non_web_models(win, workers, monkeypatch) -> None:
+    _prepare(win, plus=True)
+    monkeypatch.setattr(win, "_current_analysis_choice", lambda: _choice("anthropic", "m"))
+
+    win._start_verification(_choice("anthropic", "claude-sonnet-4-6"))
+
+    assert workers["plus"].instances[0].config.web_unverified is True
+
+
+# --- Race-Schutz ----------------------------------------------------------
+
+def test_running_check_knows_both_workers(win, workers, monkeypatch) -> None:
+    """Regression: Der Race-Schutz darf keinen der beiden Worker vergessen."""
+    assert win._verification_is_running() is False
+
+    _prepare(win, plus=True)
+    monkeypatch.setattr(win, "_current_analysis_choice", lambda: _choice("anthropic", "m"))
+    win._start_verification(_choice())
+
+    assert win._verification_is_running() is True, "Plus-Lauf wird erkannt"
+
+
+def test_running_plus_locks_the_source_and_the_mode(win, workers, monkeypatch) -> None:
+    _prepare(win, plus=True)
+    monkeypatch.setattr(win, "_current_analysis_choice", lambda: _choice("anthropic", "m"))
+    win._start_verification(_choice())
+
+    assert win.url_input.isEnabled() is False, "Quelle gesperrt (Stale-State-Riegel)"
+    assert win.btn_get_meta.isEnabled() is False
+    assert win.verify_plus_checkbox.isEnabled() is False, "Modus während des Laufs fix"
+    assert win.verify_online_checkbox.isEnabled() is False
+    assert win.btn_verify_cancel.isEnabled() is True
+
+
+def test_cancel_stops_the_plus_worker(win, workers, monkeypatch) -> None:
+    _prepare(win, plus=True)
+    monkeypatch.setattr(win, "_current_analysis_choice", lambda: _choice("anthropic", "m"))
+    win._start_verification(_choice())
+
+    win._on_verify_cancel()
+
+    assert workers["plus"].instances[0].started is False
+    assert win.btn_verify_cancel.isEnabled() is False
+
+
+def test_retry_is_blocked_while_plus_runs(win, workers, monkeypatch) -> None:
+    _prepare(win, plus=True)
+    monkeypatch.setattr(win, "_current_analysis_choice", lambda: _choice("anthropic", "m"))
+    win._start_verification(_choice())
+    workers["plus"].instances.clear()
+
+    win._on_verify_retry()
+
+    assert workers["plus"].instances == [], "kein zweiter Lauf während eines Laufs"
+
+
+def test_mode_switch_disables_stale_retry(win) -> None:
+    """Ein Abschnitt aus dem anderen Modus darf nicht per Retry ersetzt werden."""
+    win.btn_verify_retry.setEnabled(True)
+    win.verify_plus_checkbox.setChecked(True)
+    assert win.btn_verify_retry.isEnabled() is False
+
+
+def main() -> None:
+    """Hinweis: Diese Suite braucht pytest (Fixtures/monkeypatch)."""
+    print("Bitte mit pytest ausführen:  python -m pytest tests/test_factcheck_plus_gui.py")
+
+
+if __name__ == "__main__":
+    main()

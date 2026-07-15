@@ -17,7 +17,7 @@ from src.core.prompt_builder import (
     build_prompt, build_prompt_from_transcript,
     load_presets, get_preset_by_name, get_preset_by_id, PromptPreset,
     get_anti_monotony_hint,
-    extract_claims_from_faktencheck, cap_claims,
+    extract_claims_from_faktencheck, cap_claims, extract_core_thesis,
 )
 from src.core.linkedin_formatter import format_for_linkedin
 from src.core.export import (
@@ -39,6 +39,8 @@ from src.core.comparison_item import ComparisonConfig, ModelChoice
 from src.core.comparison_worker import ComparisonWorker
 from src.core.verification_item import VerificationConfig, VerificationResult
 from src.core.verification_worker import VerificationWorker
+from src.core.factcheck_plus_item import FactcheckPlusConfig, FactcheckPlusResult
+from src.core.factcheck_plus_worker import FactcheckPlusWorker
 from src.config.api_config import (
     load_providers, get_api_key, has_api_key,
     get_last_provider, get_last_model, save_last_selection,
@@ -52,6 +54,23 @@ logger = logging.getLogger(__name__)
 # Antwort signalisieren. Providerübergreifend normalisiert (Anthropic "max_tokens"
 # → "length" im Client), hier defensiv trotzdem alle Varianten erfasst.
 _TRUNCATION_FINISH_REASONS = frozenset({"length", "max_tokens", "truncated"})
+
+# v0.13.0: Die SpinBox der Verifikations-Sektion bedeutet je nach Modus etwas
+# anderes — Classic kappt die Behauptungsliste, Plus vergibt ein
+# Deep-Research-Budget (die Auswahl trifft dort der PolicyScorer).
+CLASSIC_SPIN_LABEL = "Max. zu prüfende Behauptungen:"
+CLASSIC_SPIN_TOOLTIP = "0 = unbegrenzt (alle Behauptungen prüfen)."
+PLUS_SPIN_LABEL = "Deep-Research-Budget:"
+PLUS_SPIN_TOOLTIP = (
+    "Wie viele Behauptungen maximal recherchiert werden. Die Auswahl trifft eine "
+    "versionierte Policy nach argumentativem Gewicht — nicht die Reihenfolge der "
+    "Liste. Jede ausgewählte Behauptung kostet einen eigenen API-Call."
+)
+DEFAULT_PLUS_BUDGET = 8
+# Untergrenze 1: Ein Budget von 0 hieße „nichts recherchieren" — im Classic-Modus
+# bedeutet die 0 dagegen „unbegrenzt". Zwei Bedeutungen, eine Box: die Grenzen
+# wechseln daher mit dem Modus.
+PLUS_BUDGET_RANGE = (1, 50)
 
 
 def _is_truncated_finish_reason(finish_reason: str) -> bool:
@@ -197,6 +216,15 @@ class MainWindow(QMainWindow):
         # Analyse-Text OHNE Verifikationsabschnitt (Basis für Retry, v0.10.1)
         self._verification_base_text: str = ""
 
+        # Faktencheck-Plus-State (v0.13.0). Eigener Worker und eigener
+        # Budget-Wert: Die SpinBox zeigt je nach Modus das eine ODER das andere,
+        # aber beide Werte bleiben erhalten und werden getrennt persistiert.
+        self._factcheck_plus_worker: FactcheckPlusWorker | None = None
+        self._factcheck_plus_enabled: bool = prefs.get("factcheck_plus_enabled", False)
+        self._factcheck_plus_budget: int = prefs.get(
+            "factcheck_plus_budget", DEFAULT_PLUS_BUDGET
+        )
+
         # Lade Presets mit Fehlerbehandlung
         try:
             self.presets = load_presets()
@@ -212,6 +240,9 @@ class MainWindow(QMainWindow):
 
         self._setup_ui()
         self._connect_signals()
+        # Die Plus-Checkbox wird VOR dem Signal-Connect gesetzt, ihr Handler
+        # feuert also nicht — die SpinBox einmalig auf den Modus einnorden.
+        self._apply_spin_mode(self._factcheck_plus_enabled)
         self._on_preset_changed()  # Initialisiere mit erstem Preset
         self._restore_api_selection()  # Letzte Provider/Modell-Auswahl wiederherstellen
         self._check_batch_recovery()  # Unvollständige Batch-Sessions prüfen
@@ -621,12 +652,30 @@ class MainWindow(QMainWindow):
         )
         verify_layout.addWidget(self.verify_online_checkbox)
 
+        # --- Faktencheck Plus (v0.13.0) — argumentgewichtete Recherche ---
+        self.verify_plus_checkbox = QCheckBox(
+            "Faktencheck Plus (argumentgewichtete Recherche)"
+        )
+        self.verify_plus_checkbox.setToolTip(
+            "Prüft vorrangig zentrale, strittige und folgenreiche Behauptungen. "
+            "Überspringt Basisfakten und dokumentiert die Auswahlkriterien.\n\n"
+            "Kosten: Der Plus-Modus macht 3 + N API-Calls statt 1 (N = Budget) — "
+            "Verfeinerung, Gewichtung und Recherche-Planung laufen über das "
+            "Analyse-Modell, die Recherche pro Behauptung über das "
+            "Verifikationsmodell."
+        )
+        self.verify_plus_checkbox.setChecked(self._factcheck_plus_enabled)
+        verify_layout.addWidget(self.verify_plus_checkbox)
+
         verify_opts = QHBoxLayout()
-        verify_opts.addWidget(QLabel("Max. zu prüfende Behauptungen:"))
+        # Label und Bedeutung wechseln mit dem Modus: Classic kappt die Liste,
+        # Plus vergibt ein Deep-Research-Budget (die Auswahl trifft der Scorer).
+        self.verify_max_label = QLabel(CLASSIC_SPIN_LABEL)
+        verify_opts.addWidget(self.verify_max_label)
         self.verify_max_spin = QSpinBox()
         self.verify_max_spin.setRange(0, 100)
         self.verify_max_spin.setValue(self._verification_max_claims)
-        self.verify_max_spin.setToolTip("0 = unbegrenzt (alle Behauptungen prüfen).")
+        self.verify_max_spin.setToolTip(CLASSIC_SPIN_TOOLTIP)
         verify_opts.addWidget(self.verify_max_spin)
         verify_opts.addStretch()
         # Nur Stufe 2 auf den vorhandenen Behauptungen wiederholen (z. B. nach
@@ -817,6 +866,7 @@ class MainWindow(QMainWindow):
         self.compare_checkbox.toggled.connect(self._on_compare_toggled)
         self.verify_checkbox.toggled.connect(self._on_verify_toggled)
         self.verify_max_spin.valueChanged.connect(self._on_verify_max_changed)
+        self.verify_plus_checkbox.toggled.connect(self._on_verify_plus_toggled)
         self.provider_combo.currentIndexChanged.connect(self._on_provider_changed)
         self.model_combo.currentIndexChanged.connect(self._on_model_changed)
         self.model_selector.model_selected.connect(self._on_openrouter_model_selected)
@@ -1020,9 +1070,12 @@ class MainWindow(QMainWindow):
         """Handler für 'Get Meta' Button."""
         # Defensiv: laufende Verifikation abbrechen, damit ihr Callback nicht
         # in die neue Analyse hineinschreibt (Stale-State / Race-Condition).
-        if self._verification_worker and self._verification_worker.isRunning():
-            self._verification_worker.cancel()
-            self._verification_worker.wait(2000)
+        # Gilt für beide Wege — Plus läuft deutlich länger und ist damit umso
+        # eher noch aktiv, wenn der Nutzer schon das nächste Video lädt.
+        for worker in (self._verification_worker, self._factcheck_plus_worker):
+            if worker and worker.isRunning():
+                worker.cancel()
+                worker.wait(2000)
 
         url = self.url_input.text().strip()
         if not url:
@@ -2501,11 +2554,59 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(int)
     def _on_verify_max_changed(self, value: int) -> None:
-        """Persistiert die Obergrenze der zu prüfenden Behauptungen."""
-        self._verification_max_claims = value
+        """Persistiert den SpinBox-Wert — je nach Modus Cap oder Budget.
+
+        Dieselbe Box trägt zwei Bedeutungen (Spec §4), deshalb geht der Wert in
+        den jeweils passenden Preference-Key. So bleibt der andere Wert erhalten,
+        wenn der Nutzer zwischen den Modi wechselt.
+        """
         prefs = load_preferences()
-        prefs["verification_max_claims"] = value
+        if self.verify_plus_checkbox.isChecked():
+            self._factcheck_plus_budget = value
+            prefs["factcheck_plus_budget"] = value
+        else:
+            self._verification_max_claims = value
+            prefs["verification_max_claims"] = value
         save_preferences(prefs)
+
+    @pyqtSlot(bool)
+    def _on_verify_plus_toggled(self, checked: bool) -> None:
+        """Schaltet zwischen Classic- und Plus-Modus um.
+
+        Die SpinBox wird umgedeutet (Label, Tooltip, Wertebereich, Wert), und der
+        Retry-Button wird deaktiviert: Ein bestehender Verifikationsabschnitt
+        stammt aus dem anderen Modus, ein Retry würde ihn stillschweigend durch
+        einen andersartigen ersetzen.
+        """
+        self._factcheck_plus_enabled = checked
+        prefs = load_preferences()
+        prefs["factcheck_plus_enabled"] = checked
+        save_preferences(prefs)
+        self._apply_spin_mode(checked)
+        self.btn_verify_retry.setEnabled(False)
+
+    def _apply_spin_mode(self, plus: bool) -> None:
+        """Deutet die SpinBox auf den gewählten Modus um (Label/Range/Wert).
+
+        Args:
+            plus: True = Deep-Research-Budget, False = Behauptungs-Obergrenze.
+        """
+        # Der valueChanged-Handler würde beim Umsetzen von Range/Wert feuern und
+        # den Wert in den falschen Preference-Key schreiben.
+        self.verify_max_spin.blockSignals(True)
+        try:
+            if plus:
+                self.verify_max_label.setText(PLUS_SPIN_LABEL)
+                self.verify_max_spin.setToolTip(PLUS_SPIN_TOOLTIP)
+                self.verify_max_spin.setRange(*PLUS_BUDGET_RANGE)
+                self.verify_max_spin.setValue(self._factcheck_plus_budget)
+            else:
+                self.verify_max_label.setText(CLASSIC_SPIN_LABEL)
+                self.verify_max_spin.setToolTip(CLASSIC_SPIN_TOOLTIP)
+                self.verify_max_spin.setRange(0, 100)
+                self.verify_max_spin.setValue(self._verification_max_claims)
+        finally:
+            self.verify_max_spin.blockSignals(False)
 
     @staticmethod
     def _looks_web_capable(choice: ModelChoice) -> bool:
@@ -2581,6 +2682,10 @@ class MainWindow(QMainWindow):
         self.verify_checkbox.setEnabled(not running)
         self.verify_picker.set_enabled(not running)
         self.verify_max_spin.setEnabled(not running)
+        # Modus-Umschalter und :online-Suffix ändern die Bedeutung eines
+        # laufenden Verifikationslaufs — während des Laufs gesperrt.
+        self.verify_plus_checkbox.setEnabled(not running)
+        self.verify_online_checkbox.setEnabled(not running)
         self.btn_batch.setEnabled(not running)
         # Quelle sperren: verhindert, dass ein neues Video das Ergebnis leert,
         # während die Stufe-2-Sektion noch angehängt wird (Stale-State / Race).
@@ -2605,6 +2710,17 @@ class MainWindow(QMainWindow):
         self._start_verification(sel)
 
     def _start_verification(self, sel: ModelChoice) -> None:
+        """Startet Stufe 2 — im Plus- oder im Classic-Modus.
+
+        Args:
+            sel: Das Verifikationsmodell (bei Plus nur für die Recherche, S5).
+        """
+        if self.verify_plus_checkbox.isChecked():
+            self._start_factcheck_plus(sel)
+            return
+        self._start_verification_classic(sel)
+
+    def _start_verification_classic(self, sel: ModelChoice) -> None:
         """Baut Config aus dem Basis-Text + Modellauswahl und startet den Worker."""
         all_claims = extract_claims_from_faktencheck(self._verification_base_text)
         claims, total = cap_claims(all_claims, self._verification_max_claims)
@@ -2631,10 +2747,141 @@ class MainWindow(QMainWindow):
         )
         worker.start()
 
+    # ── Faktencheck Plus (v0.13.0) ────────────────────────────────────
+
+    def _current_analysis_choice(self) -> ModelChoice | None:
+        """Liefert das aktuell gewählte Analyse-Modell als ``ModelChoice``.
+
+        Plus lässt Refiner/Mapper/Planner über das Analyse-Modell laufen — es
+        gibt bewusst keinen eigenen Picker dafür (PO-Entscheidung, Spec §8.3).
+
+        Returns:
+            Die Auswahl oder ``None``, wenn kein Modell gewählt ist.
+        """
+        provider_id = self.provider_combo.currentData()
+        model_id = self.model_selector.get_selected_model_id()
+        if not provider_id or not model_id:
+            return None
+        return ModelChoice(
+            provider_id=provider_id,
+            model_id=model_id,
+            model_name=self.model_selector.get_selected_model_name() or model_id,
+            provider_name=self.provider_combo.currentText() or provider_id,
+        )
+
+    def _start_factcheck_plus(self, sel: ModelChoice) -> None:
+        """Startet den Plus-Lauf (S1–S5).
+
+        Anders als Classic wird hier NICHT gekappt: Der PolicyScorer wählt nach
+        argumentativem Gewicht aus, das Budget begrenzt. `cap_claims(…, 0)`
+        entfernt lediglich die Basisfakten und liefert die volle Restliste.
+
+        Args:
+            sel: Das Recherchemodell (S5) — web-fähig.
+        """
+        analysis_model = self._current_analysis_choice()
+        if analysis_model is None:
+            # Ohne Analyse-Modell kein Plus-Lauf. Der Classic-Weg bleibt möglich,
+            # deshalb ist das ein Hinweis, kein harter Fehler.
+            self._on_plus_error(
+                "Kein Analyse-Modell gewählt — Faktencheck Plus braucht es für "
+                "Verfeinerung, Gewichtung und Recherche-Planung."
+            )
+            return
+
+        all_claims = extract_claims_from_faktencheck(self._verification_base_text)
+        claims, _total = cap_claims(all_claims, 0)
+        config = FactcheckPlusConfig(
+            claims=claims,
+            analysis_model=analysis_model,
+            research_model=sel,
+            budget=self._factcheck_plus_budget,
+            language=self.config.language,
+            core_thesis=extract_core_thesis(self._verification_base_text),
+            source_title=self.video_info.title if self.video_info else "",
+            source_url=self.video_info.url if self.video_info else "",
+            web_unverified=not self._looks_web_capable(sel),
+        )
+
+        worker = FactcheckPlusWorker(config, debug_logger=self._debug_logger)
+        worker.status_changed.connect(self._on_verify_status)
+        worker.stage_changed.connect(self._on_plus_stage)
+        worker.finished_ok.connect(self._on_plus_finished)
+        worker.error_occurred.connect(self._on_plus_error)
+        worker.finished.connect(lambda: self._set_verification_running(False))
+
+        self._factcheck_plus_worker = worker
+        self._set_verification_running(True)
+        self.verify_section.set_summary("Faktencheck Plus startet …", color="#1565C0")
+        logger.info(
+            "Faktencheck Plus: %d Behauptungen, Budget %d, Analyse=%s, Recherche=%s",
+            len(claims), config.budget, analysis_model.model_id, sel.model_id,
+        )
+        worker.start()
+
+    @pyqtSlot(str, int, int)
+    def _on_plus_stage(self, text: str, index: int, total: int) -> None:
+        """Zeigt den Stufenfortschritt im Sektions-Header an.
+
+        Der Plus-Lauf macht 3 + N Calls und dauert entsprechend — ohne diese
+        Anzeige stünde die App minutenlang scheinbar still.
+        """
+        self.verify_section.set_summary(f"[{index}/{total}] {text}", color="#1565C0")
+
+    @pyqtSlot(str, object)
+    def _on_plus_finished(self, section: str, result: FactcheckPlusResult) -> None:
+        """Hängt den fertigen Plus-Abschnitt an die Analyse an."""
+        self._set_result_with_verification(section)
+
+        if result.status == "skipped":
+            self.verify_section.set_summary(
+                "Keine überprüfbaren Behauptungen", color="#888888"
+            )
+        elif result.status == "cancelled":
+            self.verify_section.set_summary(
+                f"Abgebrochen — {result.verified_count} von "
+                f"{result.selected_count} geprüft",
+                color="#C62828",
+            )
+        else:
+            summary = (
+                f"Plus: {result.verified_count} von {result.refined_count} "
+                f"Prüfeinheiten recherchiert"
+            )
+            if result.failed_count:
+                summary += f" ({result.failed_count} fehlgeschlagen)"
+            self.verify_section.set_summary(summary, color="#2E7D32")
+
+        if self._verification_base_text:
+            self.btn_verify_retry.setEnabled(True)
+
+    @pyqtSlot(str)
+    def _on_plus_error(self, message: str) -> None:
+        """Meldet einen Plus-Fehler, ohne die Analyse zu verlieren."""
+        logger.warning("Faktencheck Plus fehlgeschlagen: %s", message)
+        self._set_result_with_verification(
+            "---\n\n### FAKTENCHECK · VERIFIKATION PLUS\n"
+            f"_Faktencheck Plus fehlgeschlagen: {message}_\n"
+        )
+        self.verify_section.set_summary("Plus fehlgeschlagen", color="#C62828")
+        if self._verification_base_text:
+            self.btn_verify_retry.setEnabled(True)
+
+    def _verification_is_running(self) -> bool:
+        """True, wenn ein Verifikationslauf läuft — Classic ODER Plus.
+
+        Zentral, damit die Abfrage nicht an jeder Aufrufstelle einen der beiden
+        Worker vergisst (Race-Schutz, Abbruch, Retry).
+        """
+        for worker in (self._verification_worker, self._factcheck_plus_worker):
+            if worker and worker.isRunning():
+                return True
+        return False
+
     @pyqtSlot()
     def _on_verify_retry(self) -> None:
         """Wiederholt NUR Stufe 2 auf den vorhandenen Behauptungen (Modellwechsel ok)."""
-        if self._verification_worker and self._verification_worker.isRunning():
+        if self._verification_is_running():
             return
         if self._api_worker and self._api_worker.isRunning():
             # Analyse läuft noch (Auto-Anhang folgt) — kein paralleler Retry,
@@ -2705,11 +2952,31 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot()
     def _on_verify_cancel(self) -> None:
-        """Bricht einen laufenden Verifikationslauf ab."""
-        if self._verification_worker and self._verification_worker.isRunning():
-            self._verification_worker.cancel()
+        """Bricht einen laufenden Verifikationslauf ab (Classic oder Plus).
+
+        Beim Plus-Lauf ist der Abbruch kein Verlust: S5 hält zwischen den Claims
+        an, und der Worker meldet das Teilergebnis weiterhin über ``finished_ok``
+        — der Bericht weist den Abbruch dann sichtbar aus. Deshalb setzt dieser
+        Handler die Summary nicht selbst, wenn Plus läuft.
+        """
+        if not self._verification_is_running():
+            return
+
+        plus_running = bool(
+            self._factcheck_plus_worker and self._factcheck_plus_worker.isRunning()
+        )
+        for worker in (self._verification_worker, self._factcheck_plus_worker):
+            if worker and worker.isRunning():
+                worker.cancel()
+
+        self.btn_verify_cancel.setEnabled(False)
+        if plus_running:
+            self.verify_section.set_summary(
+                "Abbruch angefordert — laufende Recherche wird beendet …",
+                color="#C62828",
+            )
+        else:
             self.verify_section.set_summary("Abgebrochen", color="#C62828")
-            self.btn_verify_cancel.setEnabled(False)
             # Retry erlauben, falls bereits Behauptungen vorliegen.
             if self._verification_base_text:
                 self.btn_verify_retry.setEnabled(True)

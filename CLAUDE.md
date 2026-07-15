@@ -7,7 +7,7 @@
 ## 🎯 Projektkontext
 
 **Name:** SOMAS Prompt Generator
-**Version:** 0.12.3
+**Version:** 0.13.0
 **Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
 **Sprache:** Python 3.11+
 **GUI-Framework:** PyQt6
@@ -58,6 +58,20 @@ somas_prompt_generator/
 │   │   ├── comparison_worker.py # QThread-Worker: 2 Analysen + Synthese + Layout-Render
 │   │   ├── verification_item.py # VerificationConfig/VerificationResult (Faktencheck Stufe 2)
 │   │   ├── verification_worker.py # QThread-Worker: Behauptungen verifizieren (Verdikt + Quelle)
+│   │   ├── factcheck_plus/     # Faktencheck Plus (v0.13.0) — Qt-frei, extrahierbar
+│   │   │   ├── schemas.py          # JSON-Verträge S1/S2/S4/S5 + Wertemengen
+│   │   │   ├── models.py           # RefinedClaim/ArgumentMapping/ResearchCard/ClaimVerdict
+│   │   │   ├── prompts.py          # Prompt-Verträge (Nicht-Zuständigkeiten je Stufe)
+│   │   │   ├── llm_stage.py        # Stufen-Mechanik: Retry, Extraktion (einzige Client-Naht)
+│   │   │   ├── refiner.py          # S1: Atomisierung + Attributions-Split
+│   │   │   ├── mapper.py           # S2: Rolle + Impact + Ratings
+│   │   │   ├── policy_scorer.py    # S3: deterministische Auswahl (KEIN LLM)
+│   │   │   ├── planner.py          # S4: Recherchekarten
+│   │   │   ├── verifier.py         # S5: ein Call pro Claim
+│   │   │   ├── verdict.py          # 8→4-Mapping + Leitplanken + Eigenbeleg-Riegel
+│   │   │   └── aggregate.py        # Render-Kontext + Transparenz-Block
+│   │   ├── factcheck_plus_item.py  # FactcheckPlusConfig/FactcheckPlusResult
+│   │   ├── factcheck_plus_worker.py # QThread-Worker: orchestriert S1–S5 (Qt↔Package-Naht)
 │   │   ├── debug_logger.py     # Debug-Logging mit Version/Session-Info
 │   │   ├── wordpress_client.py # WordPress-REST-Client (Beitrag, Taxonomien, Media-Upload)
 │   │   └── wordpress_worker.py # QThread-Worker für blockierende WordPress-Operationen
@@ -81,7 +95,8 @@ somas_prompt_generator/
 │   ├── somas_music.txt         # Musik-Preset (2.400 Zeichen, Songtext-Analyse)
 │   ├── somas_songstruktur.txt  # Songstruktur-Preset (Formanalyse)
 │   ├── somas_comparison.txt    # Modellvergleich-Layout (Jinja2-Dokumentlayout)
-│   └── somas_verification.txt  # Faktencheck-Verifikation-Abschnitt (Stufe 2)
+│   ├── somas_verification.txt  # Faktencheck-Verifikation-Abschnitt (Stufe 2)
+│   └── somas_verification_plus.txt # Faktencheck Plus: Verdikte + Transparenz-Block
 │
 ├── specs/                  # Entwicklungs-Spezifikationen
 │   ├── API_INTEGRATION_SPEC.md
@@ -580,6 +595,44 @@ die GUI aus PR 4.
   (§5.1 unterscheidet es von „nicht überprüfbar"); lebt derzeit nur in der
   Begründungszeile. Sauber wäre ein 5. UI-Verdikt — berührt den Classic-Weg.
 
+### Phase 22: Faktencheck Plus PR 4 — GUI, Worker, Release ✅ (v0.13.0)
+
+Schließt Faktencheck Plus ab: Die fünf Stufen sind verdrahtet, sichtbar und
+abbrechbar. Der Classic-Weg bleibt unverändert (Parallelbetrieb, Theorie §8.1).
+
+- [x] `factcheck_plus_item.py`: `FactcheckPlusConfig` (zwei Modelle — Analyse für
+  S1/S2/S4, Web für S5; Claims **ungekappt**, Budget statt Cap) + `FactcheckPlusResult`
+- [x] `factcheck_plus_worker.py`: orchestriert S1–S5, ist die **Qt↔Package-Naht**
+  (Fortschritt/Abbruch als Callbacks rein, Signale raus; Jinja2-Rendering hier,
+  nicht im Package). `_TokenCountingClient` hüllt die Stufen für Debug-Log und
+  Token-Summe, ohne dass das Package davon weiß.
+- [x] GUI: Plus-Checkbox in der Verifikations-Sektion (erbt damit den Ausschluss
+  mit dem Modellvergleich); die vorhandene SpinBox wechselt Label/Range/Wert
+  zwischen Cap (0–100, 0=unbegrenzt) und Budget (1–50, Default 8) — **zwei
+  getrennte Preference-Keys**, damit kein Wert den anderen überschreibt;
+  Stufen-Fortschritt im Sektions-Header; `verify_plus_checkbox`/
+  `verify_online_checkbox` während des Laufs gesperrt
+- [x] `_verification_is_running()` zentralisiert den Race-Schutz über BEIDE Worker
+  (Abbruch, Retry, Quellenwechsel) — die Bedingung war vorher pro Aufrufstelle
+  dupliziert und hätte den Plus-Worker vergessen
+- [x] `extract_core_thesis()` (prompt_builder): liefert S2 den Maßstab für
+  `thesis_proximity` aus dem `### KERNTHESE`-Abschnitt; fehlt er, läuft Plus
+  ohne Kontext weiter (kein harter Fehler)
+- [x] **Befund aus dem Test:** Der Worker verifizierte in Refiner- statt in
+  Auswahlrang-Reihenfolge → im Bericht stand der schwächste Claim oben, und ein
+  Abbruch nach 2 von 8 hätte zwei beliebige statt der zwei wichtigsten geprüft.
+  Behoben + eigener Regressionstest.
+- [x] `APP_VERSION` → 0.13.0, README (Changelog + „Aktuell"-Spotlight), CLAUDE.md
+- [x] Tests: `test_factcheck_plus_worker.py` (14), `test_factcheck_plus_gui.py` (19),
+  `extract_core_thesis` in `test_faktencheck_parser.py`. Gesamtsuite 273 grün.
+- [ ] PO-Realtest (Merge-Kriterium) — deckt zugleich den in PR 3 offenen E2E-Test ab
+- [ ] Offen für den PO: „unbelegt" hat in den 4 UI-Verdikten kein Zuhause
+  (§5.1 unterscheidet es von „nicht überprüfbar"); lebt derzeit nur in der
+  Begründungszeile. Sauber wäre ein 5. UI-Verdikt — berührt den Classic-Weg.
+- [ ] Backlog Plus: Crash-Recovery-Persistenz (analog Batch); Eskalationsroute für
+  „unbelegt" bei nicht-leerem `canonical_targets` (Spec: spätere Ausbaustufe);
+  die zwei Tuning-Kandidaten (checkability, Quoten-Semantik) nach Realtests
+
 ### Backlog
 
 - [ ] A4-Feinschliff: erzwungenes Modul aus der `MODUL-AUSWAHL`-Liste entfernen
@@ -629,4 +682,4 @@ Bei Unklarheiten: Frag nach! Lieber einmal zu viel als eine falsche Annahme tref
 
 ---
 
-Letzte Aktualisierung: 2026-07-12
+Letzte Aktualisierung: 2026-07-15
