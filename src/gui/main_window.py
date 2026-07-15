@@ -220,6 +220,11 @@ class MainWindow(QMainWindow):
         # Budget-Wert: Die SpinBox zeigt je nach Modus das eine ODER das andere,
         # aber beide Werte bleiben erhalten und werden getrennt persistiert.
         self._factcheck_plus_worker: FactcheckPlusWorker | None = None
+        # Lauf-ID gegen verspätete Callbacks (Muster: _api_active_request_id).
+        # Beim Plus besonders nötig: Anders als der Classic-Worker meldet er auch
+        # nach cancel() ein (gültiges) Teilergebnis — nach `wait()`-Timeout könnte
+        # das sonst in eine bereits neue Analyse schreiben.
+        self._plus_active_run_id: int = 0
         self._factcheck_plus_enabled: bool = prefs.get("factcheck_plus_enabled", False)
         self._factcheck_plus_budget: int = prefs.get(
             "factcheck_plus_budget", DEFAULT_PLUS_BUDGET
@@ -1076,6 +1081,12 @@ class MainWindow(QMainWindow):
             if worker and worker.isRunning():
                 worker.cancel()
                 worker.wait(2000)
+        # Lauf-ID hochzählen: Der Plus-Worker meldet auch nach cancel() sein
+        # Teilergebnis. Steckt er noch in einem Claim-Call, läuft `wait()` ins
+        # Timeout und das Signal käme NACH dem Quellenwechsel — es würde in die
+        # neue Analyse schreiben. Ab hier gehören alle laufenden Plus-Callbacks
+        # zu einem toten Lauf und werden verworfen.
+        self._plus_active_run_id += 1
 
         url = self.url_input.text().strip()
         if not url:
@@ -2755,17 +2766,22 @@ class MainWindow(QMainWindow):
         Plus lässt Refiner/Mapper/Planner über das Analyse-Modell laufen — es
         gibt bewusst keinen eigenen Picker dafür (PO-Entscheidung, Spec §8.3).
 
+        Nutzt bewusst ``_get_active_model_id()``: Nur OpenRouter benutzt den
+        filterbaren ``model_selector``, alle anderen Provider die ``model_combo``.
+        Ein direkter Zugriff auf einen der beiden wäre für den jeweils anderen
+        Provider falsch.
+
         Returns:
             Die Auswahl oder ``None``, wenn kein Modell gewählt ist.
         """
         provider_id = self.provider_combo.currentData()
-        model_id = self.model_selector.get_selected_model_id()
+        model_id = self._get_active_model_id()
         if not provider_id or not model_id:
             return None
         return ModelChoice(
             provider_id=provider_id,
             model_id=model_id,
-            model_name=self.model_selector.get_selected_model_name() or model_id,
+            model_name=self._get_model_display_name(model_id),
             provider_name=self.provider_combo.currentText() or provider_id,
         )
 
@@ -2803,11 +2819,20 @@ class MainWindow(QMainWindow):
             web_unverified=not self._looks_web_capable(sel),
         )
 
+        self._plus_active_run_id += 1
+        run_id = self._plus_active_run_id
+
         worker = FactcheckPlusWorker(config, debug_logger=self._debug_logger)
         worker.status_changed.connect(self._on_verify_status)
         worker.stage_changed.connect(self._on_plus_stage)
-        worker.finished_ok.connect(self._on_plus_finished)
-        worker.error_occurred.connect(self._on_plus_error)
+        # Lauf-ID via Lambda binden — verspätete Signale eines verworfenen Laufs
+        # dürfen nicht in eine neue Analyse schreiben.
+        worker.finished_ok.connect(
+            lambda section, result, rid=run_id: self._on_plus_finished(section, result, rid)
+        )
+        worker.error_occurred.connect(
+            lambda message, rid=run_id: self._on_plus_error(message, rid)
+        )
         worker.finished.connect(lambda: self._set_verification_running(False))
 
         self._factcheck_plus_worker = worker
@@ -2828,9 +2853,25 @@ class MainWindow(QMainWindow):
         """
         self.verify_section.set_summary(f"[{index}/{total}] {text}", color="#1565C0")
 
+    def _plus_run_is_stale(self, run_id: int | None) -> bool:
+        """True, wenn das Callback zu einem nicht mehr aktiven Plus-Lauf gehört.
+
+        Args:
+            run_id: Die beim Start gebundene Lauf-ID. ``None`` (direkter Aufruf,
+                z.B. Test) überspringt die Prüfung — wie bei ``_on_api_response``.
+        """
+        if run_id is not None and run_id != self._plus_active_run_id:
+            logger.info("Verwerfe verspätetes Faktencheck-Plus-Ergebnis (Lauf %s)", run_id)
+            return True
+        return False
+
     @pyqtSlot(str, object)
-    def _on_plus_finished(self, section: str, result: FactcheckPlusResult) -> None:
+    def _on_plus_finished(
+        self, section: str, result: FactcheckPlusResult, run_id: int | None = None,
+    ) -> None:
         """Hängt den fertigen Plus-Abschnitt an die Analyse an."""
+        if self._plus_run_is_stale(run_id):
+            return
         self._set_result_with_verification(section)
 
         if result.status == "skipped":
@@ -2856,8 +2897,10 @@ class MainWindow(QMainWindow):
             self.btn_verify_retry.setEnabled(True)
 
     @pyqtSlot(str)
-    def _on_plus_error(self, message: str) -> None:
+    def _on_plus_error(self, message: str, run_id: int | None = None) -> None:
         """Meldet einen Plus-Fehler, ohne die Analyse zu verlieren."""
+        if self._plus_run_is_stale(run_id):
+            return
         logger.warning("Faktencheck Plus fehlgeschlagen: %s", message)
         self._set_result_with_verification(
             "---\n\n### FAKTENCHECK · VERIFIKATION PLUS\n"
@@ -2866,6 +2909,10 @@ class MainWindow(QMainWindow):
         self.verify_section.set_summary("Plus fehlgeschlagen", color="#C62828")
         if self._verification_base_text:
             self.btn_verify_retry.setEnabled(True)
+        # Wie beim Classic-Weg (`_on_verify_error`): Der Nutzer soll den Fehler
+        # sehen, nicht nur im Ergebnistext finden — gerade „Kein Analyse-Modell
+        # gewählt" ist ohne Dialog kaum als Ursache erkennbar.
+        QMessageBox.warning(self, "Faktencheck Plus fehlgeschlagen", message)
 
     def _verification_is_running(self) -> bool:
         """True, wenn ein Verifikationslauf läuft — Classic ODER Plus.

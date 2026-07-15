@@ -296,6 +296,52 @@ def test_plus_marks_web_unverified_for_non_web_models(win, workers, monkeypatch)
     assert workers["plus"].instances[0].config.web_unverified is True
 
 
+# --- Analyse-Modell-Auflösung ---------------------------------------------
+#
+# Diese Tests rufen `_current_analysis_choice` ECHT auf. Die Start-Pfad-Tests
+# oben stubben es weg — dadurch blieb die Methode ungetestet, und genau darin
+# steckten zwei Fehler (CodeRabbit, PR #60): ein Aufruf einer nicht existenten
+# ModelSelector-Methode und der Griff auf den falschen Selector.
+
+def _select_provider(win, provider_id: str) -> bool:
+    """Wählt einen Provider in der Combo; False, wenn er nicht angeboten wird."""
+    for i in range(win.provider_combo.count()):
+        if win.provider_combo.itemData(i) == provider_id:
+            win.provider_combo.setCurrentIndex(i)
+            return True
+    return False
+
+
+def test_analysis_choice_uses_the_combo_for_non_openrouter(win) -> None:
+    """Nur OpenRouter nutzt den filterbaren Selector — alle anderen die Combo."""
+    if not _select_provider(win, "anthropic"):
+        pytest.skip("Provider 'anthropic' nicht konfiguriert")
+    if win.model_combo.count() == 0:
+        pytest.skip("Keine Anthropic-Modelle konfiguriert")
+    win.model_combo.setCurrentIndex(0)
+    expected_id = win.model_combo.currentData()
+
+    choice = win._current_analysis_choice()
+
+    assert choice is not None, "Nicht-OpenRouter-Provider muss ein Modell liefern"
+    assert choice.provider_id == "anthropic"
+    assert choice.model_id == expected_id
+    assert choice.model_name, "Anzeigename darf nicht leer sein"
+
+
+def test_analysis_choice_returns_none_without_a_model(win, monkeypatch) -> None:
+    monkeypatch.setattr(win, "_get_active_model_id", lambda: None)
+    assert win._current_analysis_choice() is None
+
+
+def test_analysis_choice_matches_the_analysis_run(win) -> None:
+    """Plus MUSS dasselbe Modell nehmen, mit dem auch analysiert wird (§8.3)."""
+    choice = win._current_analysis_choice()
+    if choice is None:
+        pytest.skip("Kein Modell gewählt")
+    assert choice.model_id == win._get_active_model_id()
+
+
 # --- Race-Schutz ----------------------------------------------------------
 
 def test_running_check_knows_both_workers(win, workers, monkeypatch) -> None:
@@ -348,6 +394,112 @@ def test_mode_switch_disables_stale_retry(win) -> None:
     win.btn_verify_retry.setEnabled(True)
     win.verify_plus_checkbox.setChecked(True)
     assert win.btn_verify_retry.isEnabled() is False
+
+
+# --- Verspätete Callbacks (Lauf-ID-Riegel) --------------------------------
+
+def _plus_result(status: str = "done"):
+    cfg = mw.FactcheckPlusConfig(
+        claims=["x"], analysis_model=_choice("anthropic", "m"),
+        research_model=_choice(),
+    )
+    result = mw.FactcheckPlusResult(config=cfg, status=status)
+    result.refined_count = 4
+    result.selected_count = 2
+    result.verified_count = 2
+    return result
+
+
+def test_late_plus_result_is_discarded(win) -> None:
+    """Ein Ergebnis aus einem toten Lauf darf nicht in die neue Analyse schreiben.
+
+    Anders als der Classic-Worker meldet der Plus-Worker auch nach `cancel()`
+    sein (gültiges) Teilergebnis. Steckt er noch in einem Claim-Call, läuft
+    `wait(2000)` ins Timeout und das Signal kommt NACH dem Quellenwechsel.
+    """
+    win.result_text.setPlainText("Neue Analyse")
+    win._plus_active_run_id = 5
+
+    win._on_plus_finished("### ALTER ABSCHNITT", _plus_result(), run_id=4)
+
+    assert win.result_text.toPlainText() == "Neue Analyse", (
+        "Verspätetes Plus-Ergebnis hat die neue Analyse überschrieben"
+    )
+
+
+def test_late_plus_error_is_discarded(win) -> None:
+    win.result_text.setPlainText("Neue Analyse")
+    win._plus_active_run_id = 5
+
+    win._on_plus_error("Alter Fehler", run_id=4)
+
+    assert win.result_text.toPlainText() == "Neue Analyse"
+
+
+def test_current_plus_result_is_applied(win) -> None:
+    win._verification_base_text = "Analyse"
+    win._plus_active_run_id = 5
+
+    win._on_plus_finished("### PLUS", _plus_result(), run_id=5)
+
+    assert "### PLUS" in win.result_text.toPlainText()
+
+
+def test_new_source_invalidates_a_running_plus_run(win, workers, monkeypatch) -> None:
+    """Der Quellenwechsel muss den laufenden Plus-Lauf für tot erklären.
+
+    Abbruch und Lauf-ID-Erhöhung stehen ganz oben in `_on_get_meta`, vor dem
+    URL-Check — mit leerer URL steigt die Methode direkt danach aus. So wird
+    genau dieser Riegel geprüft, ohne einen Metadaten-Abruf auszulösen.
+    """
+    _prepare(win, plus=True)
+    monkeypatch.setattr(win, "_current_analysis_choice", lambda: _choice("anthropic", "m"))
+    win._start_verification(_choice())
+    run_id_before = win._plus_active_run_id
+    assert workers["plus"].instances[0].started is True
+
+    win.url_input.setText("")
+    win._on_get_meta()
+
+    assert win._plus_active_run_id > run_id_before, (
+        "Lauf-ID nicht hochgezählt — verspätete Callbacks könnten durchschlagen"
+    )
+    assert workers["plus"].instances[0].started is False, "alter Lauf abgebrochen"
+
+    # Gegenprobe: Das jetzt eintreffende Ergebnis des toten Laufs prallt ab.
+    win.result_text.setPlainText("Neue Analyse")
+    win._on_plus_finished("### ALTER PLUS", _plus_result(), run_id=run_id_before)
+    assert win.result_text.toPlainText() == "Neue Analyse"
+
+
+def test_user_cancel_keeps_the_run_valid(win, workers, monkeypatch) -> None:
+    """Der Nutzer-Abbruch verwirft NICHT: das Teilergebnis ist gewollt."""
+    _prepare(win, plus=True)
+    monkeypatch.setattr(win, "_current_analysis_choice", lambda: _choice("anthropic", "m"))
+    win._start_verification(_choice())
+    run_id = win._plus_active_run_id
+
+    win._on_verify_cancel()
+
+    assert win._plus_active_run_id == run_id, (
+        "Nutzer-Abbruch darf das Teilergebnis nicht wegwerfen"
+    )
+
+
+# --- Fehleranzeige --------------------------------------------------------
+
+def test_plus_error_shows_a_dialog(win, monkeypatch) -> None:
+    """Wie beim Classic-Weg: Der Fehler muss sichtbar sein, nicht nur im Text."""
+    shown: list = []
+    monkeypatch.setattr(
+        QMessageBox, "warning", lambda _p, title, msg, *a, **k: shown.append((title, msg))
+    )
+
+    win._on_plus_error("Kein Analyse-Modell gewählt")
+
+    assert len(shown) == 1
+    assert "Kein Analyse-Modell gewählt" in shown[0][1]
+    assert "Faktencheck Plus fehlgeschlagen" in win.result_text.toPlainText()
 
 
 def main() -> None:

@@ -26,10 +26,12 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 from src.config.api_config import get_api_key
 
-from .api_client import APIStatus, create_client
+from .api_client import APIResponse, APIStatus, LLMClient, create_client
+from .comparison_item import ModelChoice
 from .debug_logger import APP_VERSION, DebugLogger
 from .factcheck_plus import (
-    ArgumentMapper, ClaimRefiner, ClaimVerifier, PolicyScorer, ResearchPlanner,
+    ArgumentMapper, ArgumentMapping, ClaimRefiner, ClaimVerdict, ClaimVerifier,
+    PolicyScorer, RefinedClaim, ResearchCard, ResearchPlanner, SelectionResult,
     StageError, build_render_context, join_claims,
 )
 from .factcheck_plus_item import FactcheckPlusConfig, FactcheckPlusResult
@@ -60,8 +62,8 @@ class _TokenCountingClient:
     """
 
     def __init__(
-        self, client, stage: str, debug_logger: DebugLogger | None = None,
-        meta: dict | None = None,
+        self, client: LLMClient, stage: str,
+        debug_logger: DebugLogger | None = None, meta: dict | None = None,
     ) -> None:
         """Initialisiert die Hülle.
 
@@ -78,7 +80,7 @@ class _TokenCountingClient:
         self.tokens_used = 0
         self.citations: list[str] = []
 
-    def send_prompt(self, prompt: str, model: str):
+    def send_prompt(self, prompt: str, model: str) -> APIResponse:
         """Reicht den Call durch, misst Dauer, loggt und summiert Tokens."""
         log_dir = None
         if self._debug_logger:
@@ -233,7 +235,7 @@ class FactcheckPlusWorker(QThread):
 
     # --- Stufen -----------------------------------------------------------
 
-    def _run_refiner(self, client):
+    def _run_refiner(self, client: LLMClient) -> list[RefinedClaim] | None:
         """S1: Roh-Behauptungen → atomare Prüfeinheiten."""
         self._emit_stage("Verfeinere Behauptungen …", 1)
         if self._cancelled:
@@ -249,7 +251,9 @@ class FactcheckPlusWorker(QThread):
                     len(self._config.claims), len(refined))
         return None if self._cancelled else refined
 
-    def _run_mapper(self, client, refined):
+    def _run_mapper(
+        self, client: LLMClient, refined: list[RefinedClaim],
+    ) -> list[ArgumentMapping] | None:
         """S2: Prüfeinheiten → Argumentrolle + Impact + Ratings."""
         self._emit_stage("Gewichte Argumente …", 2)
         if self._cancelled:
@@ -260,7 +264,9 @@ class FactcheckPlusWorker(QThread):
         )
         return None if self._cancelled else mappings
 
-    def _run_scorer(self, refined, mappings):
+    def _run_scorer(
+        self, refined: list[RefinedClaim], mappings: list[ArgumentMapping],
+    ) -> tuple[SelectionResult | None, list[RefinedClaim] | None]:
         """S3: deterministische Auswahl (kein LLM, kein Netzwerk).
 
         Die selektierten Claims werden in **Auswahlrang-Reihenfolge** (Klasse A
@@ -290,7 +296,9 @@ class FactcheckPlusWorker(QThread):
             return None, None
         return selection, selected
 
-    def _run_planner(self, client, selected):
+    def _run_planner(
+        self, client: LLMClient, selected: list[RefinedClaim],
+    ) -> list[ResearchCard] | None:
         """S4: Recherchekarte je selektiertem Claim."""
         if not selected:
             # Alles weggefiltert (z.B. nur Basisfakten/Meinungen) — kein Planner-Call.
@@ -304,7 +312,10 @@ class FactcheckPlusWorker(QThread):
         )
         return None if self._cancelled else cards
 
-    def _run_verifier(self, client, selected, cards):
+    def _run_verifier(
+        self, client: LLMClient, selected: list[RefinedClaim],
+        cards: list[ResearchCard],
+    ) -> list[ClaimVerdict] | None:
         """S5: ein Recherche-/Verdikt-Call PRO Claim."""
         if not selected:
             return []
@@ -330,7 +341,10 @@ class FactcheckPlusWorker(QThread):
 
     # --- Abschluss --------------------------------------------------------
 
-    def _finish(self, refined, selection, verdicts) -> None:
+    def _finish(
+        self, refined: list[RefinedClaim], selection: SelectionResult,
+        verdicts: list[ClaimVerdict],
+    ) -> None:
         """Aggregiert, rendert und meldet das Ergebnis."""
         self._result.tokens_used = sum(w.tokens_used for w in self._wrappers)
         self._result.citations = self._collect_citations()
@@ -372,7 +386,7 @@ class FactcheckPlusWorker(QThread):
 
     # --- Helfer -----------------------------------------------------------
 
-    def _make_client(self, model):
+    def _make_client(self, model: ModelChoice) -> LLMClient | None:
         """Baut einen Client oder meldet den fehlenden Key (nicht fatal)."""
         key = get_api_key(model.provider_id)
         if not key:
@@ -381,7 +395,7 @@ class FactcheckPlusWorker(QThread):
             return None
         return create_client(model.provider_id, key)
 
-    def _wrap(self, client, stage: str) -> _TokenCountingClient:
+    def _wrap(self, client: LLMClient, stage: str) -> _TokenCountingClient:
         """Hüllt einen Client für Debug-Logging und Token-Zählung einer Stufe."""
         wrapper = _TokenCountingClient(
             client, f"factcheck_plus.{stage}", self._debug_logger,
