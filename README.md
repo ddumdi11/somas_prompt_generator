@@ -16,7 +16,15 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuell (v0.13.0) — Faktencheck Plus
+### Aktuell (v0.13.1) — Faktencheck Plus: Trunkierungs-Härtung
+
+Faktencheck Plus scheiterte bei claim-reichen Videos (21 Roh-Behauptungen) in Stufe 1 mit einer irreführenden Meldung („kein parsebares JSON-Array"). Wahre Ursache war eine **Trunkierung**, kein Formatfehler: Der S1-Output skaliert mit der Behauptungszahl und sprengte zusammen mit dem Modell-Thinking das Antwort-Budget – das JSON brach mitten im String ab, und der Reparatur-Retry lief mit demselben Budget deterministisch erneut ins Limit.
+
+- **Ehrlicher Abbruch statt Reparatur-Schleife** – Die Stufen-Mechanik (S1/S2/S4/S5) prüft `finish_reason` **vor** der JSON-Extraktion. Bei einer abgeschnittenen Antwort bricht sie sofort mit klarer Meldung ab („Antwort abgeschnitten (Token-Limit) — vermutlich zu viele Behauptungen für das Antwort-Budget") – ohne den zwecklosen Reparatur-Retry
+- **Trunkierung wird im Stage-Log sichtbar** – Der `finish_reason` erreicht jetzt das Debug-Log; zuvor stand dort immer `""` und verschleppte genau diese Diagnose
+- **Mehr Antwort-Budget für die Stufen** – Die Plus-Stufen-Calls dürfen bis zu **16384** Tokens antworten (statt der globalen 8192). Die Erhöhung gilt **nur** für die Stufen-Calls, nicht global (OpenRouter/Perplexity pre-authen gegen `max_tokens`, HTTP 402); die Trunkierungs-Bremse bleibt als Sicherheitsnetz
+
+### Seit v0.13.0 — Faktencheck Plus
 
 Der bisherige Faktencheck prüfte, was **prüfbar** war. Faktencheck Plus prüft, was **prüfwürdig** ist: „Das ZDF ist öffentlich-rechtlich" ist perfekt prüfbar und trotzdem wertlos, wenn dafür die tragende strittige These ungeprüft bleibt. Optional zuschaltbar – der bisherige Weg bleibt unverändert erhalten.
 

@@ -23,7 +23,9 @@ from src.core.linkedin_formatter import format_for_linkedin
 from src.core.export import (
     export_to_markdown, get_suggested_filename, save_markdown, get_default_save_dir,
 )
-from src.core.api_client import APIResponse, APIStatus, is_empty_content_error
+from src.core.api_client import (
+    APIResponse, APIStatus, is_empty_content_error, is_truncated_finish_reason,
+)
 from src.core.api_worker import APIWorker
 from src.core.debug_logger import DebugLogger, APP_VERSION
 from src.core.rating_store import RatingStore, AnalysisRecord
@@ -50,11 +52,6 @@ from src.config.api_config import (
 
 logger = logging.getLogger(__name__)
 
-# v0.11.0: finish_reason-Werte, die eine bei max_tokens abgeschnittene (trunkierte)
-# Antwort signalisieren. Providerübergreifend normalisiert (Anthropic "max_tokens"
-# → "length" im Client), hier defensiv trotzdem alle Varianten erfasst.
-_TRUNCATION_FINISH_REASONS = frozenset({"length", "max_tokens", "truncated"})
-
 # v0.13.0: Die SpinBox der Verifikations-Sektion bedeutet je nach Modus etwas
 # anderes — Classic kappt die Behauptungsliste, Plus vergibt ein
 # Deep-Research-Budget (die Auswahl trifft dort der PolicyScorer).
@@ -76,13 +73,17 @@ PLUS_BUDGET_RANGE = (1, 50)
 def _is_truncated_finish_reason(finish_reason: str) -> bool:
     """Prüft, ob ein finish_reason eine abgeschnittene Antwort anzeigt.
 
+    Dünner Delegat auf :func:`api_client.is_truncated_finish_reason` — die
+    Trunkierungs-Werte leben seit v0.13.1 zentral dort, damit der GUI-Analysepfad
+    und die Faktencheck-Plus-Stufen (``llm_stage``) nicht auseinanderdriften.
+
     Args:
         finish_reason: Der von der API gemeldete Stopp-Grund (kann leer sein).
 
     Returns:
         True, wenn die Antwort bei der Token-Grenze trunkiert wurde.
     """
-    return bool(finish_reason) and finish_reason.strip().lower() in _TRUNCATION_FINISH_REASONS
+    return is_truncated_finish_reason(finish_reason)
 
 
 # Kürzungs-Prompt für Ergebnis-Nachbearbeitung (Teil 3: Zeichenlimit-Reihe)

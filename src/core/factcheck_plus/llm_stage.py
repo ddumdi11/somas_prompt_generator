@@ -17,7 +17,9 @@ import logging
 import re
 from typing import Callable, Protocol
 
-from ..api_client import APIResponse, APIStatus
+from ..api_client import (
+    APIResponse, APIStatus, is_truncated_finish_reason,
+)
 from .prompts import build_repair_prompt
 
 logger = logging.getLogger(__name__)
@@ -33,7 +35,9 @@ class PromptClient(Protocol):
     auch die Test-Doppelgänger.
     """
 
-    def send_prompt(self, prompt: str, model: str) -> APIResponse:
+    def send_prompt(
+        self, prompt: str, model: str, max_tokens: int | None = None
+    ) -> APIResponse:
         """Sendet einen Prompt und liefert die Antwort."""
         ...
 
@@ -41,6 +45,16 @@ class PromptClient(Protocol):
 # ein gezielter Nachschlag, dann offener Fehler — keine Retry-Schleifen, die
 # Token verbrennen und Fehler verschleiern.
 MAX_REPAIR_ATTEMPTS = 1
+
+# Antwort-Budget der Plus-Stufen-Calls. Bewusst höher als DEFAULT_MAX_TOKENS (8192):
+# Der S1-Output skaliert mit der Claim-Zahl — jede Prüfeinheit echot ``original_text``
+# + ``normalized_claim`` — und bei Anthropic zählt zusätzlich das Modell-Thinking
+# gegen ``max_tokens``. Bei ~40 Prüfeinheiten (21 Roh-Claims) sprengte 8192 den
+# Deckel: valides, aber mitten im String abgeschnittenes JSON (Realtest 2026-07-16,
+# v0.13.1). 16384 deckt ~40 Einheiten + Thinking. Gilt NUR für Stufen-Calls, nicht
+# global — OpenRouter/Perplexity pre-authen gegen ``max_tokens`` (HTTP 402, v0.10.1);
+# provoziert 16384 dort ein 402, greift der Trunkierungs-Gate unten als Sicherheitsnetz.
+STAGE_MAX_TOKENS = 16384
 
 _FENCE_RE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.IGNORECASE)
 
@@ -165,6 +179,12 @@ def run_json_stage(
     eskalieren sofort; über einen fachlichen Wiederholungslauf entscheidet der
     aufrufende Worker (PR 4).
 
+    **Trunkierung** (``finish_reason`` ∈ ``length``/``max_tokens``/``truncated``)
+    ist ebenfalls kein Vertragsbruch, sondern ein abgeschnittenes — womöglich für
+    sich valides — JSON. Ein Reparatur-Retry liefe mit demselben Budget
+    deterministisch erneut ins Limit; deshalb eskaliert die Stufe sofort mit
+    ehrlicher Meldung, statt einen sinnlosen Nachschlag zu verbrennen (v0.13.1).
+
     Args:
         client: LLM-Client mit ``send_prompt(prompt, model) -> APIResponse``.
         model: Modell-ID (Analyse-Modell; kein eigener Picker, PO-Entscheidung §8.3).
@@ -180,7 +200,8 @@ def run_json_stage(
         Das Ergebnis von ``parse``.
 
     Raises:
-        StageError: Bei API-Fehler oder nach erschöpften Reparaturversuchen.
+        StageError: Bei API-Fehler, Trunkierung oder nach erschöpften
+            Reparaturversuchen.
     """
     current_prompt = prompt
     last_error = ""
@@ -189,12 +210,25 @@ def run_json_stage(
     json_format = "Objekt" if extract is extract_json_object else "Array"
 
     for attempt in range(MAX_REPAIR_ATTEMPTS + 1):
-        response = client.send_prompt(current_prompt, model)
+        response = client.send_prompt(
+            current_prompt, model, max_tokens=STAGE_MAX_TOKENS
+        )
 
         if response.status != APIStatus.RECEIVED:
             # Transport-/Leer-Inhalt-Fehler: kein Vertragsbruch → keine Reparatur.
             raise StageError(
                 f"{stage_name}: API-Fehler — {response.error_message}"
+            )
+
+        # Trunkierung VOR der JSON-Extraktion abfangen: ein bei der Token-Grenze
+        # abgeschnittenes (evtl. für sich valides) JSON ist kein Formatfehler. Ein
+        # Reparatur-Retry liefe mit demselben Budget erneut ins Limit → sofort
+        # offen eskalieren, ohne Nachschlag (v0.13.1).
+        if is_truncated_finish_reason(response.finish_reason):
+            raise StageError(
+                f"{stage_name}: Antwort abgeschnitten (Token-Limit, "
+                f"finish_reason={response.finish_reason}) — vermutlich zu viele "
+                f"Behauptungen für das Antwort-Budget."
             )
 
         try:

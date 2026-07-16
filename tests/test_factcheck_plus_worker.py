@@ -52,7 +52,9 @@ class ScriptedClient:
         self._responses = list(responses)
         self.calls: list[tuple[str, str]] = []
 
-    def send_prompt(self, prompt: str, model: str) -> APIResponse:
+    def send_prompt(
+        self, prompt: str, model: str, max_tokens: int | None = None
+    ) -> APIResponse:
         self.calls.append((prompt, model))
         if not self._responses:
             raise AssertionError(

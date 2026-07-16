@@ -53,17 +53,22 @@ class OpenAIClient(LLMClient):
         """Gibt Liste der verfügbaren Modelle zurück (statisch)."""
         return self.MODELS
 
-    def send_prompt(self, prompt: str, model: str) -> APIResponse:
+    def send_prompt(
+        self, prompt: str, model: str, max_tokens: int | None = None
+    ) -> APIResponse:
         """Sendet Prompt an die OpenAI Chat Completions API.
 
         Args:
             prompt: Der zu sendende Prompt-Text.
             model: Die Modell-ID (z.B. 'gpt-4o').
+            max_tokens: Optionale Obergrenze für die Antwortlänge
+                (``None`` → :data:`DEFAULT_MAX_TOKENS`).
 
         Returns:
             APIResponse mit Status und Inhalt.
         """
         logger.info(f"OpenAI API-Call: model={model}, prompt_len={len(prompt)}")
+        tokens_cap = DEFAULT_MAX_TOKENS if max_tokens is None else max_tokens
 
         try:
             from openai import OpenAI
@@ -76,9 +81,9 @@ class OpenAIClient(LLMClient):
                 "messages": [{"role": "user", "content": prompt}],
             }
             if model.startswith("o"):
-                params["max_completion_tokens"] = DEFAULT_MAX_TOKENS
+                params["max_completion_tokens"] = tokens_cap
             else:
-                params["max_tokens"] = DEFAULT_MAX_TOKENS
+                params["max_tokens"] = tokens_cap
 
             response = client.chat.completions.create(**params)
 

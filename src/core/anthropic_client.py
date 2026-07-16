@@ -63,17 +63,22 @@ class AnthropicClient(LLMClient):
         """Gibt Liste der verfügbaren Modelle zurück (statisch)."""
         return self.MODELS
 
-    def send_prompt(self, prompt: str, model: str) -> APIResponse:
+    def send_prompt(
+        self, prompt: str, model: str, max_tokens: int | None = None
+    ) -> APIResponse:
         """Sendet Prompt an die Anthropic Messages API.
 
         Args:
             prompt: Der zu sendende Prompt-Text.
             model: Die Modell-ID (z.B. 'claude-sonnet-4-6').
+            max_tokens: Optionale Obergrenze für die Antwortlänge
+                (``None`` → :data:`DEFAULT_MAX_TOKENS`).
 
         Returns:
             APIResponse mit Status und Inhalt.
         """
         logger.info(f"Anthropic API-Call: model={model}, prompt_len={len(prompt)}")
+        tokens_cap = DEFAULT_MAX_TOKENS if max_tokens is None else max_tokens
 
         try:
             import anthropic
@@ -81,7 +86,7 @@ class AnthropicClient(LLMClient):
             client = anthropic.Anthropic(api_key=self.api_key)
             message = client.messages.create(
                 model=model,
-                max_tokens=DEFAULT_MAX_TOKENS,
+                max_tokens=tokens_cap,
                 messages=[{"role": "user", "content": prompt}],
             )
 

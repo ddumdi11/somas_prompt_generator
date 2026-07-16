@@ -7,7 +7,7 @@
 ## 🎯 Projektkontext
 
 **Name:** SOMAS Prompt Generator
-**Version:** 0.13.0
+**Version:** 0.13.1
 **Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
 **Sprache:** Python 3.11+
 **GUI-Framework:** PyQt6
@@ -633,6 +633,43 @@ abbrechbar. Der Classic-Weg bleibt unverändert (Parallelbetrieb, Theorie §8.1)
   „unbelegt" bei nicht-leerem `canonical_targets` (Spec: spätere Ausbaustufe);
   die zwei Tuning-Kandidaten (checkability, Quoten-Semantik) nach Realtests
 
+### Phase 23: Faktencheck Plus — Trunkierungs-Härtung der Stufen ✅ (v0.13.1)
+
+PO-Realtest 2026-07-16 (Fable 5 UND Opus 4.8): Plus scheiterte bei einem
+claim-reichen Video (21 Roh-Claims) in S1 mit „kein parsebares JSON-Array". Wahre
+Ursache: **Trunkierung**, kein Formatfehler. Der S1-Output skaliert mit der
+Claim-Zahl (jede Prüfeinheit echot `original_text` + `normalized_claim`), plus
+Anthropic-Thinking gegen `max_tokens` (8192) → valides, aber mitten im String
+abgeschnittenes JSON; der Reparatur-Retry lief mit demselben Budget deterministisch
+erneut ins Limit. Die Debug-Logs bestätigten es (S1-Content 17k Zeichen, doppelt so
+lang wie die 8,5k-Analyse; mid-JSON abgeschnitten).
+
+- [x] Teil A · Trunkierungs-Gate in `llm_stage.run_json_stage`: `finish_reason`
+  wird VOR der JSON-Extraktion geprüft; bei Trunkierung (`length`/`max_tokens`/
+  `truncated`) sofort offener `StageError` mit ehrlicher Meldung, **kein**
+  Reparatur-Retry (das gleiche Budget schnitte erneut ab). Gilt für alle Stufen
+  S1/S2/S4/S5 — der Fix sitzt in der Stufen-Mechanik. Transport-/Leer-Inhalt-
+  Verhalten unverändert (weiterhin kein Reparatur-Retry). Trunkierungs-Werte
+  jetzt zentral in `api_client` (`TRUNCATION_FINISH_REASONS`/
+  `is_truncated_finish_reason`); `main_window` delegiert dorthin (Drift-Schutz)
+- [x] Teil B · `_TokenCountingClient` reicht `response.finish_reason` an
+  `debug_logger.log_response` durch (Parameter existierte, wurde nicht bespielt) —
+  genau diese Lücke hatte die Diagnose verschleppt (Log zeigte immer `""`)
+- [x] Teil C · Ursachen-Fix: Stufen-Calls dürfen bis `STAGE_MAX_TOKENS = 16384`
+  antworten. `send_prompt` aller 4 Clients um optionalen `max_tokens`-Parameter
+  erweitert (Default weiter `DEFAULT_MAX_TOKENS` — kein Verhalten außerhalb von
+  Plus geändert); `_TokenCountingClient` reicht ihn durch. Erhöhung NUR für
+  Stufen-Calls (OpenRouter/Perplexity pre-authen gegen `max_tokens` → HTTP 402,
+  v0.10.1); Teil A bleibt Sicherheitsnetz, falls 16384 dort ein 402 provoziert
+- [x] Tests `tests/test_stage_truncation_gate.py`: Trunkierung → StageError +
+  genau 1 Call (A); kaputtes JSON ohne Trunkierung → weiterhin 1 Reparatur-Retry;
+  Transport-Fehler → kein Retry; `finish_reason` erreicht das Log (B);
+  Stufen-Call setzt 16384, normaler Call weiter Default (C)
+- [x] `APP_VERSION` → 0.13.1, README-Spotlight + „Seit v0.13.0"-Demotion
+- [ ] NICHT in diesem PR (Folge-Kandidaten): Thinking für Struktur-Stufen
+  deaktivieren (braucht Provider-Recherche, gleiche Klasse wie Phase-17-Item 3);
+  S1-Schema verschlanken (`original_text`-Echo halbieren)
+
 ### Backlog
 
 - [ ] A4-Feinschliff: erzwungenes Modul aus der `MODUL-AUSWAHL`-Liste entfernen
@@ -682,4 +719,4 @@ Bei Unklarheiten: Frag nach! Lieber einmal zu viel als eine falsche Annahme tref
 
 ---
 
-Letzte Aktualisierung: 2026-07-15
+Letzte Aktualisierung: 2026-07-16

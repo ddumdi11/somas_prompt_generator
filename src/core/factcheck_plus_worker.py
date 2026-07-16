@@ -80,8 +80,17 @@ class _TokenCountingClient:
         self.tokens_used = 0
         self.citations: list[str] = []
 
-    def send_prompt(self, prompt: str, model: str) -> APIResponse:
-        """Reicht den Call durch, misst Dauer, loggt und summiert Tokens."""
+    def send_prompt(
+        self, prompt: str, model: str, max_tokens: int | None = None
+    ) -> APIResponse:
+        """Reicht den Call durch, misst Dauer, loggt und summiert Tokens.
+
+        Args:
+            prompt: Der Stufen-Prompt.
+            model: Die Modell-ID.
+            max_tokens: Antwort-Budget der Stufe (``llm_stage.STAGE_MAX_TOKENS``);
+                wird unverändert an den echten Client durchgereicht.
+        """
         log_dir = None
         if self._debug_logger:
             endpoint = (
@@ -102,7 +111,7 @@ class _TokenCountingClient:
             )
 
         start = time.time()
-        response = self._client.send_prompt(prompt, model)
+        response = self._client.send_prompt(prompt, model, max_tokens=max_tokens)
         duration = time.time() - start
         response.duration_seconds = duration
 
@@ -125,6 +134,9 @@ class _TokenCountingClient:
                 model_used=response.model_used,
                 citations=response.citations,
                 error=None if ok else (response.error_message or "Fehler"),
+                # v0.13.1: finish_reason durchreichen — sonst stand im Stage-Log
+                # immer "" und verschleppte die Trunkierungs-Diagnose (Teil B).
+                finish_reason=response.finish_reason,
             )
         return response
 

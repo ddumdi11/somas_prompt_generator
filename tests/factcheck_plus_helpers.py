@@ -41,6 +41,8 @@ class FakeClient:
     Attributes:
         prompts: Alle gesendeten Prompts in Aufrufreihenfolge.
         models: Alle verwendeten Modell-IDs in Aufrufreihenfolge.
+        max_tokens: Alle übergebenen ``max_tokens``-Werte in Aufrufreihenfolge
+            (``None`` = kein Override) — belegt, dass die Stufen 16384 setzen.
     """
 
     def __init__(self, responses: list) -> None:
@@ -53,11 +55,15 @@ class FakeClient:
         self._responses = list(responses)
         self.prompts: list[str] = []
         self.models: list[str] = []
+        self.max_tokens: list[int | None] = []
 
-    def send_prompt(self, prompt: str, model: str) -> APIResponse:
+    def send_prompt(
+        self, prompt: str, model: str, max_tokens: int | None = None
+    ) -> APIResponse:
         """Liefert die nächste skriptierte Antwort und protokolliert den Aufruf."""
         self.prompts.append(prompt)
         self.models.append(model)
+        self.max_tokens.append(max_tokens)
         if not self._responses:
             raise AssertionError(
                 f"FakeClient: unerwarteter {len(self.prompts)}. Aufruf — "

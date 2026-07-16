@@ -61,6 +61,30 @@ def is_empty_content_error(message: str) -> bool:
     return bool(message) and message.strip().startswith(EMPTY_CONTENT_ERROR_PREFIX)
 
 
+# Finish-Reasons, die eine bei max_tokens abgeschnittene (trunkierte) Antwort
+# signalisieren. Zentral hier definiert (v0.13.1), damit der GUI-Analysepfad
+# (main_window) und die Faktencheck-Plus-Stufen (llm_stage) denselben
+# Trunkierungs-Gate verwenden und nicht auseinanderdriften. Anthropic normalisiert
+# "max_tokens" → "length" schon im Client; die übrigen Varianten bleiben defensiv
+# erfasst.
+TRUNCATION_FINISH_REASONS = frozenset({"length", "max_tokens", "truncated"})
+
+
+def is_truncated_finish_reason(finish_reason: str) -> bool:
+    """Erkennt einen finish_reason, der eine abgeschnittene Antwort anzeigt.
+
+    Args:
+        finish_reason: Der von der API gemeldete Stopp-Grund (kann leer sein).
+
+    Returns:
+        True, wenn die Antwort bei der Token-Grenze trunkiert wurde.
+    """
+    return (
+        bool(finish_reason)
+        and finish_reason.strip().lower() in TRUNCATION_FINISH_REASONS
+    )
+
+
 @dataclass
 class APIResponse:
     """Antwort eines LLM-API-Aufrufs."""
@@ -99,7 +123,7 @@ class LLMClient(ABC):
         """Normalisiert den provider-spezifischen Stopp-Grund einheitlich.
 
         Zentralisiert das ``raw or ""`` sowie provider-spezifische Aliasse, damit
-        der Trunkierungs-Gate (main_window `_TRUNCATION_FINISH_REASONS`) über alle
+        der Trunkierungs-Gate (:data:`TRUNCATION_FINISH_REASONS`) über alle
         Clients konsistente Werte bekommt.
 
         Args:
@@ -151,12 +175,19 @@ class LLMClient(ABC):
         """
 
     @abstractmethod
-    def send_prompt(self, prompt: str, model: str) -> APIResponse:
+    def send_prompt(
+        self, prompt: str, model: str, max_tokens: int | None = None
+    ) -> APIResponse:
         """Sendet einen Prompt an die API und gibt die Antwort zurück.
 
         Args:
             prompt: Der zu sendende Prompt-Text.
             model: Die Modell-ID (z.B. 'sonar-pro').
+            max_tokens: Optionale Obergrenze für die Antwortlänge. ``None`` →
+                :data:`DEFAULT_MAX_TOKENS`. Höhere Werte kommen nur aus den
+                Faktencheck-Plus-Stufen (``llm_stage.STAGE_MAX_TOKENS``), NICHT
+                global — OpenRouter/Perplexity pre-authen gegen ``max_tokens``
+                (HTTP 402, v0.10.1).
 
         Returns:
             APIResponse mit Status und Inhalt.
