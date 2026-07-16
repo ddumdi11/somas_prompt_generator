@@ -123,17 +123,22 @@ class OpenRouterClient(LLMClient):
         logger.info("OpenRouter: Verwende Fallback-Modelle")
         return self.FALLBACK_MODELS
 
-    def send_prompt(self, prompt: str, model: str) -> APIResponse:
+    def send_prompt(
+        self, prompt: str, model: str, max_tokens: int | None = None
+    ) -> APIResponse:
         """Sendet Prompt an OpenRouter API.
 
         Args:
             prompt: Der zu sendende Prompt-Text.
             model: Die Modell-ID (z.B. 'anthropic/claude-3-haiku').
+            max_tokens: Optionale Obergrenze für die Antwortlänge
+                (``None`` → :data:`DEFAULT_MAX_TOKENS`).
 
         Returns:
             APIResponse mit Status und Inhalt.
         """
         logger.info(f"OpenRouter API-Call: model={model}, prompt_len={len(prompt)}")
+        tokens_cap = DEFAULT_MAX_TOKENS if max_tokens is None else max_tokens
 
         try:
             response = requests.post(
@@ -145,7 +150,7 @@ class OpenRouterClient(LLMClient):
                     # max_tokens setzen, sonst rechnet OpenRouter mit dem vollen
                     # Context-Window als Worst-Case und blockt bei moderatem
                     # Guthaben mit HTTP 402.
-                    "max_tokens": DEFAULT_MAX_TOKENS,
+                    "max_tokens": tokens_cap,
                     # v0.11.0 (Reasoning-Leak-Härtung, stärkster Hebel): Das Modell
                     # reasont weiterhin INTERN (Qualität bleibt), gibt die Reasoning-
                     # Tokens aber NICHT zurück. Verhindert, dass manche Upstream-

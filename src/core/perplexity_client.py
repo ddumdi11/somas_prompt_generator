@@ -70,17 +70,22 @@ class PerplexityClient(LLMClient):
         """
         return self.MODELS
 
-    def send_prompt(self, prompt: str, model: str) -> APIResponse:
+    def send_prompt(
+        self, prompt: str, model: str, max_tokens: int | None = None
+    ) -> APIResponse:
         """Sendet Prompt an Perplexity API.
 
         Args:
             prompt: Der zu sendende Prompt-Text.
             model: Die Modell-ID (z.B. 'sonar-pro').
+            max_tokens: Optionale Obergrenze für die Antwortlänge
+                (``None`` → :data:`DEFAULT_MAX_TOKENS`).
 
         Returns:
             APIResponse mit Status und Inhalt.
         """
         logger.info(f"Perplexity API-Call: model={model}, prompt_len={len(prompt)}")
+        tokens_cap = DEFAULT_MAX_TOKENS if max_tokens is None else max_tokens
 
         try:
             response = requests.post(
@@ -91,7 +96,7 @@ class PerplexityClient(LLMClient):
                     "messages": [{"role": "user", "content": prompt}],
                     # max_tokens explizit setzen (analog OpenRouter/Anthropic/OpenAI),
                     # um Worst-Case-Pre-Auth zu vermeiden.
-                    "max_tokens": DEFAULT_MAX_TOKENS,
+                    "max_tokens": tokens_cap,
                     # Such-Tiefe hochsetzen (Default wäre "low") — mehr Quellen pro
                     # Anfrage, spürbar bessere Belegtiefe in der Verifikation.
                     "web_search_options": {
