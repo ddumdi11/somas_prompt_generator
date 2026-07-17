@@ -22,6 +22,21 @@ class OpenRouterClient(LLMClient):
     PROVIDER_ID = "openrouter"
     PROVIDER_NAME = "OpenRouter"
 
+    # v0.13.2: Reasoning-Cap für strukturierte Stage-Calls (Faktencheck Plus).
+    # DeepSeek V4 Pro reasonte bei der JSON-Extraktion ~14,7k Tokens (durch
+    # `exclude: true` unsichtbar, zählt aber voll gegen `max_tokens`) → trotz
+    # 16384-Budget `finish_reason=length`, kein verwertbarer Output. Ein Effort-Cap
+    # deckelt das Reasoning für Stage-Calls.
+    #
+    # BEWUSST `effort` statt `max_tokens`: Das reale Zielmodell DeepSeek V4 ist auf
+    # OpenRouter effort-gesteuert (Issue earendil-works/pi#4055). Die
+    # effort→Budget-Normalisierung ist die dokumentierte Richtung; die
+    # `max_tokens`→effort-Rückabbildung nur vage. `"max"` gemieden (bekannter
+    # Mapping-Bug); `"low"` ist ein valider normalisierter Enum-Wert und liegt für
+    # token-basierte Familien (0.2 × max_tokens ≈ 3,3k) über Anthropics 1024-Minimum.
+    # Kombinierbar mit `exclude` (laut Doku orthogonal).
+    REASONING_CAP_EFFORT = "low"
+
     # Fallback-Modelle falls /models nicht erreichbar (Stand Januar 2026)
     FALLBACK_MODELS: ClassVar[list[dict]] = [
         {
@@ -124,7 +139,8 @@ class OpenRouterClient(LLMClient):
         return self.FALLBACK_MODELS
 
     def send_prompt(
-        self, prompt: str, model: str, max_tokens: int | None = None
+        self, prompt: str, model: str, max_tokens: int | None = None,
+        cap_reasoning: bool = False,
     ) -> APIResponse:
         """Sendet Prompt an OpenRouter API.
 
@@ -133,12 +149,28 @@ class OpenRouterClient(LLMClient):
             model: Die Modell-ID (z.B. 'anthropic/claude-3-haiku').
             max_tokens: Optionale Obergrenze für die Antwortlänge
                 (``None`` → :data:`DEFAULT_MAX_TOKENS`).
+            cap_reasoning: Wenn ``True``, wird das Reasoning zusätzlich per
+                Effort-Cap gedeckelt (:data:`REASONING_CAP_EFFORT`) — nur für
+                strukturierte Stage-Calls, nicht für die normale Analyse (dort ist
+                Reasoning erwünscht). Einziger Consumer dieses Flags: OpenRouter.
 
         Returns:
             APIResponse mit Status und Inhalt.
         """
         logger.info(f"OpenRouter API-Call: model={model}, prompt_len={len(prompt)}")
         tokens_cap = DEFAULT_MAX_TOKENS if max_tokens is None else max_tokens
+
+        # v0.11.0 (Reasoning-Leak-Härtung, stärkster Hebel): Das Modell reasont
+        # weiterhin INTERN (Qualität bleibt), gibt die Reasoning-Tokens aber NICHT
+        # zurück. Verhindert, dass manche Upstream-Backends das Reasoning inline in
+        # `content` serialisieren, das Token-Budget auffressen und die finale
+        # Analyse abschneiden (realer Iran-DeepSeek-Fall 2026-07-01). Nur OpenRouter
+        # — andere Provider haben eigene Reasoning-Semantik und bleiben unangetastet.
+        reasoning: dict = {"exclude": True}
+        # v0.13.2: Für Stage-Calls zusätzlich das Reasoning-Budget kappen (s.
+        # REASONING_CAP_EFFORT). `exclude` bleibt orthogonal aktiv.
+        if cap_reasoning:
+            reasoning["effort"] = self.REASONING_CAP_EFFORT
 
         try:
             response = requests.post(
@@ -151,14 +183,7 @@ class OpenRouterClient(LLMClient):
                     # Context-Window als Worst-Case und blockt bei moderatem
                     # Guthaben mit HTTP 402.
                     "max_tokens": tokens_cap,
-                    # v0.11.0 (Reasoning-Leak-Härtung, stärkster Hebel): Das Modell
-                    # reasont weiterhin INTERN (Qualität bleibt), gibt die Reasoning-
-                    # Tokens aber NICHT zurück. Verhindert, dass manche Upstream-
-                    # Backends das Reasoning inline in `content` serialisieren, das
-                    # Token-Budget auffressen und die finale Analyse abschneiden
-                    # (realer Iran-DeepSeek-Fall 2026-07-01). Nur OpenRouter — andere
-                    # Provider haben eigene Reasoning-Semantik und bleiben unangetastet.
-                    "reasoning": {"exclude": True},
+                    "reasoning": reasoning,
                 },
                 timeout=120,
             )

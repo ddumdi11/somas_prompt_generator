@@ -54,7 +54,8 @@ class OpenAIClient(LLMClient):
         return self.MODELS
 
     def send_prompt(
-        self, prompt: str, model: str, max_tokens: int | None = None
+        self, prompt: str, model: str, max_tokens: int | None = None,
+        cap_reasoning: bool = False,
     ) -> APIResponse:
         """Sendet Prompt an die OpenAI Chat Completions API.
 
@@ -63,6 +64,10 @@ class OpenAIClient(LLMClient):
             model: Die Modell-ID (z.B. 'gpt-4o').
             max_tokens: Optionale Obergrenze für die Antwortlänge
                 (``None`` → :data:`DEFAULT_MAX_TOKENS`).
+            cap_reasoning: Wird hier bewusst **ignoriert** (v0.13.2) — der
+                Reasoning-Cap ist OpenRouter-spezifisch; die o-Series steuert
+                Reasoning über ``reasoning_effort`` mit eigener Semantik
+                (separater PR).
 
         Returns:
             APIResponse mit Status und Inhalt.

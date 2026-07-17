@@ -36,7 +36,8 @@ class PromptClient(Protocol):
     """
 
     def send_prompt(
-        self, prompt: str, model: str, max_tokens: int | None = None
+        self, prompt: str, model: str, max_tokens: int | None = None,
+        cap_reasoning: bool = False,
     ) -> APIResponse:
         """Sendet einen Prompt und liefert die Antwort."""
         ...
@@ -210,8 +211,12 @@ def run_json_stage(
     json_format = "Objekt" if extract is extract_json_object else "Array"
 
     for attempt in range(MAX_REPAIR_ATTEMPTS + 1):
+        # cap_reasoning=True: Stage-Calls sind strukturierte JSON-Extraktion, kein
+        # Freitext — ausuferndes Reasoning fraß bei DeepSeek V4 Pro das Antwort-
+        # Budget auf (v0.13.2). Nur OpenRouter wertet das Flag aus; die anderen
+        # Clients ignorieren es. Das Trunkierungs-Gate unten bleibt Sicherheitsnetz.
         response = client.send_prompt(
-            current_prompt, model, max_tokens=STAGE_MAX_TOKENS
+            current_prompt, model, max_tokens=STAGE_MAX_TOKENS, cap_reasoning=True,
         )
 
         if response.status != APIStatus.RECEIVED:

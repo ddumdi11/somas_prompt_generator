@@ -71,7 +71,8 @@ class PerplexityClient(LLMClient):
         return self.MODELS
 
     def send_prompt(
-        self, prompt: str, model: str, max_tokens: int | None = None
+        self, prompt: str, model: str, max_tokens: int | None = None,
+        cap_reasoning: bool = False,
     ) -> APIResponse:
         """Sendet Prompt an Perplexity API.
 
@@ -80,6 +81,9 @@ class PerplexityClient(LLMClient):
             model: Die Modell-ID (z.B. 'sonar-pro').
             max_tokens: Optionale Obergrenze für die Antwortlänge
                 (``None`` → :data:`DEFAULT_MAX_TOKENS`).
+            cap_reasoning: Wird hier bewusst **ignoriert** (v0.13.2) — der
+                Reasoning-Cap ist OpenRouter-spezifisch; Perplexity hat kein
+                entsprechendes Steuer-Feld.
 
         Returns:
             APIResponse mit Status und Inhalt.

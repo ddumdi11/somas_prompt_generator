@@ -7,7 +7,7 @@
 ## 🎯 Projektkontext
 
 **Name:** SOMAS Prompt Generator
-**Version:** 0.13.1
+**Version:** 0.13.2
 **Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
 **Sprache:** Python 3.11+
 **GUI-Framework:** PyQt6
@@ -477,10 +477,10 @@ seit v0.11.0 einen sichtbaren Ein-Retry bekommt.
 - [x] Tests: `tests/test_analysis_retry_cancel.py` (Leer-Inhalt-Retry, 2. Leer→offener
   Fehlschlag, Abbruch während Retry, Trunkierungs-Regression, harter Fehler ohne Retry) +
   Classifier/`http_status` in `tests/test_empty_content.py`
-- [ ] Deferiert (Item 3, PO-Kosten-Tradeoff): OpenRouter-Reasoning-Budget deckeln
-  (`reasoning: {"max_tokens": 4096, "exclude": true}`) — würde die Ursache adressieren,
-  aber `reasoning.max_tokens` wird nicht von allen Modellen gestützt (effort- vs.
-  token-basiert); Risiko, andere Modelle zu stören → separater PR nach Recherche
+- [x] ~~Deferiert (Item 3, PO-Kosten-Tradeoff): OpenRouter-Reasoning-Budget deckeln~~
+  → **umgesetzt in Phase 24 (v0.13.2)**. Recherche bestätigte den effort-/token-
+  Vorbehalt: token-basiert (`max_tokens`) trägt nicht für alle Familien; gewählt
+  wurde die `effort`-Variante (das reale Zielmodell DeepSeek V4 ist effort-gesteuert)
 
 ### Phase 18: Anthropic-Direktmodelle aktualisieren ✅ (v0.12.2)
 
@@ -670,6 +670,48 @@ lang wie die 8,5k-Analyse; mid-JSON abgeschnitten).
   deaktivieren (braucht Provider-Recherche, gleiche Klasse wie Phase-17-Item 3);
   S1-Schema verschlanken (`original_text`-Echo halbieren)
 
+### Phase 24: Reasoning-Cap für OpenRouter-Stage-Calls ✅ (v0.13.2)
+
+Setzt das in Phase 17 deferierte Item 3 um (Bedingung war: Recherche zuerst).
+Realtest 2026-07-17 (DeepSeek V4 Pro via OpenRouter): S1 scheiterte **trotz**
+`STAGE_MAX_TOKENS = 16384` — nicht die Output-Größe, sondern das (durch
+`exclude: true` unsichtbare) Reasoning fraß ~14,7k von ~16,4k Tokens, nur ~1,6k
+sichtbares JSON, mid-Objekt gekappt (`finish_reason=length`). Das Trunkierungs-Gate
+aus v0.13.1 hat korrekt und ehrlich gemeldet — jetzt die Ursache adressiert.
+
+- [x] Recherche (OpenRouter-`reasoning`-Doku, live): `effort` XOR `max_tokens`
+  (nicht beide), `exclude` orthogonal kombinierbar. OpenRouter normalisiert
+  zwischen effort und Budget; die **effort→Budget-Richtung ist dokumentiert**, die
+  `max_tokens`→effort-Rückabbildung nur vage. **DeepSeek V4 ist auf OpenRouter
+  effort-gesteuert** (belegt via Issue earendil-works/pi#4055: nutzt effort-Enum,
+  `xhigh`→`max`). Fehlerverhalten bei Mismatch/Non-Reasoning-Modellen: **Doku-Lücke**
+  (nicht explizit; offen als Risiko notiert — Sicherheitsnetz greift, s.u.)
+- [x] Entscheidung: **`effort` statt `max_tokens`** (Startprompt gab die Wahl frei).
+  Das reale Zielmodell ist effort-gesteuert → nativer Konsum statt vager
+  Rückabbildung. `REASONING_CAP_EFFORT = "low"` (≈ 0.2 × max_tokens ≈ 3,3k für
+  token-basierte Familien, über Anthropics 1024-Minimum); `"max"` gemieden
+  (bekannter Mapping-Bug aus #4055)
+- [x] `send_prompt` aller 4 Clients um `cap_reasoning: bool = False` erweitert; **nur
+  `openrouter_client` wertet es aus** (`reasoning: {effort: "low", exclude: true}`),
+  die anderen ignorieren es dokumentiert. `_TokenCountingClient` reicht durch,
+  `run_json_stage` fordert `cap_reasoning=True` für alle Stage-Calls (S1/S2/S4/S5)
+- [x] Normaler Analyse-Call bleibt **ungecappt** (Reasoning erwünscht; v0.11-Gate+
+  Retry deckt Trunkierung); `STAGE_MAX_TOKENS` unverändert (16384); Trunkierungs-Gate
+  (v0.13.1 Teil A) bleibt Sicherheitsnetz, falls ein Modell den Cap ignoriert
+- [x] Nebeneffekt: Reasoning-Tokens werden berechnet → der Cap spart bei
+  reasoning-lastigen Modellen direkt Geld (README-Changelog)
+- [x] Tests `tests/test_reasoning_cap.py` (7): Stage-Call sendet Effort-Cap +
+  `exclude`; normaler Call unverändert; Perplexity/OpenAI/Anthropic ignorieren das
+  Flag (kein Payload-Feld, kein Fehler); `run_json_stage` fordert den Cap an.
+  Gesamtsuite 297 grün
+- [x] `APP_VERSION` → 0.13.2, README-Spotlight + „Seit v0.13.1"-Demotion
+- [ ] Offene Risiken (Doku-Lücke, PO-Realtest = Merge-Kriterium): exaktes
+  Reasoning-Budget für „low" bei DeepSeek V4 nicht garantiert (empirisch << 14,7k);
+  Mismatch-/Non-Reasoning-Verhalten unspezifiziert — ein Fehler degradiert aber zu
+  einem ehrlichen `StageError`, nicht zu stiller Korruption
+- [ ] NICHT in diesem PR: Thinking-Steuerung für Anthropic direkt (eigene
+  API-Semantik, separater PR nach Recherche)
+
 ### Backlog
 
 - [ ] A4-Feinschliff: erzwungenes Modul aus der `MODUL-AUSWAHL`-Liste entfernen
@@ -719,4 +761,4 @@ Bei Unklarheiten: Frag nach! Lieber einmal zu viel als eine falsche Annahme tref
 
 ---
 
-Letzte Aktualisierung: 2026-07-16
+Letzte Aktualisierung: 2026-07-17
