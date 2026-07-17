@@ -7,7 +7,7 @@
 ## 🎯 Projektkontext
 
 **Name:** SOMAS Prompt Generator
-**Version:** 0.13.2
+**Version:** 0.13.3
 **Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
 **Sprache:** Python 3.11+
 **GUI-Framework:** PyQt6
@@ -712,6 +712,46 @@ aus v0.13.1 hat korrekt und ehrlich gemeldet — jetzt die Ursache adressiert.
 - [ ] NICHT in diesem PR: Thinking-Steuerung für Anthropic direkt (eigene
   API-Semantik, separater PR nach Recherche)
 
+### Phase 25: 32k-Stage-Budget für OpenRouter + Token-Split im Log ✅ (v0.13.3)
+
+Realtest 2026-07-17 08:02 (DeepSeek V4 Pro via OpenRouter, v0.13.2): Der
+Reasoning-Cap wurde korrekt gesendet (Verdrahtung geprüft), aber der **Upstream-
+Host respektierte ihn nicht** — S1 verbrauchte erneut exakt das volle Budget
+(tokens_total 18.348 ≈ ~1,96k Input + 16.384), davon ~11,4k Reasoning, nur ~4,6k
+sichtbarer Content, `finish_reason=length`. Das in v0.13.2 als Doku-Lücke notierte
+Risiko (Compliance = Glückssache bei wechselnden Hosts) ist damit empirisch
+bestätigt. Das Gate (v0.13.1) hat korrekt gemeldet — jetzt braucht der Content mehr
+Luft, unabhängig von Host-Kooperation.
+
+- [x] Teil A · OpenRouter-Stage-Budget `STAGE_MAX_TOKENS_OPENROUTER = 32768`:
+  greift für S1/S2/S4/S5, **wenn der Stufen-Client OpenRouter ist**
+  (~21k Worst Case → ~11k Reserve). `STAGE_MAX_TOKENS = 16384` bleibt für alle
+  anderen Provider. **Ort der Entscheidung:** die Qt↔Package-Naht
+  (`_TokenCountingClient` prüft `PROVIDER_ID == "openrouter"` und hebt das Budget,
+  reicht es wie bisher als `max_tokens` durch) — `llm_stage`/Package bleiben
+  provider-agnostisch. Reasoning-Cap (v0.13.2) bleibt aktiv (schadet nie, spart bei
+  kooperativen Hosts); Trunkierungs-Gate (v0.13.1) bleibt Sicherheitsnetz. Normaler
+  Analyse-Call unverändert (`DEFAULT_MAX_TOKENS`). 402-Vorauth gegen 32768 bei
+  DeepSeek-Preisen akzeptiert (PO); echtes 402 bliebe offener Fehler (v0.13.2-Linie)
+- [x] Teil B · Token-Split im Debug-Log: `APIResponse` trägt jetzt
+  `tokens_input`/`tokens_output`/`reasoning_tokens` (+ `token_log_dict()`-Helfer);
+  alle 4 Clients füllen input/output aus dem `usage`-Objekt (Feldnamen live
+  geprüft: OpenAI-kompatibel `prompt_tokens`/`completion_tokens`, Anthropic
+  `input_tokens`/`output_tokens`), OpenRouter/OpenAI zusätzlich
+  `completion_tokens_details.reasoning_tokens`. `log_response` persistiert
+  `tokens_reasoning` (leer=`null`, wenn nicht geliefert). Alle 5 Log-Aufrufstellen
+  mit echter Response (api/comparison/verification/factcheck_plus_worker) schreiben
+  den Split; die Reasoning-Anteile mussten bisher per Zeichen-Arithmetik geschätzt
+  werden
+- [x] Tests `tests/test_stage_budget_and_tokens.py` (11): OpenRouter-Stage → 32768
+  + Cap; Perplexity/Anthropic-Stage → 16384; normaler OpenRouter-Call → DEFAULT;
+  Token-Split je Provider (inkl. reasoning_tokens); fehlendes `usage` → 0/None kein
+  Crash; Log persistiert den Split. Gesamtsuite 308 grün
+- [x] `APP_VERSION` → 0.13.3, README-Spotlight + „Seit v0.13.2"-Demotion
+- [ ] NICHT in diesem PR: Entkopplung Stufen-/Analyse-Modell (struktureller
+  Folge-PR, PO entscheidet nach mehr Modell-Daten); S1-Schema verschlanken;
+  weitere Cap-Varianten (`effort: "minimal"` — gleiche Compliance-Lotterie)
+
 ### Backlog
 
 - [ ] A4-Feinschliff: erzwungenes Modul aus der `MODUL-AUSWAHL`-Liste entfernen
@@ -761,4 +801,4 @@ Bei Unklarheiten: Frag nach! Lieber einmal zu viel als eine falsche Annahme tref
 
 ---
 
-Letzte Aktualisierung: 2026-07-17
+Letzte Aktualisierung: 2026-07-17 (v0.13.3)

@@ -98,11 +98,12 @@ class APIWorker(QThread):
                         log_dir=log_dir,
                         status_code=200,
                         content=response.content,
-                        tokens={"total": response.tokens_used},
+                        tokens=response.token_log_dict(),
                         duration=duration,
                         model_used=response.model_used,
                         citations=response.citations,
                         finish_reason=response.finish_reason,
+                        reasoning_tokens=response.reasoning_tokens,
                     )
             else:
                 self.status_changed.emit(APIStatus.ERROR.value)
@@ -115,11 +116,12 @@ class APIWorker(QThread):
                         log_dir=log_dir,
                         status_code=response.http_status if response.http_status is not None else 500,
                         content=response.content,
-                        tokens={"total": response.tokens_used},
+                        tokens=response.token_log_dict(),
                         duration=duration,
                         model_used=response.model_used,
                         error=response.error_message,
                         finish_reason=response.finish_reason,
+                        reasoning_tokens=response.reasoning_tokens,
                     )
 
         except Exception as e:

@@ -16,7 +16,14 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuell (v0.13.2) — Reasoning-Cap für Stage-Calls
+### Aktuell (v0.13.3) — 32k-Stage-Budget für OpenRouter + Token-Split im Log
+
+Der Reasoning-Cap aus v0.13.2 wurde nachweislich korrekt gesendet, aber der DeepSeek-Upstream-Host **respektierte ihn nicht**: S1 verbrauchte erneut das volle Budget (~11,4k Reasoning, nur ~4,6k sichtbarer Content, `finish_reason=length`). Effort-Compliance ist bei wechselnden Hosts Glückssache – also braucht der Content schlicht mehr Luft, unabhängig von Host-Kooperation.
+
+- **OpenRouter-Stage-Budget auf 32768** – Die Plus-Stufen-Calls (S1/S2/S4/S5) bekommen bei OpenRouter das doppelte Antwort-Budget (11,4–14,7k Reasoning + ~5–6k Content ≈ 21k Worst Case → 32768 lässt ~11k Reserve). Andere Provider bleiben bei 16384; der normale Analyse-Call unverändert. Der Reasoning-Cap bleibt aktiv (schadet nie, spart Geld bei Hosts, die ihn respektieren); das Trunkierungs-Gate bleibt Sicherheitsnetz. Die Provider-Entscheidung sitzt an der Qt↔Package-Naht – das `factcheck_plus`-Package bleibt provider-agnostisch
+- **Token-Split im Debug-Log** – Alle 4 Clients füllen jetzt `tokens_input`/`tokens_output` aus dem `usage`-Objekt (standen bisher immer auf 0); OpenRouter/OpenAI zusätzlich den **Reasoning-Anteil** (`tokens_reasoning`, sonst leer). Damit lässt sich der Reasoning-Verbrauch verschiedener Modelle direkt vergleichen, statt ihn per Zeichen-Arithmetik zu schätzen
+
+### Seit v0.13.2 — Reasoning-Cap für Stage-Calls
 
 Faktencheck Plus S1 scheiterte bei DeepSeek V4 Pro (via OpenRouter) **trotz** des 16384-Budgets aus v0.13.1: Diesmal war nicht der Output zu groß, sondern das (durch `reasoning.exclude=true` unsichtbare) Modell-Reasoning fraß ~14,7k der ~16,4k Tokens – nur ~1,6k kamen als sichtbares JSON an, mitten im Objekt gekappt (`finish_reason=length`). Budget weiter zu erhöhen wäre ein Wettrüsten.
 

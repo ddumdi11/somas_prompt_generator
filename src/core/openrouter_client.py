@@ -221,7 +221,15 @@ class OpenRouterClient(LLMClient):
                         "finish_reason", finish_reason
                     )
 
-                tokens = data.get("usage", {}).get("total_tokens", 0)
+                # v0.13.3: Token-Split fürs Debug-Log. OpenRouter (OpenAI-kompatibel)
+                # liefert usage immer mit: prompt_tokens/completion_tokens/total_tokens
+                # + optional completion_tokens_details.reasoning_tokens (gegen die
+                # Live-Doku „Usage Accounting" geprüft).
+                usage = data.get("usage") or {}
+                tokens = usage.get("total_tokens", 0)
+                reasoning_tokens = (
+                    usage.get("completion_tokens_details") or {}
+                ).get("reasoning_tokens")
 
                 logger.info(
                     f"OpenRouter Antwort: {len(content)} Zeichen, "
@@ -234,6 +242,9 @@ class OpenRouterClient(LLMClient):
                     model_used=model,
                     provider_used=self.PROVIDER_NAME,
                     tokens_used=tokens,
+                    tokens_input=usage.get("prompt_tokens", 0),
+                    tokens_output=usage.get("completion_tokens", 0),
+                    reasoning_tokens=reasoning_tokens,
                     finish_reason=self._normalize_finish_reason(finish_reason),
                 )
 

@@ -94,6 +94,14 @@ class APIResponse:
     model_used: str = ""
     provider_used: str = ""
     tokens_used: int = 0
+    # v0.13.3: Aufschlüsselung des Token-Verbrauchs für die Debug-Log-Datensammlung
+    # (Modellvergleiche). ``tokens_used`` bleibt die Gesamtsumme (rückwärtskompatibel);
+    # ``tokens_input``/``tokens_output`` kommen aus dem ``usage``-Objekt der Antwort.
+    # ``reasoning_tokens`` ist optional — nur Provider mit entsprechender
+    # ``usage``-Aufschlüsselung (OpenRouter/OpenAI) liefern es, sonst ``None``.
+    tokens_input: int = 0
+    tokens_output: int = 0
+    reasoning_tokens: int | None = None
     citations: list[str] = field(default_factory=list)
     duration_seconds: float = 0.0
     # v0.11.0: Warum das Modell gestoppt hat (z.B. "stop", "length", "max_tokens").
@@ -104,6 +112,22 @@ class APIResponse:
     # Ein Leer-Inhalt-Fehler trägt hier 200 (HTTP war OK, nur der Content leer) —
     # der Worker loggt diesen echten Status statt eines Default-500.
     http_status: int | None = None
+
+    def token_log_dict(self) -> dict:
+        """Baut das ``tokens``-Dict fürs Debug-Log (input/output/total).
+
+        Zentralisiert die Aufschlüsselung, damit alle Log-Aufrufstellen
+        (api_worker, comparison_/verification_/factcheck_plus_worker) den Split
+        einheitlich schreiben statt nur ``{"total": …}``.
+
+        Returns:
+            Dict mit den Schlüsseln ``input``/``output``/``total``.
+        """
+        return {
+            "input": self.tokens_input,
+            "output": self.tokens_output,
+            "total": self.tokens_used,
+        }
 
 
 class LLMClient(ABC):

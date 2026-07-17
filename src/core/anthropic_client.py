@@ -115,12 +115,15 @@ class AnthropicClient(LLMClient):
                     "stop_reason", stop_reason, {"max_tokens": "length"}
                 )
 
-            tokens_used = 0
+            # v0.13.3: Token-Split fürs Debug-Log. Anthropic nennt die Felder
+            # input_tokens/output_tokens (kein total). Thinking-Tokens zählen bei
+            # Anthropic in output_tokens — keine separate Reasoning-Zahl → None.
+            tokens_input = 0
+            tokens_output = 0
             if message.usage:
-                tokens_used = (
-                    getattr(message.usage, "input_tokens", 0)
-                    + getattr(message.usage, "output_tokens", 0)
-                )
+                tokens_input = getattr(message.usage, "input_tokens", 0)
+                tokens_output = getattr(message.usage, "output_tokens", 0)
+            tokens_used = tokens_input + tokens_output
 
             # v0.11.0: stop_reason durchreichen. Anthropic nennt Trunkierung
             # "max_tokens" — auf das providerübergreifende "length" normalisieren,
@@ -140,6 +143,8 @@ class AnthropicClient(LLMClient):
                 model_used=model,
                 provider_used=self.PROVIDER_NAME,
                 tokens_used=tokens_used,
+                tokens_input=tokens_input,
+                tokens_output=tokens_output,
                 finish_reason=finish_reason,
             )
 
