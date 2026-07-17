@@ -47,6 +47,17 @@ NO_CLAIMS_SECTION = (
 # Stufenanzahl für die Fortschrittsanzeige (S1, S2, S3, S4, S5).
 TOTAL_STAGES = 5
 
+# v0.13.3: Größeres Antwort-Budget für OpenRouter-Stage-Calls. DeepSeek-Upstream-
+# Hosts respektieren den Reasoning-Cap (v0.13.2) nicht zuverlässig — das Reasoning
+# frisst weiter das Budget (~11–15k), der sichtbare JSON-Content braucht schlicht
+# mehr Luft (~5–6k bei 19–21 Claims). 32768 lässt ~11k Reserve über den Worst Case.
+# Die Provider-Kenntnis sitzt bewusst HIER an der Qt↔Package-Naht, nicht im
+# client-agnostischen ``llm_stage`` (das Package kennt keine Provider). Andere
+# Provider bleiben bei ``llm_stage.STAGE_MAX_TOKENS`` (16384). 402-Vorauth gegen
+# 32768 ist bei DeepSeek-Preisen vernachlässigbar (PO-Entscheidung); ein echtes 402
+# bliebe ein offener Fehler (nicht still absenken, Linie aus v0.13.2).
+STAGE_MAX_TOKENS_OPENROUTER = 32768
+
 
 class _TokenCountingClient:
     """Zählt Tokens und loggt Requests, ohne die Stufen davon wissen zu lassen.
@@ -113,9 +124,21 @@ class _TokenCountingClient:
                 },
             )
 
+        # v0.13.3: OpenRouter-Stufen bekommen das größere Budget (s.
+        # STAGE_MAX_TOKENS_OPENROUTER). Die Anhebung greift nur, wenn die Stufe
+        # überhaupt ein Budget anfordert (max_tokens gesetzt) und der echte Client
+        # OpenRouter ist — die Provider-Wahl bleibt an dieser Naht, nicht im Package.
+        effective_max_tokens = max_tokens
+        if (
+            max_tokens is not None
+            and getattr(self._client, "PROVIDER_ID", "") == "openrouter"
+        ):
+            effective_max_tokens = STAGE_MAX_TOKENS_OPENROUTER
+
         start = time.time()
         response = self._client.send_prompt(
-            prompt, model, max_tokens=max_tokens, cap_reasoning=cap_reasoning,
+            prompt, model, max_tokens=effective_max_tokens,
+            cap_reasoning=cap_reasoning,
         )
         duration = time.time() - start
         response.duration_seconds = duration
@@ -134,7 +157,7 @@ class _TokenCountingClient:
                     else (200 if ok else 500)
                 ),
                 content=response.content,
-                tokens={"total": response.tokens_used},
+                tokens=response.token_log_dict(),
                 duration=duration,
                 model_used=response.model_used,
                 citations=response.citations,
@@ -142,6 +165,8 @@ class _TokenCountingClient:
                 # v0.13.1: finish_reason durchreichen — sonst stand im Stage-Log
                 # immer "" und verschleppte die Trunkierungs-Diagnose (Teil B).
                 finish_reason=response.finish_reason,
+                # v0.13.3: Token-Split + Reasoning-Anteil (Datensammlung).
+                reasoning_tokens=response.reasoning_tokens,
             )
         return response
 

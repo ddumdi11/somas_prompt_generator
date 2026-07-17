@@ -169,11 +169,13 @@ class VerificationWorker(QThread):
                 log_dir=log_dir,
                 status_code=200 if ok else 500,
                 content=response.content,
-                tokens={"total": response.tokens_used},
+                tokens=response.token_log_dict(),
                 duration=duration,
                 model_used=response.model_used,
                 citations=response.citations,
                 error=None if ok else (response.error_message or "Fehler"),
+                finish_reason=response.finish_reason,
+                reasoning_tokens=response.reasoning_tokens,
             )
         return response
 

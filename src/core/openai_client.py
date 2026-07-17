@@ -105,7 +105,17 @@ class OpenAIClient(LLMClient):
                     "finish_reason", finish_reason
                 )
 
-            tokens_used = response.usage.total_tokens if response.usage else 0
+            # v0.13.3: Token-Split fürs Debug-Log. usage nennt prompt_tokens/
+            # completion_tokens/total_tokens; die o-Series liefert den Reasoning-
+            # Anteil unter completion_tokens_details.reasoning_tokens.
+            usage = response.usage
+            tokens_used = usage.total_tokens if usage else 0
+            tokens_input = getattr(usage, "prompt_tokens", 0) if usage else 0
+            tokens_output = getattr(usage, "completion_tokens", 0) if usage else 0
+            reasoning_tokens = None
+            if usage is not None:
+                details = getattr(usage, "completion_tokens_details", None)
+                reasoning_tokens = getattr(details, "reasoning_tokens", None)
 
             logger.info(
                 f"OpenAI Antwort: {len(content)} Zeichen, "
@@ -118,6 +128,9 @@ class OpenAIClient(LLMClient):
                 model_used=model,
                 provider_used=self.PROVIDER_NAME,
                 tokens_used=tokens_used,
+                tokens_input=tokens_input,
+                tokens_output=tokens_output,
+                reasoning_tokens=reasoning_tokens,
                 finish_reason=self._normalize_finish_reason(finish_reason),
             )
 

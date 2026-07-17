@@ -137,7 +137,10 @@ class PerplexityClient(LLMClient):
                         "finish_reason", finish_reason
                     )
 
-                tokens = data.get("usage", {}).get("total_tokens", 0)
+                # v0.13.3: Token-Split fürs Debug-Log (OpenAI-kompatibles usage).
+                # Perplexity liefert keine Reasoning-Aufschlüsselung → None.
+                usage = data.get("usage") or {}
+                tokens = usage.get("total_tokens", 0)
                 citations = data.get("citations", [])
 
                 logger.info(
@@ -151,6 +154,8 @@ class PerplexityClient(LLMClient):
                     model_used=model,
                     provider_used=self.PROVIDER_NAME,
                     tokens_used=tokens,
+                    tokens_input=usage.get("prompt_tokens", 0),
+                    tokens_output=usage.get("completion_tokens", 0),
                     citations=citations,
                     finish_reason=self._normalize_finish_reason(finish_reason),
                 )

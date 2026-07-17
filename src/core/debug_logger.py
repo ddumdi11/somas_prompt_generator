@@ -14,7 +14,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-APP_VERSION = "0.13.2"
+APP_VERSION = "0.13.3"
 
 
 class DebugLogger:
@@ -93,6 +93,7 @@ class DebugLogger:
         citations: list[str] | None = None,
         error: str | None = None,
         finish_reason: str = "",
+        reasoning_tokens: int | None = None,
     ) -> None:
         """Logs received API response.
 
@@ -108,6 +109,9 @@ class DebugLogger:
             finish_reason: Stopp-Grund des Modells (z.B. "stop", "length"). v0.11.0:
                 persistiert, weil "length"/"max_tokens" eine Trunkierung verraten —
                 im Iran-Sample fehlte genau dieses Feld.
+            reasoning_tokens: Reasoning-Anteil der Output-Tokens (v0.13.3, nur
+                Provider mit ``usage``-Aufschlüsselung). ``None`` = nicht geliefert;
+                wird dann als ``null`` persistiert (statt fälschlich als 0).
         """
         if not self.enabled or log_dir is None:
             return
@@ -121,6 +125,7 @@ class DebugLogger:
             "tokens_input": tokens.get("input", 0),
             "tokens_output": tokens.get("output", 0),
             "tokens_total": tokens.get("total", 0),
+            "tokens_reasoning": reasoning_tokens,
             "content_length_chars": len(content),
             "error": error is not None,
         }
