@@ -64,7 +64,8 @@ class AnthropicClient(LLMClient):
         return self.MODELS
 
     def send_prompt(
-        self, prompt: str, model: str, max_tokens: int | None = None
+        self, prompt: str, model: str, max_tokens: int | None = None,
+        cap_reasoning: bool = False,
     ) -> APIResponse:
         """Sendet Prompt an die Anthropic Messages API.
 
@@ -73,6 +74,9 @@ class AnthropicClient(LLMClient):
             model: Die Modell-ID (z.B. 'claude-sonnet-4-6').
             max_tokens: Optionale Obergrenze für die Antwortlänge
                 (``None`` → :data:`DEFAULT_MAX_TOKENS`).
+            cap_reasoning: Wird hier bewusst **ignoriert** (v0.13.2) — der
+                Reasoning-Cap ist OpenRouter-spezifisch; Anthropics
+                Thinking-Steuerung hat eigene API-Semantik (separater PR).
 
         Returns:
             APIResponse mit Status und Inhalt.

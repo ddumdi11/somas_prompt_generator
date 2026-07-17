@@ -176,7 +176,8 @@ class LLMClient(ABC):
 
     @abstractmethod
     def send_prompt(
-        self, prompt: str, model: str, max_tokens: int | None = None
+        self, prompt: str, model: str, max_tokens: int | None = None,
+        cap_reasoning: bool = False,
     ) -> APIResponse:
         """Sendet einen Prompt an die API und gibt die Antwort zurück.
 
@@ -188,6 +189,11 @@ class LLMClient(ABC):
                 Faktencheck-Plus-Stufen (``llm_stage.STAGE_MAX_TOKENS``), NICHT
                 global — OpenRouter/Perplexity pre-authen gegen ``max_tokens``
                 (HTTP 402, v0.10.1).
+            cap_reasoning: Bittet um ein gedeckeltes Reasoning-Budget für
+                strukturierte Stage-Calls (v0.13.2). **Nur OpenRouter** wertet das
+                Flag aus (Effort-Cap); die anderen Clients ignorieren es
+                dokumentiert — sie kennen kein providerübergreifendes
+                Reasoning-Steuer-Feld. Default ``False`` = heutiges Verhalten.
 
         Returns:
             APIResponse mit Status und Inhalt.

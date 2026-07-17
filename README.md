@@ -16,7 +16,16 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuell (v0.13.1) — Faktencheck Plus: Trunkierungs-Härtung
+### Aktuell (v0.13.2) — Reasoning-Cap für Stage-Calls
+
+Faktencheck Plus S1 scheiterte bei DeepSeek V4 Pro (via OpenRouter) **trotz** des 16384-Budgets aus v0.13.1: Diesmal war nicht der Output zu groß, sondern das (durch `reasoning.exclude=true` unsichtbare) Modell-Reasoning fraß ~14,7k der ~16,4k Tokens – nur ~1,6k kamen als sichtbares JSON an, mitten im Objekt gekappt (`finish_reason=length`). Budget weiter zu erhöhen wäre ein Wettrüsten.
+
+- **Reasoning gedeckelt, wo es nicht gebraucht wird** – Die strukturierten Stage-Calls (S1/S2/S4/S5) senden an OpenRouter jetzt einen **Effort-Cap** (`reasoning: {effort: "low", exclude: true}`). Die JSON-Extraktion braucht kein ausuferndes Reasoning; der normale Analyse-Call bleibt **ungecappt** (dort ist Reasoning erwünscht, und der v0.11-Gate+Retry-Pfad fängt Trunkierung ab)
+- **`effort` statt Token-Budget – bewusst** – Das reale Zielmodell DeepSeek V4 ist auf OpenRouter effort-gesteuert; `effort` wird nativ verstanden, statt über die vage `max_tokens`→effort-Rückabbildung zu laufen. Nur OpenRouter wertet den Cap aus; die anderen Provider ignorieren ihn dokumentiert (Anthropic/OpenAI haben eigene Reasoning-Semantik → separater PR)
+- **Spart nebenbei Geld** – Reasoning-Tokens werden berechnet; der Cap vermeidet bei reasoning-lastigen Modellen die verschwendeten Tokens (im Fehlerfall oben: ~14,7k Tokens für einen Fehlschlag)
+- **Sicherheitsnetz bleibt** – Das Trunkierungs-Gate aus v0.13.1 greift weiterhin, falls ein Modell den Cap ignoriert
+
+### Seit v0.13.1 — Faktencheck Plus: Trunkierungs-Härtung
 
 Faktencheck Plus scheiterte bei claim-reichen Videos (21 Roh-Behauptungen) in Stufe 1 mit einer irreführenden Meldung („kein parsebares JSON-Array"). Wahre Ursache war eine **Trunkierung**, kein Formatfehler: Der S1-Output skaliert mit der Behauptungszahl und sprengte zusammen mit dem Modell-Thinking das Antwort-Budget – das JSON brach mitten im String ab, und der Reparatur-Retry lief mit demselben Budget deterministisch erneut ins Limit.
 

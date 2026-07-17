@@ -81,7 +81,8 @@ class _TokenCountingClient:
         self.citations: list[str] = []
 
     def send_prompt(
-        self, prompt: str, model: str, max_tokens: int | None = None
+        self, prompt: str, model: str, max_tokens: int | None = None,
+        cap_reasoning: bool = False,
     ) -> APIResponse:
         """Reicht den Call durch, misst Dauer, loggt und summiert Tokens.
 
@@ -90,6 +91,8 @@ class _TokenCountingClient:
             model: Die Modell-ID.
             max_tokens: Antwort-Budget der Stufe (``llm_stage.STAGE_MAX_TOKENS``);
                 wird unverändert an den echten Client durchgereicht.
+            cap_reasoning: Reasoning-Cap-Wunsch der Stufe (v0.13.2); wird
+                unverändert durchgereicht (nur OpenRouter wertet ihn aus).
         """
         log_dir = None
         if self._debug_logger:
@@ -111,7 +114,9 @@ class _TokenCountingClient:
             )
 
         start = time.time()
-        response = self._client.send_prompt(prompt, model, max_tokens=max_tokens)
+        response = self._client.send_prompt(
+            prompt, model, max_tokens=max_tokens, cap_reasoning=cap_reasoning,
+        )
         duration = time.time() - start
         response.duration_seconds = duration
 

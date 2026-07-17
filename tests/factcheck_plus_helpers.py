@@ -43,6 +43,8 @@ class FakeClient:
         models: Alle verwendeten Modell-IDs in Aufrufreihenfolge.
         max_tokens: Alle übergebenen ``max_tokens``-Werte in Aufrufreihenfolge
             (``None`` = kein Override) — belegt, dass die Stufen 16384 setzen.
+        cap_reasoning: Alle übergebenen ``cap_reasoning``-Flags in
+            Aufrufreihenfolge — belegt, dass die Stufen den Cap anfordern.
     """
 
     def __init__(self, responses: list) -> None:
@@ -56,14 +58,17 @@ class FakeClient:
         self.prompts: list[str] = []
         self.models: list[str] = []
         self.max_tokens: list[int | None] = []
+        self.cap_reasoning: list[bool] = []
 
     def send_prompt(
-        self, prompt: str, model: str, max_tokens: int | None = None
+        self, prompt: str, model: str, max_tokens: int | None = None,
+        cap_reasoning: bool = False,
     ) -> APIResponse:
         """Liefert die nächste skriptierte Antwort und protokolliert den Aufruf."""
         self.prompts.append(prompt)
         self.models.append(model)
         self.max_tokens.append(max_tokens)
+        self.cap_reasoning.append(cap_reasoning)
         if not self._responses:
             raise AssertionError(
                 f"FakeClient: unerwarteter {len(self.prompts)}. Aufruf — "

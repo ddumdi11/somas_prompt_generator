@@ -179,7 +179,7 @@ class _StubClient:
         self._response = response
         self.seen_max_tokens = []
 
-    def send_prompt(self, prompt, model, max_tokens=None):
+    def send_prompt(self, prompt, model, max_tokens=None, cap_reasoning=False):
         self.seen_max_tokens.append(max_tokens)
         return self._response
 
