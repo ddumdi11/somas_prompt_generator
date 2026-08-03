@@ -16,6 +16,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+# KI-Kennzeichnung (Art. 50 AI Act) — zentral in ai_disclosure.py
+from src.core.ai_disclosure import AI_DISCLOSURE_MARKDOWN
 from src.config.defaults import VideoInfo
 
 
@@ -257,6 +259,12 @@ def get_markdown_content(
         for i, url in enumerate(sources, 1):
             parts.append(f"[{i}] {url}  ")
 
+    # KI-Kennzeichnung (Art. 50 AI Act) — zentral in ai_disclosure.py
+    # Fußblock mit ---Trenner davor. Der <img>-Tag ist bewusst unsanitisiert
+    # (parts hier werden nicht durch sanitize_unicode_for_export geschickt).
+    parts.append("\n---\n")
+    parts.append(AI_DISCLOSURE_MARKDOWN)
+
     return '\n'.join(parts)
 
 
@@ -281,6 +289,10 @@ def save_markdown(
     Returns:
         Pfad zur geschriebenen Datei.
     """
+    # KI-Kennzeichnung (Art. 50 AI Act) — zentral in ai_disclosure.py
+    # Modellvergleich-Pfad (rendert eigenes Jinja-Layout); Fußblock mit Trenner.
+    # Vor der Sanitisierung angehängt, damit der <img>-Tag mitläuft (bleibt intakt).
+    content = content.rstrip() + "\n\n---\n\n" + AI_DISCLOSURE_MARKDOWN + "\n"
     safe_content = sanitize_unicode_for_export(content)
 
     if not output_path:

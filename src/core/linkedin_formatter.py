@@ -5,6 +5,9 @@ LinkedIn unterstützt kein Markdown, aber Unicode-Zeichen für Fett/Kursiv.
 
 import re
 
+# KI-Kennzeichnung (Art. 50 AI Act) — zentral in ai_disclosure.py
+from src.core.ai_disclosure import AI_DISCLOSURE_TEXT
+
 # Unicode Bold (Sans-Serif Bold)
 UNICODE_BOLD = {
     'A': '𝗔', 'B': '𝗕', 'C': '𝗖', 'D': '𝗗', 'E': '𝗘', 'F': '𝗙', 'G': '𝗚',
@@ -305,6 +308,11 @@ def format_for_linkedin(
             source_parts.append(f"{nums}: {domain}")
 
         formatted_text += "\n\nQuellen: " + " | ".join(source_parts)
+
+    # KI-Kennzeichnung (Art. 50 AI Act) — zentral in ai_disclosure.py
+    # Nur Text als letzte Zeile (Fuß): LinkedIn kann keine Icons im Text, eine
+    # nackte Bild-URL wäre störender Linkmüll.
+    formatted_text += "\n\n" + AI_DISCLOSURE_TEXT
 
     # Detail-Quellen: nummerierte Liste mit vollen URLs
     detailed_sources = ""

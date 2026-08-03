@@ -16,7 +16,15 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuell (v0.13.3) — 32k-Stage-Budget für OpenRouter + Token-Split im Log
+### Aktuell (v0.14.0) — KI-Kennzeichnung in allen Output-Formen
+
+Seit **02.08.2026** gelten die Transparenzpflichten aus **Art. 50 EU AI Act**. SOMAS-Beiträge durchlaufen menschliche Prüfung, Quellenauswahl und redaktionelle Verantwortung und fallen damit unter die **Ausnahme (Art. 50(4))** – die Kennzeichnung ist also **freiwillige Transparenz**, keine Pflichterfüllung. Sie ist trotzdem überall an, so knapp wie möglich, und **immer aktiv** (kein Toggle: Transparenz ist Standard, nicht Option).
+
+- **Eine Quelle der Wahrheit** – `src/core/ai_disclosure.py` liefert die Kennzeichnung in drei Formen (Text / Markdown / HTML), alle mit demselben Kerntext (Drift-Schutz per Konsistenztest)
+- **Fuß-Platzierung überall** – LinkedIn bekommt **nur die Textzeile** (kein Icon-Linkmüll); Markdown-Export (Einzelanalyse **und** Modellvergleich) und WordPress bekommen zusätzlich das **EU-Basiszeichen „AI"** als Icon (Hotlink, mit `alt`-Text für Barrierefreiheit)
+- **Auffindbar für künftige Gesetzesänderungen** – jede Einbaustelle trägt ein grepbares Tag: `grep "Art. 50"` findet in Sekunden das zentrale Modul und alle drei Integrationspunkte
+
+### Seit v0.13.3 — 32k-Stage-Budget für OpenRouter + Token-Split im Log
 
 Der Reasoning-Cap aus v0.13.2 wurde nachweislich korrekt gesendet, aber der DeepSeek-Upstream-Host **respektierte ihn nicht**: S1 verbrauchte erneut das volle Budget (~11,4k Reasoning, nur ~4,6k sichtbarer Content, `finish_reason=length`). Effort-Compliance ist bei wechselnden Hosts Glückssache – also braucht der Content schlicht mehr Luft, unabhängig von Host-Kooperation.
 

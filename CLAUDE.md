@@ -7,7 +7,7 @@
 ## 🎯 Projektkontext
 
 **Name:** SOMAS Prompt Generator
-**Version:** 0.13.3
+**Version:** 0.14.0
 **Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
 **Sprache:** Python 3.11+
 **GUI-Framework:** PyQt6
@@ -41,6 +41,7 @@ somas_prompt_generator/
 │   ├── core/               # Business-Logik
 │   │   ├── youtube_client.py   # Metadaten via yt-dlp
 │   │   ├── prompt_builder.py   # SOMAS-Prompt + Preset-Handling + Transkript-Builder
+│   │   ├── ai_disclosure.py    # KI-Kennzeichnung (Art. 50 AI Act) — zentrale Quelle, 3 Formen
 │   │   ├── linkedin_formatter.py # Unicode-Formatierung für LinkedIn
 │   │   ├── export.py           # Markdown-Export
 │   │   ├── api_client.py       # API-Abstraktion (Provider-Routing)
@@ -752,6 +753,43 @@ Luft, unabhängig von Host-Kooperation.
   Folge-PR, PO entscheidet nach mehr Modell-Daten); S1-Schema verschlanken;
   weitere Cap-Varianten (`effort: "minimal"` — gleiche Compliance-Lotterie)
 
+### Phase 26: KI-Kennzeichnung in allen Output-Formen ✅ (v0.14.0)
+
+Seit 2026-08-02 gilt Art. 50 EU AI Act (Transparenzpflichten). Rechtlich geprüft:
+SOMAS-Beiträge fallen unter die **Ausnahme (Art. 50(4))** (menschliche Prüfung/
+Kuration + redaktionelle Verantwortung) — die Kennzeichnung ist **freiwillige
+Transparenz**, keine Pflichterfüllung. PO will sie trotzdem, in allen Output-Formen,
+immer an. PO-Entscheidungen (final): Fuß-Platzierung überall · EU-Icon per Hotlink ·
+eine Zeile Text überall.
+
+- [x] Zentrales Modul `src/core/ai_disclosure.py` (eine Quelle der Wahrheit, drei
+  Formen): `AI_DISCLOSURE_TEXT` (LinkedIn, nur Text), `AI_DISCLOSURE_MARKDOWN`
+  (EU-`<img>` width=90 + `alt` + `**Label**`-Zeile), `AI_DISCLOSURE_HTML` (`<p>`-
+  Block, Inline-Icon + `<strong>`). Alle drei teilen `_CORE` (Drift-Schutz). Kein
+  GUI-Toggle (PO-Linie: Transparenz ist Standard). Docstring mit Rechtsgrundlage +
+  Quellen (Art. 50, EU-Icon-Seite, „freiwillig — Ausnahme greift")
+- [x] Auffindbarkeit: jede Einbaustelle trägt das grepbare Tag
+  `# KI-Kennzeichnung (Art. 50 AI Act) — zentral in ai_disclosure.py` →
+  `grep "Art. 50"` findet Modul + alle drei Integrationspunkte
+- [x] LinkedIn (`linkedin_formatter.format_for_linkedin`): Textzeile als letzte
+  Zeile (Fuß), NUR Text — kein `<img>`/keine URL (LinkedIn kann keine Icons im
+  Text; nackte Bild-URL wäre Linkmüll)
+- [x] Markdown (`export.py`): Fußblock mit `---`-Trenner. **Beide Pfade** explizit
+  (kein gemeinsamer Chokepoint): `get_markdown_content` (Einzelanalyse) UND
+  `save_markdown` (Modellvergleich); Konsistenztest sichert Gleichlauf.
+  `sanitize_unicode_for_export` lässt den `<img>`-Tag intakt (getestet)
+- [x] WordPress (`wordpress_client.assemble_content`): `AI_DISCLOSURE_HTML` am Fuß
+  nach dem Outro — deckt Vorschau UND Senden ab (beide über `_assembled_markdown`).
+  Der `<p>`-Block überlebt `markdown_to_html` (Roh-HTML durchgereicht, getestet)
+- [x] Tests `tests/test_ai_disclosure.py` (9): LinkedIn nur Text; Markdown Einzel+
+  Vergleich mit Icon+Text; WordPress hängt an + leeres Outro; Konsistenz aller drei
+  Formen; Sanitize lässt `<img>` intakt; HTML überlebt Markdown-Konvertierung.
+  Gesamtsuite 317 grün
+- [x] `APP_VERSION` → 0.14.0, README-Spotlight + Feature-Absatz, CLAUDE.md
+- [ ] NICHT in diesem PR: PDF-Export (erbt Kennzeichnung später über Markdown-Pfad);
+  prozentuale Mensch/KI-Anteilsberechnung (bewusst verworfen); Icon lokal bündeln/
+  WP-Mediathek (PO: Hotlink; bricht die EU-URL, bleibt der Text stehen)
+
 ### Backlog
 
 - [ ] A4-Feinschliff: erzwungenes Modul aus der `MODUL-AUSWAHL`-Liste entfernen
@@ -801,4 +839,4 @@ Bei Unklarheiten: Frag nach! Lieber einmal zu viel als eine falsche Annahme tref
 
 ---
 
-Letzte Aktualisierung: 2026-07-17 (v0.13.3)
+Letzte Aktualisierung: 2026-08-02 (v0.14.0)

@@ -22,6 +22,9 @@ import keyring
 import requests
 from requests.auth import HTTPBasicAuth
 
+# KI-Kennzeichnung (Art. 50 AI Act) — zentral in ai_disclosure.py
+from src.core.ai_disclosure import AI_DISCLOSURE_HTML
+
 from src.config.api_config import (
     SERVICE_NAME,
     load_preferences,
@@ -206,19 +209,28 @@ def assemble_content(intro_md: str, analysis_md: str, outro_md: str) -> str:
     Leere Felder werden ausgelassen, sodass bei leerem Intro/Outro nur die
     Analyse gesendet wird (Variante A: getrennte Felder).
 
+    Am Fuß wird die KI-Kennzeichnung (Art. 50 AI Act) als HTML-Block angehängt —
+    sie gehört zum Beitrag und ist damit auch in der Dialog-Vorschau sichtbar.
+    Der ``<p>``-Block überlebt die spätere ``markdown_to_html``-Konvertierung
+    (Python-Markdown reicht block-level Roh-HTML unverändert durch).
+
     Args:
         intro_md: Optionaler Einleitungstext (Markdown).
         analysis_md: Die SOMAS-Analyse (Markdown).
         outro_md: Optionaler Ausleitungstext (Markdown).
 
     Returns:
-        Zusammengesetzter Markdown-String (Teile durch Leerzeile getrennt).
+        Zusammengesetzter Markdown-String (Teile durch Leerzeile getrennt),
+        mit KI-Kennzeichnung als letztem Block.
     """
     parts = [
         part.strip()
         for part in (intro_md, analysis_md, outro_md)
         if part and part.strip()
     ]
+    # KI-Kennzeichnung (Art. 50 AI Act) — zentral in ai_disclosure.py
+    # Immer an (PO-Linie: Transparenz ist Standard), am Fuß nach dem Outro.
+    parts.append(AI_DISCLOSURE_HTML)
     return "\n\n".join(parts)
 
 
