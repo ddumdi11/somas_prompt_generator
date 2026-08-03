@@ -50,7 +50,7 @@ def test_linkedin_ends_with_disclosure_text_only() -> None:
 
 def _assert_markdown_footer(doc: str, label: str) -> None:
     assert AI_DISCLOSURE_MARKDOWN in doc, f"{label}: Fußblock fehlt"
-    assert f'width="90"' in doc, f"{label}: img width fehlt"
+    assert 'width="90"' in doc, f"{label}: img width fehlt"
     assert f'alt="{AI_DISCLOSURE_ICON_ALT}"' in doc, f"{label}: alt-Text fehlt"
     assert _CORE in doc, f"{label}: Kerntext fehlt"
 
