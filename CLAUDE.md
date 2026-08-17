@@ -7,7 +7,7 @@
 ## 🎯 Projektkontext
 
 **Name:** SOMAS Prompt Generator
-**Version:** 0.14.0
+**Version:** 0.14.1
 **Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
 **Sprache:** Python 3.11+
 **GUI-Framework:** PyQt6
@@ -790,6 +790,24 @@ eine Zeile Text überall.
   prozentuale Mensch/KI-Anteilsberechnung (bewusst verworfen); Icon lokal bündeln/
   WP-Mediathek (PO: Hotlink; bricht die EU-URL, bleibt der Text stehen)
 
+### Phase 27: WordPress-Sende-Dialog — Sicherheits-Vorwahl „Privat" ✅ (v0.14.1)
+
+PO-Realtest v0.14.0: Der Sende-Dialog „An Blog senden" öffnete den Status auf dem
+in den Settings gespeicherten Default (`wordpress_default_status`, beim PO
+„publish") → ein versehentlicher Klick hätte sofort öffentlich gepostet. PO-Linie:
+grundsätzlich „Privat", damit erst auf der Blog-Seite geprüft und dort manuell
+freigeschaltet wird.
+
+- [x] `wordpress_dialog._build_options_group`: Status-Combo wird beim Öffnen fest
+  auf `_SAFE_DEFAULT_STATUS = "private"` vorgewählt — unabhängig vom Settings-
+  Default. Minimaler Eingriff (nur `wordpress_dialog.py`); der Settings-Regler
+  „Default-Status" bleibt unangetastet (steuert nur nicht mehr die Vorwahl), alle
+  Status bleiben im Dialog manuell wählbar (PO-Entscheidung: „Regler bleibt")
+- [x] Tests `tests/test_wordpress_dialog_default_status.py` (3): Vorwahl „private"
+  trotz gespeichertem „publish" bzw. „draft"; „publish" bleibt manuell wählbar.
+  Gesamtsuite 320 grün
+- [x] `APP_VERSION` → 0.14.1, README-Spotlight + „Seit v0.14.0"-Demotion, CLAUDE.md
+
 ### Backlog
 
 - [ ] A4-Feinschliff: erzwungenes Modul aus der `MODUL-AUSWAHL`-Liste entfernen
@@ -839,4 +857,4 @@ Bei Unklarheiten: Frag nach! Lieber einmal zu viel als eine falsche Annahme tref
 
 ---
 
-Letzte Aktualisierung: 2026-08-02 (v0.14.0)
+Letzte Aktualisierung: 2026-08-17 (v0.14.1)
