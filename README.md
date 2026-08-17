@@ -16,7 +16,14 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuell (v0.14.0) — KI-Kennzeichnung in allen Output-Formen
+### Aktuell (v0.14.1) — WordPress: Sicherheits-Vorwahl „Privat"
+
+Der Sende-Dialog „An Blog senden" öffnete den Beitragsstatus bisher auf dem in den Settings gespeicherten Default (bei mir „Veröffentlichen") – ein versehentlicher Klick hätte sofort öffentlich gepostet.
+
+- **Beim Öffnen immer „Privat"** – Der Status ist jetzt aus Sicherheitsgründen fest auf „Privat" vorgewählt, unabhängig vom Settings-Default. So landet jeder Beitrag erst unveröffentlicht im Blog und wird dort geprüft, bevor er manuell freigeschaltet wird
+- **Manuell frei wählbar** – Im Dialog lassen sich Entwurf/Veröffentlichen/Ausstehend weiterhin auswählen; der Settings-Regler „Default-Status" bleibt unangetastet (steuert nur nicht mehr die Vorwahl)
+
+### Seit v0.14.0 — KI-Kennzeichnung in allen Output-Formen
 
 Seit **02.08.2026** gelten die Transparenzpflichten aus **Art. 50 EU AI Act**. SOMAS-Beiträge durchlaufen menschliche Prüfung, Quellenauswahl und redaktionelle Verantwortung und fallen damit unter die **Ausnahme (Art. 50(4))** – die Kennzeichnung ist also **freiwillige Transparenz**, keine Pflichterfüllung. Sie ist trotzdem überall an, so knapp wie möglich, und **immer aktiv** (kein Toggle: Transparenz ist Standard, nicht Option).
 

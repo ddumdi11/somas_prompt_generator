@@ -2,7 +2,8 @@
 
 Getrennte Felder für Intro / Analyse / Outro. Das Intro-/Outro-Feld ist optional
 – bleibt es leer, wird nur die Analyse gesendet. Status, Kategorie und Tags sind
-einstellbar; Default-Status kommt aus den Einstellungen (üblicherweise „Entwurf").
+einstellbar; der Status ist beim Öffnen aus Sicherheitsgründen immer auf „Privat"
+vorgewählt (erst auf der Blog-Seite prüfen, dann manuell freischalten).
 """
 
 import logging
@@ -25,6 +26,11 @@ from src.core.wordpress_client import (
 from src.core.wordpress_worker import WordPressWorker
 
 logger = logging.getLogger(__name__)
+
+#: Sichere Vorauswahl im Sende-Dialog: immer „Privat" (erst auf der Blog-Seite
+#: prüfen, dann manuell freischalten). Bewusst unabhängig vom Settings-Default-
+#: Status, damit nie versehentlich sofort veröffentlicht wird (PO-Linie).
+_SAFE_DEFAULT_STATUS = "private"
 
 #: Benutzerfreundliche Beschriftungen für die Status-Auswahl.
 _STATUS_LABELS = {
@@ -161,8 +167,10 @@ class WordPressSendDialog(QDialog):
         self.status_combo = QComboBox()
         for status in WP_STATUSES:
             self.status_combo.addItem(_STATUS_LABELS.get(status, status), status)
-        # Default-Status vorwählen
-        idx = self.status_combo.findData(self._config.default_status)
+        # Sicherheits-Vorwahl: immer „Privat", unabhängig vom Settings-Default.
+        # Verhindert versehentliches Sofort-Veröffentlichen – der Beitrag wird
+        # erst auf der Blog-Seite geprüft und dort manuell freigeschaltet.
+        idx = self.status_combo.findData(_SAFE_DEFAULT_STATUS)
         if idx >= 0:
             self.status_combo.setCurrentIndex(idx)
         grid.addRow("Status:", self.status_combo)
