@@ -105,6 +105,18 @@ class AnthropicClient(LLMClient):
 
             stop_reason = getattr(message, "stop_reason", None)
 
+            # v0.13.3: Token-Split fürs Debug-Log. Anthropic nennt die Felder
+            # input_tokens/output_tokens (kein total). Thinking-Tokens zählen bei
+            # Anthropic in output_tokens — keine separate Reasoning-Zahl → None.
+            # v0.14.2: VOR der Leer-Prüfung, damit auch der Leer-Inhalt-Fehlerpfad
+            # den Token-Split trägt (statt 0/0).
+            tokens_input = 0
+            tokens_output = 0
+            if message.usage:
+                tokens_input = getattr(message.usage, "input_tokens", 0)
+                tokens_output = getattr(message.usage, "output_tokens", 0)
+            tokens_used = tokens_input + tokens_output
+
             # Leerer Inhalt: sauber als Fehler melden (im Vergleich nicht
             # weiterverarbeiten, statt ein leeres "Erfolgs"-Ergebnis zu liefern).
             if not content.strip():
@@ -112,18 +124,11 @@ class AnthropicClient(LLMClient):
                     f"Anthropic: leerer Inhalt (stop_reason={stop_reason})"
                 )
                 return self._build_empty_content_response(
-                    "stop_reason", stop_reason, {"max_tokens": "length"}
+                    "stop_reason", stop_reason, {"max_tokens": "length"},
+                    tokens_input=tokens_input,
+                    tokens_output=tokens_output,
+                    tokens_used=tokens_used,
                 )
-
-            # v0.13.3: Token-Split fürs Debug-Log. Anthropic nennt die Felder
-            # input_tokens/output_tokens (kein total). Thinking-Tokens zählen bei
-            # Anthropic in output_tokens — keine separate Reasoning-Zahl → None.
-            tokens_input = 0
-            tokens_output = 0
-            if message.usage:
-                tokens_input = getattr(message.usage, "input_tokens", 0)
-                tokens_output = getattr(message.usage, "output_tokens", 0)
-            tokens_used = tokens_input + tokens_output
 
             # v0.11.0: stop_reason durchreichen. Anthropic nennt Trunkierung
             # "max_tokens" — auf das providerübergreifende "length" normalisieren,

@@ -10,9 +10,24 @@ from typing import ClassVar, Optional
 
 import requests
 
-from .api_client import DEFAULT_MAX_TOKENS, APIResponse, APIStatus, LLMClient
+from .api_client import APIResponse, APIStatus, LLMClient
 
 logger = logging.getLogger(__name__)
+
+# v0.14.2: Eigener Default-Budget für normale (nicht-Stage) OpenRouter-Calls —
+# also Analyse UND (klassische) Verifikation, alles was mit `max_tokens=None`
+# reinkommt. DeepSeek V4 raisont invers zur Prompt-Größe: bei kleinem Prompt
+# 6–8k+ Reasoning → das alte 8192er-Budget (`DEFAULT_MAX_TOKENS`) platzte mitten
+# im sichtbaren Content (`finish_reason=length`, Realtests 2026-08-20). 32768 gibt
+# der finalen Analyse Luft, auch wenn der Host `exclude`/Cap ignoriert; die
+# Sicherheitsnetze (v0.11-Gate + Retry, Struktur-Validator, Phase-17-Eskalation)
+# bleiben. Reasoning des Analyse-Calls wird bewusst NICHT gecappt (erwünscht).
+#
+# NICHT zu verwechseln mit `factcheck_plus_worker.STAGE_MAX_TOKENS_OPENROUTER`
+# (v0.13.3, gleicher Wert 32768): das ist das explizite Stufen-Budget an der
+# Qt↔Package-Naht — andere Schicht, andere Bedeutung. Stage-Calls übergeben
+# `max_tokens` explizit; dieser Default hier greift nur bei `max_tokens is None`.
+OPENROUTER_DEFAULT_MAX_TOKENS = 32768
 
 
 class OpenRouterClient(LLMClient):
@@ -147,8 +162,9 @@ class OpenRouterClient(LLMClient):
         Args:
             prompt: Der zu sendende Prompt-Text.
             model: Die Modell-ID (z.B. 'anthropic/claude-3-haiku').
-            max_tokens: Optionale Obergrenze für die Antwortlänge
-                (``None`` → :data:`DEFAULT_MAX_TOKENS`).
+            max_tokens: Optionale Obergrenze für die Antwortlänge. ``None``
+                (normaler Analyse-/Verifikations-Call) → :data:`OPENROUTER_DEFAULT_MAX_TOKENS`
+                (32768, v0.14.2); explizite Werte (Stage-Calls) bleiben unangetastet.
             cap_reasoning: Wenn ``True``, wird das Reasoning zusätzlich per
                 Effort-Cap gedeckelt (:data:`REASONING_CAP_EFFORT`) — nur für
                 strukturierte Stage-Calls, nicht für die normale Analyse (dort ist
@@ -158,7 +174,11 @@ class OpenRouterClient(LLMClient):
             APIResponse mit Status und Inhalt.
         """
         logger.info(f"OpenRouter API-Call: model={model}, prompt_len={len(prompt)}")
-        tokens_cap = DEFAULT_MAX_TOKENS if max_tokens is None else max_tokens
+        # v0.14.2: normaler Call (max_tokens is None) → OpenRouter-eigener 32768-
+        # Default statt 8192; explizite Stage-Werte 1:1 respektieren.
+        tokens_cap = (
+            OPENROUTER_DEFAULT_MAX_TOKENS if max_tokens is None else max_tokens
+        )
 
         # v0.11.0 (Reasoning-Leak-Härtung, stärkster Hebel): Das Modell reasont
         # weiterhin INTERN (Qualität bleibt), gibt die Reasoning-Tokens aber NICHT
@@ -211,6 +231,19 @@ class OpenRouterClient(LLMClient):
                 # der finish_reason-Gate (PR 3) bzw. der Struktur-Validator (PR 5) ab.
                 content = message.get("content") or message.get("reasoning")
 
+                # v0.13.3: Token-Split fürs Debug-Log. OpenRouter (OpenAI-kompatibel)
+                # liefert usage immer mit: prompt_tokens/completion_tokens/total_tokens
+                # + optional completion_tokens_details.reasoning_tokens (gegen die
+                # Live-Doku „Usage Accounting" geprüft). v0.14.2: VOR der Leer-Prüfung
+                # extrahiert, damit auch der Leer-Inhalt-Fehlerpfad belegt, WOHIN das
+                # Budget ging (typisch: Reasoning) — genau dort standen die Felder
+                # bisher auf 0.
+                usage = data.get("usage") or {}
+                tokens = usage.get("total_tokens", 0)
+                reasoning_tokens = (
+                    usage.get("completion_tokens_details") or {}
+                ).get("reasoning_tokens")
+
                 # Leerer/fehlender Inhalt: sauber als Fehler melden statt bei
                 # len(content) zu crashen (NoneType has no len()).
                 if not content or not content.strip():
@@ -218,18 +251,12 @@ class OpenRouterClient(LLMClient):
                         f"OpenRouter: leerer Inhalt (finish_reason={finish_reason})"
                     )
                     return self._build_empty_content_response(
-                        "finish_reason", finish_reason
+                        "finish_reason", finish_reason,
+                        tokens_input=usage.get("prompt_tokens", 0),
+                        tokens_output=usage.get("completion_tokens", 0),
+                        tokens_used=tokens,
+                        reasoning_tokens=reasoning_tokens,
                     )
-
-                # v0.13.3: Token-Split fürs Debug-Log. OpenRouter (OpenAI-kompatibel)
-                # liefert usage immer mit: prompt_tokens/completion_tokens/total_tokens
-                # + optional completion_tokens_details.reasoning_tokens (gegen die
-                # Live-Doku „Usage Accounting" geprüft).
-                usage = data.get("usage") or {}
-                tokens = usage.get("total_tokens", 0)
-                reasoning_tokens = (
-                    usage.get("completion_tokens_details") or {}
-                ).get("reasoning_tokens")
 
                 logger.info(
                     f"OpenRouter Antwort: {len(content)} Zeichen, "

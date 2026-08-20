@@ -16,7 +16,15 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuell (v0.14.1) — WordPress: Sicherheits-Vorwahl „Privat"
+### Aktuell (v0.14.2) — 32k-Analyse-Budget für OpenRouter
+
+Abend-Realtests (2026-08-20, DeepSeek V4 Pro via OpenRouter) scheiterten bei einem **kurzen** Video 6× in Folge am Analyse-Call: `finish_reason=length`, Output exakt 8192 Tokens. Ursache: DeepSeek raisont **invers zur Prompt-Größe** – bei kleinem Prompt frisst das (unsichtbare) Reasoning 6–8k+ Tokens und sprengt das alte 8192er-Budget mitten im sichtbaren Text. Bisher fiel das nie auf, weil reale Analysen 80–180k-Prompts hatten. Das ist das Spiegelstück zum 32k-**Stage**-Budget aus v0.13.3, jetzt für den Analyse-/Verifikations-Call.
+
+- **32768 statt 8192 für normale OpenRouter-Calls** – Analyse **und** klassische Verifikation bekommen mehr Luft; die finale Analyse läuft durch, auch wenn der Host den Reasoning-Ausschluss ignoriert. Alle anderen Provider bleiben bei 8192, die Sicherheitsnetze (Trunkierungs-Gate, Struktur-Validator, Leer-Inhalt-Eskalation) bleiben aktiv
+- **Ehrlicher Beleg im Debug-Log** – auch der Leer-Inhalt-Fehlerpfad trägt jetzt den Token-Split (Input/Output/Reasoning) aus `usage`; bisher stand dort 0, obwohl genau hier die Frage „wohin ging das Budget?" (Reasoning!) zu beantworten ist
+- **Hinweis zu den Kosten** – OpenRouter reserviert gegen `max_tokens` (Pre-Auth); bei Billig-Modellen wie DeepSeek Cent-Beträge, bei teuren OpenRouter-Slugs (z. B. Claude, ~$75/M Output) bis ~2–3 $ Reservierung. **Und im Leck-Fehlfall** generiert ein Modell jetzt echte Tokens bis 32k statt 8k, bevor die Gates greifen – auf DeepSeek Cent-Beträge, auf teuren Slugs realer Aufpreis pro Fehllauf. Teure Modelle laufen bei mir direkt über Anthropic (von diesem PR unberührt); der Tradeoff bleibt richtig: lieber eine durchlaufende legitime Analyse als ein garantiert scheiternder Sparlauf. Ein echtes HTTP 402 bleibt ein offener Fehler (nicht still absenken)
+
+### Seit v0.14.1 — WordPress: Sicherheits-Vorwahl „Privat"
 
 Der Sende-Dialog „An Blog senden" öffnete den Beitragsstatus bisher auf dem in den Settings gespeicherten Default (bei mir „Veröffentlichen") – ein versehentlicher Klick hätte sofort öffentlich gepostet.
 

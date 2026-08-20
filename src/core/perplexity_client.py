@@ -127,6 +127,14 @@ class PerplexityClient(LLMClient):
                 # Text ggf. im Feld 'reasoning'.
                 content = message.get("content") or message.get("reasoning")
 
+                # v0.13.3: Token-Split fürs Debug-Log (OpenAI-kompatibles usage).
+                # Perplexity liefert keine Reasoning-Aufschlüsselung → None.
+                # v0.14.2: VOR der Leer-Prüfung extrahiert, damit auch der
+                # Leer-Inhalt-Fehlerpfad den Token-Split trägt (statt 0/0).
+                usage = data.get("usage") or {}
+                tokens = usage.get("total_tokens", 0)
+                citations = data.get("citations", [])
+
                 # Leerer/fehlender Inhalt: sauber als Fehler melden statt bei
                 # len(content) zu crashen (NoneType has no len()).
                 if not content or not content.strip():
@@ -134,14 +142,11 @@ class PerplexityClient(LLMClient):
                         f"Perplexity: leerer Inhalt (finish_reason={finish_reason})"
                     )
                     return self._build_empty_content_response(
-                        "finish_reason", finish_reason
+                        "finish_reason", finish_reason,
+                        tokens_input=usage.get("prompt_tokens", 0),
+                        tokens_output=usage.get("completion_tokens", 0),
+                        tokens_used=tokens,
                     )
-
-                # v0.13.3: Token-Split fürs Debug-Log (OpenAI-kompatibles usage).
-                # Perplexity liefert keine Reasoning-Aufschlüsselung → None.
-                usage = data.get("usage") or {}
-                tokens = usage.get("total_tokens", 0)
-                citations = data.get("citations", [])
 
                 logger.info(
                     f"Perplexity Antwort: {len(content)} Zeichen, "

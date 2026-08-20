@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.core.api_client import DEFAULT_MAX_TOKENS, APIResponse, APIStatus
 from src.core.debug_logger import DebugLogger
-from src.core.openrouter_client import OpenRouterClient
+from src.core.openrouter_client import OPENROUTER_DEFAULT_MAX_TOKENS, OpenRouterClient
 from src.core.perplexity_client import PerplexityClient
 from src.core.factcheck_plus.llm_stage import STAGE_MAX_TOKENS
 from src.core.factcheck_plus_worker import STAGE_MAX_TOKENS_OPENROUTER, _TokenCountingClient
@@ -132,14 +132,18 @@ def test_non_openrouter_budget_unchanged_at_seam() -> None:
     print("  non_openrouter_budget_unchanged_at_seam OK")
 
 
-def test_normal_openrouter_call_unchanged() -> None:
-    """Normaler (nicht durch die Naht laufender) OpenRouter-Call: DEFAULT + nur exclude."""
+def test_normal_openrouter_call_uses_own_default() -> None:
+    """Normaler OpenRouter-Call (max_tokens is None): OpenRouter-eigener 32768-
+    Default (v0.14.2, NICHT der 8192-DEFAULT_MAX_TOKENS) + nur exclude, kein Cap."""
     captured, ctx = _capture("src.core.openrouter_client")
     with ctx:
         OpenRouterClient("k").send_prompt("p", "some/model")
-    assert captured["json"]["max_tokens"] == DEFAULT_MAX_TOKENS
+    assert OPENROUTER_DEFAULT_MAX_TOKENS == 32768
+    assert captured["json"]["max_tokens"] == OPENROUTER_DEFAULT_MAX_TOKENS
+    assert captured["json"]["max_tokens"] != DEFAULT_MAX_TOKENS
+    # Reasoning des Analyse-Calls bleibt ungecappt (nur exclude).
     assert captured["json"]["reasoning"] == {"exclude": True}
-    print("  normal_openrouter_call_unchanged OK")
+    print("  normal_openrouter_call_uses_own_default OK")
 
 
 # === Teil B: Token-Split im Debug-Log =====================================
@@ -299,7 +303,7 @@ def main() -> None:
     test_openrouter_stage_call_uses_32k()
     test_perplexity_stage_call_stays_16k()
     test_non_openrouter_budget_unchanged_at_seam()
-    test_normal_openrouter_call_unchanged()
+    test_normal_openrouter_call_uses_own_default()
     test_openrouter_token_split_and_reasoning()
     test_openrouter_missing_usage_no_crash()
     test_perplexity_token_split_no_reasoning()
