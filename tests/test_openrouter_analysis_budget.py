@@ -24,6 +24,8 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.core.api_client import (
@@ -52,7 +54,8 @@ def _capture(module_path: str, payload: dict) -> tuple[dict, object]:
     """Patch-Kontext, der den gesendeten JSON-Payload einsammelt."""
     captured: dict = {}
 
-    def fake_post(url, headers=None, json=None, timeout=None):  # noqa: ANN001
+    def fake_post(url: str, headers: dict | None = None,
+                  json: dict | None = None, timeout: float | None = None) -> _Resp:
         captured["json"] = json
         return _Resp(payload)
 
@@ -100,11 +103,9 @@ def test_perplexity_normal_call_stays_8192() -> None:
 
 def test_anthropic_normal_call_stays_8192() -> None:
     """Anthropic-Normal-Call: weiterhin 8192 (nicht vom OpenRouter-Default berührt)."""
-    try:
-        import anthropic  # noqa: F401
-    except ImportError:
-        print("  anthropic_normal_call_stays_8192: SDK fehlt -> uebersprungen")
-        return
+    # SDK ist Pflicht-Dependency (requirements.txt); fehlt sie doch, honest SKIP
+    # statt assertion-freiem Durchlauf (der als PASS bzw. „ALL OK" durchginge).
+    pytest.importorskip("anthropic")
     from src.core.anthropic_client import AnthropicClient
 
     block = MagicMock()
@@ -124,11 +125,7 @@ def test_anthropic_normal_call_stays_8192() -> None:
 
 def test_openai_normal_call_stays_8192() -> None:
     """OpenAI-Normal-Call: weiterhin 8192."""
-    try:
-        import openai  # noqa: F401
-    except ImportError:
-        print("  openai_normal_call_stays_8192: SDK fehlt -> uebersprungen")
-        return
+    pytest.importorskip("openai")
     from src.core.openai_client import OpenAIClient
 
     resp = MagicMock()
@@ -198,11 +195,7 @@ def test_perplexity_empty_content_carries_usage() -> None:
 
 def test_anthropic_empty_content_carries_usage() -> None:
     """Anthropic-Leer-Inhalt trägt input/output aus usage."""
-    try:
-        import anthropic  # noqa: F401
-    except ImportError:
-        print("  anthropic_empty_content_carries_usage: SDK fehlt -> uebersprungen")
-        return
+    pytest.importorskip("anthropic")
     from src.core.anthropic_client import AnthropicClient
 
     msg = MagicMock()
@@ -223,11 +216,7 @@ def test_anthropic_empty_content_carries_usage() -> None:
 
 def test_openai_empty_content_carries_usage() -> None:
     """OpenAI-Leer-Inhalt trägt input/output + reasoning (o-Series)."""
-    try:
-        import openai  # noqa: F401
-    except ImportError:
-        print("  openai_empty_content_carries_usage: SDK fehlt -> uebersprungen")
-        return
+    pytest.importorskip("openai")
     from src.core.openai_client import OpenAIClient
 
     resp = MagicMock()
@@ -247,6 +236,14 @@ def test_openai_empty_content_carries_usage() -> None:
 
 
 def main() -> None:
+    """Führt alle Prüfungen ohne pytest nacheinander aus.
+
+    Deckt Teil A (Analyse-Budget: Normal-Call 32k, explizite Werte 1:1, andere
+    Provider 8192) und Teil B (Token-Split im Leer-Inhalt-Fehlerpfad je Provider)
+    ab und meldet am Ende „ALLE TESTS OK". Fehlt ein Pflicht-SDK
+    (anthropic/openai), bricht der jeweilige Test per ``importorskip`` sichtbar ab
+    statt still als Erfolg durchzulaufen.
+    """
     print("32k-Analyse-Budget + Usage im Leer-Pfad (v0.14.2):")
     test_normal_openrouter_call_uses_32k()
     test_explicit_max_tokens_respected()
