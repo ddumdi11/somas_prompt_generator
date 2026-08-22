@@ -166,6 +166,11 @@ class LLMClient(ABC):
     def _build_empty_content_response(
         self, reason_label: str, reason_value: str | None,
         extra_map: dict[str, str] | None = None,
+        *,
+        tokens_input: int = 0,
+        tokens_output: int = 0,
+        tokens_used: int = 0,
+        reasoning_tokens: int | None = None,
     ) -> "APIResponse":
         """Baut die einheitliche Leer-Inhalt-Fehlerantwort für alle Clients.
 
@@ -179,15 +184,33 @@ class LLMClient(ABC):
             reason_value: Der rohe Stopp-Grund (kann ``None`` sein).
             extra_map: Optionale Aliasse für :meth:`_normalize_finish_reason`
                 (z.B. ``{"max_tokens": "length"}`` bei Anthropic).
+            tokens_input: Prompt-/Input-Tokens aus dem ``usage``-Objekt der
+                Antwort (v0.14.2). Bleiben bei fehlendem ``usage`` auf 0.
+            tokens_output: Completion-/Output-Tokens aus ``usage`` (v0.14.2).
+            tokens_used: Gesamt-Tokens aus ``usage`` (v0.14.2).
+            reasoning_tokens: Reasoning-Anteil aus ``usage`` (v0.14.2, nur
+                OpenRouter/OpenAI) — ``None``, wenn nicht geliefert.
 
         Returns:
             Die fertige :class:`APIResponse` mit Status ERROR.
+
+        Note:
+            v0.14.2: Der Leer-Inhalt-Pfad trägt jetzt den Token-Split, sofern der
+            Client ihn aus ``usage`` extrahiert und durchreicht. Genau hier fehlte
+            bisher der Beleg, WOHIN das Budget ging (Reasoning), obwohl das
+            Debug-Log die Felder längst persistiert. Die usage-Extraktion bleibt
+            clientspezifisch (unterschiedliche Feldnamen) — dieser Chokepoint baut
+            nur die eine, provider-einheitliche :class:`APIResponse` daraus.
         """
         return APIResponse(
             status=APIStatus.ERROR,
             error_message=build_empty_content_error(reason_label, reason_value),
             finish_reason=self._normalize_finish_reason(reason_value, extra_map),
             http_status=200,
+            tokens_input=tokens_input,
+            tokens_output=tokens_output,
+            tokens_used=tokens_used,
+            reasoning_tokens=reasoning_tokens,
         )
 
     @abstractmethod

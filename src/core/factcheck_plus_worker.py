@@ -56,6 +56,13 @@ TOTAL_STAGES = 5
 # Provider bleiben bei ``llm_stage.STAGE_MAX_TOKENS`` (16384). 402-Vorauth gegen
 # 32768 ist bei DeepSeek-Preisen vernachlässigbar (PO-Entscheidung); ein echtes 402
 # bliebe ein offener Fehler (nicht still absenken, Linie aus v0.13.2).
+#
+# NICHT zu verwechseln mit `openrouter_client.OPENROUTER_DEFAULT_MAX_TOKENS`
+# (v0.14.2, gleicher Wert 32768): das ist der Default-Budget für NORMALE
+# OpenRouter-Calls (Analyse/Verifikation, `max_tokens is None`) im Client selbst.
+# Diese Konstante hier ist das EXPLIZITE Stage-Budget, das die Naht als `max_tokens`
+# durchreicht — andere Schicht, andere Bedeutung; getrennt, damit das Package
+# provider-agnostisch bleibt.
 STAGE_MAX_TOKENS_OPENROUTER = 32768
 
 

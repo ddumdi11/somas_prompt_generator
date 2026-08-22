@@ -31,12 +31,12 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.core.api_client import (
-    DEFAULT_MAX_TOKENS, APIResponse, APIStatus,
+    APIResponse, APIStatus,
 )
 from src.core.factcheck_plus.llm_stage import (
     STAGE_MAX_TOKENS, StageError, run_json_stage,
 )
-from src.core.openrouter_client import OpenRouterClient
+from src.core.openrouter_client import OPENROUTER_DEFAULT_MAX_TOKENS, OpenRouterClient
 import src.core.factcheck_plus_worker as fpw
 from tests.factcheck_plus_helpers import FakeClient, error_response
 
@@ -124,8 +124,9 @@ def test_stage_call_uses_stage_max_tokens():
 
 
 def test_normal_client_call_uses_default_budget():
-    """Ein normaler Client-Call ohne Override bleibt bei DEFAULT_MAX_TOKENS,
-    ein expliziter Override (wie aus der Stufe) landet 1:1 im Payload."""
+    """Ein normaler OpenRouter-Call ohne Override nutzt den OpenRouter-eigenen
+    Default (OPENROUTER_DEFAULT_MAX_TOKENS, v0.14.2), ein expliziter Override
+    (wie aus der Stufe) landet 1:1 im Payload."""
     captured = []
 
     class _Resp:
@@ -149,7 +150,7 @@ def test_normal_client_call_uses_default_budget():
         assert client.send_prompt("p", "some/model").status == APIStatus.RECEIVED
         client.send_prompt("p", "some/model", max_tokens=STAGE_MAX_TOKENS)
 
-    assert captured[0]["max_tokens"] == DEFAULT_MAX_TOKENS, captured[0]["max_tokens"]
+    assert captured[0]["max_tokens"] == OPENROUTER_DEFAULT_MAX_TOKENS, captured[0]["max_tokens"]
     assert captured[1]["max_tokens"] == STAGE_MAX_TOKENS, captured[1]["max_tokens"]
     print("  normal_client_call_uses_default_budget OK")
 

@@ -7,7 +7,7 @@
 ## 🎯 Projektkontext
 
 **Name:** SOMAS Prompt Generator
-**Version:** 0.14.1
+**Version:** 0.14.2
 **Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
 **Sprache:** Python 3.11+
 **GUI-Framework:** PyQt6
@@ -808,6 +808,54 @@ freigeschaltet wird.
   Gesamtsuite 320 grün
 - [x] `APP_VERSION` → 0.14.1, README-Spotlight + „Seit v0.14.0"-Demotion, CLAUDE.md
 
+### Phase 28: 32k-Analyse-Budget für OpenRouter + Usage im Leer-Pfad ✅ (v0.14.2)
+
+Spiegel-Stück zu Phase 25 (v0.13.3) für den **Analyse-Call**. Realtests
+2026-08-20 (DeepSeek V4 Pro/-0813 via OpenRouter): Abend-Läufe mit **kleinem**
+Prompt (16k Zeichen, kurzes Video) scheiterten 6× am Analyse-Call
+(`finish_reason=length`, out exakt 8192 = `DEFAULT_MAX_TOKENS`): 3× komplett
+leer (Reasoning fraß das Budget — Phase-17-Pfad griff), 2× mitten im Text gekappt
+(v0.11-Gate griff), 1× Reasoning-Leak (Host ignorierte `exclude`, Struktur-
+Validator verwarf ihn). Der Mittags-Lauf (170k-Prompt) lief sauber — Analyse-
+Reasoning nur 831 Tokens. Befund: **DeepSeek raisont invers zur Prompt-Größe**
+(kleiner Prompt → 6–8k+ Reasoning → 8192 platzt); fiel nie auf, weil alle
+bisherigen Analysen 80–180k-Prompts hatten. Nur der Analyse-Call hing noch am
+alten 8192er-Budget (Stufen haben seit v0.13.3 ihr 32k).
+
+- [x] Teil A · `OPENROUTER_DEFAULT_MAX_TOKENS = 32768` (modul-level in
+  `openrouter_client`, importierbar wie `STAGE_MAX_TOKENS_OPENROUTER`): greift für
+  **normale** OpenRouter-Calls (`max_tokens is None` → Analyse UND klassische
+  Verifikation). Explizite Stage-Werte bleiben 1:1; **alle anderen Provider**
+  bleiben bei `DEFAULT_MAX_TOKENS = 8192`. Reasoning des Analyse-Calls bleibt
+  **ungecappt** (erwünscht; `exclude: true` bleibt). Sicherheitsnetze unverändert
+  (v0.11-Gate + Retry, Struktur-Validator, Phase-17-Eskalation, Trunkierungs-Gate).
+  Cross-Ref-Kommentar in **beide Richtungen** zu `STAGE_MAX_TOKENS_OPENROUTER`
+  (gleicher Wert 32768, andere Schicht: Client-Default vs. explizites Stufen-Budget
+  an der Qt↔Package-Naht — bewusst getrennt, damit das Package provider-agnostisch
+  bleibt)
+- [x] Teil B · Usage-Erfassung im Leer-Inhalt-Fehlerpfad: `_build_empty_content_response`
+  (der eine Chokepoint) um optionale `tokens_input`/`tokens_output`/`tokens_used`/
+  `reasoning_tokens` erweitert; **alle 4 Clients** extrahieren `usage` jetzt VOR
+  der Leer-Prüfung (clientspezifische Feldnamen) und reichen den Split durch —
+  statt den `APIResponse`-Bau 4× zu duplizieren. Bisher standen `tokens_*` im
+  Leer-Pfad auf 0, obwohl genau dort der Beleg fehlt, WOHIN das Budget ging
+  (Reasoning). Debug-Log persistierte die Felder längst — nur befüllt
+- [x] 402-Risiko + **echter Verbrauch** im Changelog benannt: Pre-Auth gegen 32k
+  (Cent bei DeepSeek, ~2–3 $ bei teuren Slugs bei knappem Guthaben); zusätzlich
+  generiert ein Leck-Fehllauf jetzt bis 32k echte (berechnete) Tokens statt 8k,
+  bevor die Gates greifen. Teure Modelle laufen direkt über Anthropic (unberührt)
+  → Restrisiko klein. Echtes 402 bleibt offener Fehler (Linie aus v0.13.2)
+- [x] Tests `tests/test_openrouter_analysis_budget.py` (10): Normal-Call → 32768;
+  explizite Werte 1:1; Perplexity/Anthropic/OpenAI-Normal-Call → 8192; Leer-Inhalt
+  mit/ohne `usage` je Provider (Split befüllt bzw. 0/None kein Crash). Zwei
+  Alt-Tests (`test_stage_budget_and_tokens`, `test_stage_truncation_gate`) auf den
+  OpenRouter-Default umgestellt. Gesamtsuite 330 grün
+- [x] `APP_VERSION` → 0.14.2, README-Spotlight + „Seit v0.14.1"-Demotion, CLAUDE.md
+- [ ] NICHT in diesem PR: Reasoning-Cap für den Analyse-Call (Compliance-Lotterie,
+  s. v0.13.2 — und Analyse-Reasoning ist bei großen Prompts erwünscht/harmlos);
+  Maßnahmen gegen den Reasoning-Leak selbst (Host-Fehlverhalten; Validator + Gate
+  decken ihn); Stufen-Modell-Entkopplung, S1-Schema (weiter vertagt)
+
 ### Backlog
 
 - [ ] A4-Feinschliff: erzwungenes Modul aus der `MODUL-AUSWAHL`-Liste entfernen
@@ -857,4 +905,4 @@ Bei Unklarheiten: Frag nach! Lieber einmal zu viel als eine falsche Annahme tref
 
 ---
 
-Letzte Aktualisierung: 2026-08-17 (v0.14.1)
+Letzte Aktualisierung: 2026-08-20 (v0.14.2)

@@ -95,19 +95,11 @@ class OpenAIClient(LLMClient):
             content = response.choices[0].message.content or ""
             finish_reason = getattr(response.choices[0], "finish_reason", None)
 
-            # Leerer Inhalt: sauber als Fehler melden (im Vergleich nicht
-            # weiterverarbeiten, statt ein leeres "Erfolgs"-Ergebnis zu liefern).
-            if not content.strip():
-                logger.error(
-                    f"OpenAI: leerer Inhalt (finish_reason={finish_reason})"
-                )
-                return self._build_empty_content_response(
-                    "finish_reason", finish_reason
-                )
-
             # v0.13.3: Token-Split fürs Debug-Log. usage nennt prompt_tokens/
             # completion_tokens/total_tokens; die o-Series liefert den Reasoning-
             # Anteil unter completion_tokens_details.reasoning_tokens.
+            # v0.14.2: VOR der Leer-Prüfung, damit auch der Leer-Inhalt-Fehlerpfad
+            # den Token-Split trägt (statt 0/0) — bei o-Series inkl. reasoning_tokens.
             usage = response.usage
             tokens_used = usage.total_tokens if usage else 0
             tokens_input = getattr(usage, "prompt_tokens", 0) if usage else 0
@@ -116,6 +108,20 @@ class OpenAIClient(LLMClient):
             if usage is not None:
                 details = getattr(usage, "completion_tokens_details", None)
                 reasoning_tokens = getattr(details, "reasoning_tokens", None)
+
+            # Leerer Inhalt: sauber als Fehler melden (im Vergleich nicht
+            # weiterverarbeiten, statt ein leeres "Erfolgs"-Ergebnis zu liefern).
+            if not content.strip():
+                logger.error(
+                    f"OpenAI: leerer Inhalt (finish_reason={finish_reason})"
+                )
+                return self._build_empty_content_response(
+                    "finish_reason", finish_reason,
+                    tokens_input=tokens_input,
+                    tokens_output=tokens_output,
+                    tokens_used=tokens_used,
+                    reasoning_tokens=reasoning_tokens,
+                )
 
             logger.info(
                 f"OpenAI Antwort: {len(content)} Zeichen, "
