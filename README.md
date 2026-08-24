@@ -16,7 +16,14 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuell (v0.14.2) — 32k-Analyse-Budget für OpenRouter
+### Aktuell (v0.14.3) — Struktur-Validator für den Modellvergleich
+
+Ein Modellvergleich (Realtest 2026-08-24) übernahm einen **degenerierten** Output von DeepSeek V4 Flash ungeprüft ins Dokument: lexikalischer Zerfall mit ins Wort verklebten kyrillischen Buchstaben („Selbstse**грегация**"), Ende mitten im Wort – und das bei `finish_reason=stop`, das Modell hielt sich für fertig. Ursache: Der Vergleichspfad stammt aus v0.9.0 und hatte keine der v0.11-Schutzmaßnahmen der Einzelanalyse. Empirisch gegen das echte Artefakt geprüft: Selbst der v0.11-Validator ließ diesen Output durch – der Zerfall ist lexikalisch, nicht strukturell.
+
+- **Prüfkette im Modellvergleich** – Beide Analysen durchlaufen jetzt dieselbe Kontrolle wie die Einzelanalyse: Reasoning-Preamble-Bereinigung, finish_reason-Gate (Trunkierung), Struktur-Validator und **1× sichtbarer Auto-Retry**. Bleibt eine Analyse ungültig, schlägt der ganze Vergleich **ehrlich fehl** statt ein Müll-Dokument zu liefern (eine kaputte Analyse macht den Vergleich wertlos); der Synthese-Fehler bleibt wie bisher nicht-fatal
+- **Neuer Schriftmix-Detektor im Validator** – Ein Token, das zwei verwechselbare Alphabete mischt (Latin+Kyrillisch/Griechisch), gilt als Modell-Zerfall und macht die Analyse ungültig. Bewusst **im Validator selbst**, nicht nur im Vergleich – die Einzelanalyse hatte exakt denselben blinden Fleck. False-Positive-sicher: eigenständige fremdsprachige Zitat-Tokens, „N8N", „GPT-5.6" bleiben gültig (geprüft wird nur Mischung **innerhalb** eines Tokens)
+
+### Seit v0.14.2 — 32k-Analyse-Budget für OpenRouter
 
 Abend-Realtests (2026-08-20, DeepSeek V4 Pro via OpenRouter) scheiterten bei einem **kurzen** Video 6× in Folge am Analyse-Call: `finish_reason=length`, Output exakt 8192 Tokens. Ursache: DeepSeek raisont **invers zur Prompt-Größe** – bei kleinem Prompt frisst das (unsichtbare) Reasoning 6–8k+ Tokens und sprengt das alte 8192er-Budget mitten im sichtbaren Text. Bisher fiel das nie auf, weil reale Analysen 80–180k-Prompts hatten. Das ist das Spiegelstück zum 32k-**Stage**-Budget aus v0.13.3, jetzt für den Analyse-/Verifikations-Call.
 
