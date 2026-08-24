@@ -59,7 +59,10 @@ class _FakeClient:
         self._responses = list(responses)
         self.calls = 0
 
-    def send_prompt(self, prompt, model, max_tokens=None, cap_reasoning=False):
+    def send_prompt(
+        self, prompt: str, model: str, max_tokens: int | None = None,
+        cap_reasoning: bool = False,
+    ) -> APIResponse:
         self.calls += 1
         return self._responses.pop(0)
 
@@ -68,7 +71,11 @@ def _degenerate_content() -> str:
     return (FIXTURES / "comparison_degenerate_flash.txt").read_text(encoding="utf-8")
 
 
-def _run_worker(resp_a, resp_b, resp_synth):
+def _run_worker(
+    resp_a: list[APIResponse],
+    resp_b: list[APIResponse],
+    resp_synth: list[APIResponse],
+) -> tuple[ComparisonWorker, dict[str, list], dict[str, _FakeClient]]:
     """Baut Worker + Fake-Clients, ruft run() direkt auf, sammelt die Signale."""
     client_a = _FakeClient(resp_a)
     client_b = _FakeClient(resp_b)
@@ -181,6 +188,28 @@ def test_both_valid_document_and_synthesis_error_nonfatal() -> None:
     print("  both_valid_document_and_synthesis_error_nonfatal OK")
 
 
+# --- Regression: entfernbarer Reasoning-Vorspann leakt NICHT ins Dokument ---
+
+def test_reasoning_preamble_stripped_from_document() -> None:
+    """Gültige Analyse mit entfernbarem Reasoning-Vorspann → Doc trägt den
+    bereinigten Text, nicht den Rohtext (kein Preamble-Leak ins Dokument)."""
+    preamble = "Let me think about this carefully before I write the analysis.\n\n"
+    a_with_preamble = preamble + VALID_ANALYSIS
+    worker, events, clients = _run_worker(
+        resp_a=[_received(a_with_preamble)],
+        resp_b=[_received(VALID_ANALYSIS)],
+        resp_synth=[_received("Kurzbeschreibung")],
+    )
+    # Analyse bleibt gültig (Preamble wird VOR der Validierung entfernt).
+    assert events["finished"], "Dokument müsste entstehen"
+    assert worker.result.status == "done"
+    # Der Vorspann darf weder im gespeicherten Analysetext noch im Dokument stehen.
+    assert "Let me think" not in worker.result.analysis_a_text
+    assert "Let me think" not in worker.result.final_markdown
+    assert worker.result.analysis_a_text.lstrip().startswith("### FRAMING")
+    print("  reasoning_preamble_stripped_from_document OK")
+
+
 # --- Regression: A-Transport-Fehler → sofortiger Fehlschlag, kein Retry -----
 
 def test_transport_error_no_retry() -> None:
@@ -204,6 +233,7 @@ def main() -> None:
     test_b_valid_on_retry_produces_document()
     test_b_truncated_finish_reason_open_failure()
     test_both_valid_document_and_synthesis_error_nonfatal()
+    test_reasoning_preamble_stripped_from_document()
     test_transport_error_no_retry()
     print("ALLE TESTS OK")
 

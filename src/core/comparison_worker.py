@@ -177,27 +177,31 @@ class ComparisonWorker(QThread):
 
             # 2) Analyse A (mit v0.11-Prüfkette + 1× Auto-Retry, s. _run_analysis_step)
             self._emit_step("a")
-            resp_a = self._run_analysis_step(client_a, analysis_prompt, cfg.model_a, video_info, "a")
-            if resp_a is None:
+            result_a = self._run_analysis_step(client_a, analysis_prompt, cfg.model_a, video_info, "a")
+            if result_a is None:
                 return  # abgebrochen oder offener Fehlschlag (bereits gemeldet)
-            self._result.analysis_a_text = normalize_markdown_headings(resp_a.content)
+            resp_a, display_a = result_a  # display_a = preamble-bereinigt (kein Leak)
+            self._result.analysis_a_text = normalize_markdown_headings(display_a)
             self._result.tokens_a = resp_a.tokens_used
-            self.analysis_completed.emit("a", resp_a.content, resp_a)
+            self.analysis_completed.emit("a", display_a, resp_a)
 
             # 3) Analyse B (gleiche Prüfkette)
             self._emit_step("b")
-            resp_b = self._run_analysis_step(client_b, analysis_prompt, cfg.model_b, video_info, "b")
-            if resp_b is None:
+            result_b = self._run_analysis_step(client_b, analysis_prompt, cfg.model_b, video_info, "b")
+            if result_b is None:
                 return
-            self._result.analysis_b_text = normalize_markdown_headings(resp_b.content)
+            resp_b, display_b = result_b
+            self._result.analysis_b_text = normalize_markdown_headings(display_b)
             self._result.tokens_b = resp_b.tokens_used
-            self.analysis_completed.emit("b", resp_b.content, resp_b)
+            self.analysis_completed.emit("b", display_b, resp_b)
 
-            # 4) Synthese (Fehler ist NICHT fatal → Platzhalter + Warnung)
+            # 4) Synthese (Fehler ist NICHT fatal → Platzhalter + Warnung).
+            #    Auch die Synthese bekommt den bereinigten Text, damit ein
+            #    Reasoning-Vorspann die Kurzbeschreibung nicht verunreinigt.
             self._emit_step("synth")
             synth_prompt = build_synthesis_prompt(
-                resp_a.content,
-                resp_b.content,
+                display_a,
+                display_b,
                 title=video_info.title,
                 channel=video_info.channel,
                 duration_formatted=video_info.duration_formatted,
@@ -261,7 +265,7 @@ class ComparisonWorker(QThread):
             # Synthese-Fehler ist nicht fatal → trotzdem GUI warnen
             self.error_occurred.emit(step, message)
 
-    def _validate_analysis(self, response: APIResponse) -> tuple[bool, str]:
+    def _validate_analysis(self, response: APIResponse) -> tuple[bool, str, str]:
         """Prüft eine erhaltene Analyse mit der v0.11-Kette.
 
         Kombiniert das finish_reason-Gate (Trunkierung) mit dem Struktur-/
@@ -273,15 +277,18 @@ class ComparisonWorker(QThread):
             response: Die (bereits als RECEIVED bestätigte) API-Antwort.
 
         Returns:
-            ``(True, "")`` bei gültiger Analyse, sonst ``(False, Grund)``.
+            ``(ok, grund, display_content)`` — ``display_content`` ist der
+            preamble-bereinigte Text (wie in der Einzelanalyse angezeigt) und wird
+            vom Aufrufer weiterverwendet, damit ein entfernbarer Reasoning-Vorspann
+            NICHT ins Vergleichsdokument leakt. ``grund`` ist bei ``ok=True`` leer.
         """
-        if is_truncated_finish_reason(response.finish_reason or ""):
-            return False, "Antwort abgeschnitten (Token-Limit)"
         display_content, _ = strip_reasoning_preamble(response.content)
+        if is_truncated_finish_reason(response.finish_reason or ""):
+            return False, "Antwort abgeschnitten (Token-Limit)", display_content
         result = validate_analysis_structure(display_content)
         if not result.ok:
-            return False, result.reason
-        return True, ""
+            return False, result.reason, display_content
+        return True, "", display_content
 
     def _run_analysis_step(
         self,
@@ -290,7 +297,7 @@ class ComparisonWorker(QThread):
         model_choice: ModelChoice,
         video_info: VideoInfo,
         step: str,
-    ) -> APIResponse | None:
+    ) -> tuple[APIResponse, str] | None:
         """Führt eine Analyse-Stufe (A oder B) mit Prüfkette + 1× Auto-Retry aus.
 
         Sendet den Prompt und prüft ihn mit :meth:`_validate_analysis`. Bei
@@ -308,9 +315,11 @@ class ComparisonWorker(QThread):
             step: ``"a"`` oder ``"b"``.
 
         Returns:
-            Die gültige :class:`APIResponse`, oder ``None`` bei Abbruch,
-            Transport-Fehler oder endgültiger Ungültigkeit (``_fail`` wurde in den
-            beiden Fehlerfällen bereits emittiert; der Aufrufer bricht dann ab).
+            ``(response, display_content)`` bei gültiger Analyse —
+            ``display_content`` ist der preamble-bereinigte Text (der Aufrufer
+            speichert/emittiert/synthetisiert diesen, NICHT den Rohtext). ``None``
+            bei Abbruch, Transport-Fehler oder endgültiger Ungültigkeit (``_fail``
+            wurde in den beiden Fehlerfällen bereits emittiert).
         """
         step_label = f"analysis_{step}"
         model_name = model_choice.model_name or model_choice.model_id
@@ -332,9 +341,9 @@ class ComparisonWorker(QThread):
                 # Transport-/API-Fehler: sofort offener Fehlschlag, kein Retry.
                 self._fail(step, response.error_message or f"Analyse {step.upper()} fehlgeschlagen.")
                 return None
-            ok, reason = self._validate_analysis(response)
+            ok, reason, display_content = self._validate_analysis(response)
             if ok:
-                return response
+                return response, display_content
             last_reason = reason
 
         # Beide Versuche ungültig → offener Fehlschlag des GESAMTEN Vergleichs.
