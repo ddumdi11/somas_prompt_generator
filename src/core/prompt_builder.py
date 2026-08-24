@@ -10,6 +10,7 @@ Changelog v0.5.1:
 
 import json
 import re
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from dataclasses import dataclass, field
@@ -850,6 +851,71 @@ def _looks_truncated(text: str) -> bool:
     return False
 
 
+# Schriftsysteme, die in einem echten Wort NIE gemischt vorkommen, aber bei
+# Modell-Degeneration ineinanderlaufen (visuell verwechselbare bikamerale
+# Alphabete — reale Belege v0.14.3: „Selbstseгрегация", „meистиспользованных").
+# BEWUSST auf diese drei beschränkt: CJK/Kana/Hangul/Arabisch/Hebräisch treten in
+# legitimem Text durchaus gemischt im selben Token auf (z.B. japanische Silben +
+# Kanji) und dürfen KEIN False Positive auslösen.
+_CONFUSABLE_SCRIPTS = frozenset({"LATIN", "CYRILLIC", "GREEK"})
+
+
+def _letter_script(ch: str) -> Optional[str]:
+    """Bestimmt das Schriftsystem eines Buchstabens (nur die verwechselbaren
+    Alphabete Latin/Kyrillisch/Griechisch), sonst ``None``.
+
+    Nutzt den Unicode-Namen (locale-unabhängig): ``"LATIN SMALL LETTER A"`` →
+    ``"LATIN"``. Deutsche Umlaute sind ``"LATIN … WITH DIAERESIS"`` → ``LATIN``.
+
+    Args:
+        ch: Ein einzelnes Zeichen.
+
+    Returns:
+        ``"LATIN"``/``"CYRILLIC"``/``"GREEK"`` oder ``None`` (Ziffer, Zeichen aus
+        einem nicht überwachten Schriftsystem, unbenanntes Zeichen).
+    """
+    try:
+        name = unicodedata.name(ch)
+    except ValueError:
+        return None
+    head = name.split(" ", 1)[0]
+    return head if head in _CONFUSABLE_SCRIPTS else None
+
+
+def find_mixed_script_token(text: str) -> Optional[str]:
+    """Findet das erste Token, das zwei verwechselbare Alphabete mischt.
+
+    Präzises Signal für lexikalischen Modell-Zerfall, den der Struktur-Validator
+    (Header/Reihenfolge/Trunkierung) per Design NICHT sieht (realer Fall v0.14.3:
+    DeepSeek V4 Flash lieferte bei ``finish_reason=stop`` u.a. „Selbstseгрегация").
+
+    False-Positive-Schutz:
+
+    - Es zählt nur Mischung INNERHALB eines Tokens. Ein eigenständiges
+      fremdsprachiges Zitat-Token (kyrillischer Songtitel, persischer Kanalname)
+      bleibt gültig — es enthält nur EIN Schriftsystem.
+    - Ziffern/Interpunktion werden ignoriert → „N8N", „GPT-5.6" bleiben gültig
+      (die Regex ``\\w+`` trennt ohnehin an ``-``/``.``).
+    - CJK/Kana/Hangul/Arabisch/Hebräisch lösen NICHT aus (legitimer Intra-Token-
+      Mix möglich, s. :data:`_CONFUSABLE_SCRIPTS`).
+
+    Args:
+        text: Der zu prüfende Text.
+
+    Returns:
+        Das erste gemischte Token in Dokumentreihenfolge, oder ``None``.
+    """
+    for token in re.findall(r"\w+", text):
+        scripts: set[str] = set()
+        for ch in token:
+            script = _letter_script(ch)
+            if script:
+                scripts.add(script)
+                if len(scripts) >= 2:
+                    return token
+    return None
+
+
 def validate_analysis_structure(
     text: str, require_faktencheck: bool = False
 ) -> ValidationResult:
@@ -923,6 +989,15 @@ def validate_analysis_structure(
     # 5. Trunkierungs-Heuristik (mitten in Satz/Nummerierung abgeschnitten).
     if _looks_truncated(normalized):
         return ValidationResult(False, "Antwort endet abgeschnitten (Trunkierung)")
+
+    # 6. Schriftsystem-Mix (lexikalischer Zerfall, v0.14.3): ein Token, das zwei
+    #    verwechselbare Alphabete mischt, ist ein starkes Degenerations-Signal,
+    #    das die Strukturprüfung nicht sieht (Header/Reihenfolge bleiben ja intakt).
+    mixed_token = find_mixed_script_token(normalized)
+    if mixed_token:
+        return ValidationResult(
+            False, f"Schriftsystem-Mix im Token '{mixed_token}' (Modell-Zerfall?)"
+        )
 
     return ValidationResult(True, "")
 

@@ -17,8 +17,14 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from src.config.api_config import get_api_key
 from src.config.defaults import SomasConfig, VideoInfo
 
-from .api_client import APIResponse, APIStatus, LLMClient, create_client
-from .comparison_item import ComparisonConfig, ComparisonResult
+from .api_client import (
+    APIResponse,
+    APIStatus,
+    LLMClient,
+    create_client,
+    is_truncated_finish_reason,
+)
+from .comparison_item import ComparisonConfig, ComparisonResult, ModelChoice
 from .debug_logger import APP_VERSION, DebugLogger
 from .prompt_builder import (
     build_prompt,
@@ -27,6 +33,8 @@ from .prompt_builder import (
     clean_synthesis_output,
     get_template_dir,
     normalize_markdown_headings,
+    strip_reasoning_preamble,
+    validate_analysis_structure,
 )
 from .youtube_client import build_thumbnail_urls, extract_video_id, resolve_video_info
 
@@ -167,25 +175,19 @@ class ComparisonWorker(QThread):
                     perspective=cfg.perspective,
                 )
 
-            # 2) Analyse A
+            # 2) Analyse A (mit v0.11-Prüfkette + 1× Auto-Retry, s. _run_analysis_step)
             self._emit_step("a")
-            resp_a = self._send(client_a, analysis_prompt, cfg.model_a.model_id, video_info, "analysis_a")
-            if self._cancelled:
-                return
-            if resp_a.status != APIStatus.RECEIVED:
-                self._fail("a", resp_a.error_message or "Analyse A fehlgeschlagen.")
-                return
+            resp_a = self._run_analysis_step(client_a, analysis_prompt, cfg.model_a, video_info, "a")
+            if resp_a is None:
+                return  # abgebrochen oder offener Fehlschlag (bereits gemeldet)
             self._result.analysis_a_text = normalize_markdown_headings(resp_a.content)
             self._result.tokens_a = resp_a.tokens_used
             self.analysis_completed.emit("a", resp_a.content, resp_a)
 
-            # 3) Analyse B
+            # 3) Analyse B (gleiche Prüfkette)
             self._emit_step("b")
-            resp_b = self._send(client_b, analysis_prompt, cfg.model_b.model_id, video_info, "analysis_b")
-            if self._cancelled:
-                return
-            if resp_b.status != APIStatus.RECEIVED:
-                self._fail("b", resp_b.error_message or "Analyse B fehlgeschlagen.")
+            resp_b = self._run_analysis_step(client_b, analysis_prompt, cfg.model_b, video_info, "b")
+            if resp_b is None:
                 return
             self._result.analysis_b_text = normalize_markdown_headings(resp_b.content)
             self._result.tokens_b = resp_b.tokens_used
@@ -258,6 +260,91 @@ class ComparisonWorker(QThread):
         if step == "synth":
             # Synthese-Fehler ist nicht fatal → trotzdem GUI warnen
             self.error_occurred.emit(step, message)
+
+    def _validate_analysis(self, response: APIResponse) -> tuple[bool, str]:
+        """Prüft eine erhaltene Analyse mit der v0.11-Kette.
+
+        Kombiniert das finish_reason-Gate (Trunkierung) mit dem Struktur-/
+        Schriftmix-Validator auf dem preamble-bereinigten Text. Im Vergleich wird
+        KEIN Modul erzwungen → ``require_faktencheck=False`` (der Validator
+        toleriert die freie Modulwahl per v0.11-Design).
+
+        Args:
+            response: Die (bereits als RECEIVED bestätigte) API-Antwort.
+
+        Returns:
+            ``(True, "")`` bei gültiger Analyse, sonst ``(False, Grund)``.
+        """
+        if is_truncated_finish_reason(response.finish_reason or ""):
+            return False, "Antwort abgeschnitten (Token-Limit)"
+        display_content, _ = strip_reasoning_preamble(response.content)
+        result = validate_analysis_structure(display_content)
+        if not result.ok:
+            return False, result.reason
+        return True, ""
+
+    def _run_analysis_step(
+        self,
+        client: LLMClient,
+        prompt: str,
+        model_choice: ModelChoice,
+        video_info: VideoInfo,
+        step: str,
+    ) -> APIResponse | None:
+        """Führt eine Analyse-Stufe (A oder B) mit Prüfkette + 1× Auto-Retry aus.
+
+        Sendet den Prompt und prüft ihn mit :meth:`_validate_analysis`. Bei
+        Ungültigkeit wird GENAU EINMAL sichtbar neu angefordert (Fortschritts-
+        Signal ``"{step}_retry"``). Bleibt die Analyse ungültig, schlägt der
+        GESAMTE Vergleich offen fehl (kein Teil-Dokument, keine kosmetische
+        Reparatur — eine kaputte Analyse macht den Vergleich wertlos, Startprompt
+        v0.14.3 §Teil A.4). Ein Transport-Fehler bricht sofort ab (kein Retry).
+
+        Args:
+            client: Der LLM-Client für dieses Modell.
+            prompt: Der (für A und B identische) Analyse-Prompt.
+            model_choice: Modellwahl des Schritts (Name für die Fehlermeldung).
+            video_info: Metadaten (für das Debug-Log).
+            step: ``"a"`` oder ``"b"``.
+
+        Returns:
+            Die gültige :class:`APIResponse`, oder ``None`` bei Abbruch,
+            Transport-Fehler oder endgültiger Ungültigkeit (``_fail`` wurde in den
+            beiden Fehlerfällen bereits emittiert; der Aufrufer bricht dann ab).
+        """
+        step_label = f"analysis_{step}"
+        model_name = model_choice.model_name or model_choice.model_id
+        max_attempts = 2  # 1 regulärer Versuch + 1 sichtbarer Auto-Retry (v0.11-Linie)
+        last_reason = ""
+        for attempt in range(max_attempts):
+            if attempt > 0:
+                # Sichtbarer Auto-Retry. Eigener Status-Wert, damit _result.status
+                # (der reale Schritt "a"/"b") nicht überschrieben wird.
+                self.step_status_changed.emit(f"{step}_retry")
+                logger.warning(
+                    f"Vergleich: Analyse {step.upper()} ungültig ({last_reason}) — "
+                    f"Wiederholung {attempt}/{max_attempts - 1}"
+                )
+            response = self._send(client, prompt, model_choice.model_id, video_info, step_label)
+            if self._cancelled:
+                return None
+            if response.status != APIStatus.RECEIVED:
+                # Transport-/API-Fehler: sofort offener Fehlschlag, kein Retry.
+                self._fail(step, response.error_message or f"Analyse {step.upper()} fehlgeschlagen.")
+                return None
+            ok, reason = self._validate_analysis(response)
+            if ok:
+                return response
+            last_reason = reason
+
+        # Beide Versuche ungültig → offener Fehlschlag des GESAMTEN Vergleichs.
+        self._fail(
+            step,
+            f"Analyse {step.upper()} ({model_name}) blieb nach Wiederholung "
+            f"ungültig: {last_reason}. Der Vergleich wurde abgebrochen "
+            f"(kein Teil-Dokument).",
+        )
+        return None
 
     def _send(
         self,

@@ -2483,11 +2483,19 @@ class MainWindow(QMainWindow):
             "meta": "Metadaten werden geladen…",
             "a": "Analyse A läuft…",
             "b": "Analyse B läuft…",
+            "a_retry": "Analyse A ungültig — wird wiederholt…",
+            "b_retry": "Analyse B ungültig — wird wiederholt…",
             "synth": "Kurzbeschreibung wird erstellt…",
             "render": "Dokument wird gebaut…",
             "done": "Fertig ✓",
         }
-        color = "#2E7D32" if step == "done" else "#1565C0"
+        # Retry-Hinweis in Warnfarbe absetzen, sonst Standard-Blau/Grün.
+        if step in ("a_retry", "b_retry"):
+            color = "#E65100"
+        elif step == "done":
+            color = "#2E7D32"
+        else:
+            color = "#1565C0"
         self.compare_section.set_summary(labels.get(step, step), color=color)
 
     @pyqtSlot(object)
