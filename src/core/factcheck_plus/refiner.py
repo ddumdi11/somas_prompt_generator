@@ -123,6 +123,7 @@ class ClaimRefiner:
 
     def refine(
         self, claims: list[str], core_thesis: str = "", source_hint: str = "",
+        anchor_date: str = "",
     ) -> list[RefinedClaim]:
         """Zerlegt und normalisiert die vorgelegten Behauptungen.
 
@@ -130,6 +131,9 @@ class ClaimRefiner:
             claims: Roh-Behauptungen aus Stufe 1 (Basisfakt-bereinigt, gekappt).
             core_thesis: SOMAS-Kernthese/Framing — nur Kontext, wird nicht bewertet.
             source_hint: Titel/URL der geprüften Quelle, nur zur Einordnung.
+            anchor_date: Optionales Veröffentlichungsdatum (v0.15.0, formatiert) —
+                der wichtigste Hebel: erlaubt die Umrechnung relativer Zeitangaben
+                in absolute. "" → keine Datums-Zeile im Kontext.
 
         Returns:
             Die atomisierten :class:`RefinedClaim`-Objekte.
@@ -142,7 +146,7 @@ class ClaimRefiner:
             raise ValueError("Keine Behauptungen übergeben — S1 hat nichts zu tun.")
 
         input_ids = [make_claim_id(i) for i in range(1, len(claims) + 1)]
-        prompt = build_refiner_prompt(claims, core_thesis, source_hint)
+        prompt = build_refiner_prompt(claims, core_thesis, source_hint, anchor_date)
         return run_json_stage(
             client=self.client,
             model=self.model,

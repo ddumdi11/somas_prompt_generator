@@ -11,6 +11,8 @@ Deep-Research-Budget die Max-Behauptungen-Kappung (Spec §4), und die Auswahl
 trifft der PolicyScorer.
 """
 from dataclasses import dataclass, field
+from datetime import date
+from typing import Optional
 
 from .comparison_item import ModelChoice  # wiederverwenden
 
@@ -34,6 +36,8 @@ class FactcheckPlusConfig:
         source_url: URL der geprüften Quelle.
         web_unverified: True, wenn das Recherchemodell keinen bestätigten
             Web-Zugriff hat (rendert einen Disclaimer).
+        video_published: Optionales Veröffentlichungsdatum des geprüften Videos
+            (v0.15.0, Zeitanker für S1/S4/S5). ``None`` → kein Datums-Kontext.
     """
 
     claims: list[str]
@@ -45,6 +49,7 @@ class FactcheckPlusConfig:
     source_title: str = ""
     source_url: str = ""
     web_unverified: bool = False
+    video_published: Optional[date] = None
 
     @property
     def source_hint(self) -> str:

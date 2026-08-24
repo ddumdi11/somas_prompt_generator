@@ -1330,6 +1330,7 @@ class MainWindow(QMainWindow):
                 anti_monotony_hint=anti_monotony_hint,
                 custom_system_prompt=self._custom_system_prompt,
                 custom_module=effective_module,
+                video_published=self.video_info.published,  # v0.15.0 Zeitanker
             )
         else:
             # Kein Transkript → nur URL/Metadaten (bisheriges Verhalten)
@@ -2752,6 +2753,7 @@ class MainWindow(QMainWindow):
             source_title=self.video_info.title if self.video_info else "",
             source_url=self.video_info.url if self.video_info else "",
             web_unverified=not self._looks_web_capable(sel),
+            video_published=self.video_info.published if self.video_info else None,
         )
 
         worker = VerificationWorker(config, debug_logger=self._debug_logger)
@@ -2826,6 +2828,7 @@ class MainWindow(QMainWindow):
             source_title=self.video_info.title if self.video_info else "",
             source_url=self.video_info.url if self.video_info else "",
             web_unverified=not self._looks_web_capable(sel),
+            video_published=self.video_info.published if self.video_info else None,
         )
 
         self._plus_active_run_id += 1

@@ -35,7 +35,7 @@ from .factcheck_plus import (
     StageError, build_render_context, join_claims,
 )
 from .factcheck_plus_item import FactcheckPlusConfig, FactcheckPlusResult
-from .prompt_builder import get_template_dir
+from .prompt_builder import _format_german_date, get_template_dir
 
 logger = logging.getLogger(__name__)
 
@@ -284,6 +284,17 @@ class FactcheckPlusWorker(QThread):
 
     # --- Stufen -----------------------------------------------------------
 
+    @property
+    def _anchor_date(self) -> str:
+        """Formatiertes Veröffentlichungsdatum als Zeitanker (v0.15.0).
+
+        Die Naht formatiert HIER (via ``_format_german_date``), damit das
+        client-agnostische Package nur einen fertigen String sieht (kein ``date``).
+        ``""`` wenn kein Datum vorliegt (Transkript-Modus / Intake-Core).
+        """
+        published = self._config.video_published
+        return _format_german_date(published) if published else ""
+
     def _run_refiner(self, client: LLMClient) -> list[RefinedClaim] | None:
         """S1: Roh-Behauptungen → atomare Prüfeinheiten."""
         self._emit_stage("Verfeinere Behauptungen …", 1)
@@ -294,6 +305,7 @@ class FactcheckPlusWorker(QThread):
             self._config.claims,
             core_thesis=self._config.core_thesis,
             source_hint=self._config.source_hint,
+            anchor_date=self._anchor_date,
         )
         self._result.refined_count = len(refined)
         logger.info("S1: %d Roh-Claims → %d Prüfeinheiten",
@@ -358,6 +370,7 @@ class FactcheckPlusWorker(QThread):
         wrapper = self._wrap(client, "s4_planner")
         cards = ResearchPlanner(wrapper, self._config.analysis_model.model_id).plan(
             selected, core_thesis=self._config.core_thesis,
+            anchor_date=self._anchor_date,
         )
         return None if self._cancelled else cards
 
@@ -378,6 +391,7 @@ class FactcheckPlusWorker(QThread):
             self._config.research_model.model_id,
             source_hint=self._config.source_hint,
             language=self._config.language,
+            anchor_date=self._anchor_date,
         )
         verdicts = verifier.verify_all(
             selected, cards,

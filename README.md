@@ -16,7 +16,17 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuell (v0.14.3) — Struktur-Validator für den Modellvergleich
+### Aktuell (v0.15.0) — Veröffentlichungsdatum als Zeitanker
+
+Ein externes Review des Nas-Daily-Faktenchecks (2026-08-24) fand „Referenz-Drift": Die Verifikationsstufen kannten das Datum des geprüften Videos nicht. Behauptungen mit relativen Zeitangaben („vor zweieinhalb Jahren") wurden gegen **irgendein datierbares Ersatzobjekt** aus den Suchtreffern geprüft (z. B. ein 2019er-Video) – drei „zweieinhalb Jahre"-Prüfungen scheiterten deshalb. Der Analyse-Prompt hatte seit v0.12.1 einen Zeitanker mit dem *aktuellen* Datum; das *Veröffentlichungsdatum* des Videos war vorbereitet, wurde aber nie befüllt.
+
+- **`VideoInfo.published` aus yt-dlp `upload_date`** – Das Veröffentlichungsdatum fließt jetzt in Analyse-Prompt, klassische Verifikation und Faktencheck Plus (S1/S4/S5). Der Analyse-Zeitanker nennt es locale-sicher; die Verifikation ankert relative Zeitangaben daran statt an Ersatzobjekten. **S1 (Refiner)** ist der wichtigste Hebel: Mit Ankerdatum kann er relative Angaben in absolute umrechnen (`normalized_claim`)
+- **Ehrlicher Anker** – „veröffentlicht", nicht „aufgenommen" (das Aufnahmedatum kennen wir nicht, die Differenz bleibt offen). Transkript-Modus und Metadaten ohne Datum → kein Anker (alle Verbraucher laufen unverändert, kein „None"-Text im Prompt)
+- **Hinweis Intake-Core** – Der optionale Intake-Core-Pfad liefert bis zu einem eigenen Follow-up (Wire-Form um `upload_date` erweitern + Re-Pin) noch kein Datum; da er per Default aus ist, betrifft das den Normalbetrieb nicht
+
+> **Scoping-Ehrlichkeit:** Dass der Anker in den Prompts *präsent* und die Umrechnung *instruiert* ist, ist getestet. Ob ein Modell „vor zweieinhalb Jahren → ca. Anfang 2024" tatsächlich korrekt *rechnet*, ist Modell-Güte – kein Versprechen dieses Features.
+
+### Seit v0.14.3 — Struktur-Validator für den Modellvergleich
 
 Ein Modellvergleich (Realtest 2026-08-24) übernahm einen **degenerierten** Output von DeepSeek V4 Flash ungeprüft ins Dokument: lexikalischer Zerfall mit ins Wort verklebten kyrillischen Buchstaben („Selbstse**грегация**"), Ende mitten im Wort – und das bei `finish_reason=stop`, das Modell hielt sich für fertig. Ursache: Der Vergleichspfad stammt aus v0.9.0 und hatte keine der v0.11-Schutzmaßnahmen der Einzelanalyse. Empirisch gegen das echte Artefakt geprüft: Selbst der v0.11-Validator ließ diesen Output durch – der Zerfall ist lexikalisch, nicht strukturell.
 

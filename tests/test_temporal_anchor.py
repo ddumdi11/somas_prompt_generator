@@ -8,7 +8,7 @@ Datum locale-sicher ist und der Transkript-Pfad kein Veröffentlichungsdatum tr�
 Lauf (ohne pytest):  python tests/test_temporal_anchor.py
 """
 import sys
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -71,6 +71,46 @@ def test_transcript_prompt_has_anchor_no_published() -> None:
     print("  transcript_prompt_has_anchor_no_published: Datum ja, Publish-Datum nein OK")
 
 
+def test_format_german_date_accepts_date() -> None:
+    """_format_german_date nimmt auch ein date (nicht nur datetime) — v0.15.0."""
+    assert _format_german_date(date(2026, 8, 24)) == "24. August 2026"
+    print("  format_german_date_accepts_date: date-Objekt OK")
+
+
+def test_youtube_prompt_with_published_date_all_presets() -> None:
+    """build_prompt mit VideoInfo.published → Veröffentlichungszeile in ALLEN Presets."""
+    cfg = SomasConfig()
+    vi = VideoInfo(title="T", channel="C", duration=300,
+                   url="https://youtu.be/abcdef12345", published=date(2026, 8, 24))
+    presets = list(load_presets().values())
+    for preset in presets:
+        p = build_prompt(vi, cfg, preset_name=preset.name)
+        assert "Der Beitrag wurde am 24. August 2026 veröffentlicht." in p, preset.name
+    print(f"  youtube_prompt_with_published_date_all_presets: {len(presets)} Presets OK")
+
+
+def test_youtube_prompt_without_published_unchanged() -> None:
+    """OHNE Datum: keine Veröffentlichungszeile (Regression, bisheriger Text)."""
+    cfg = SomasConfig()
+    vi = VideoInfo(title="T", channel="C", duration=300,
+                   url="https://youtu.be/abcdef12345")  # published=None (Default)
+    p = build_prompt(vi, cfg, preset_name="Standard")
+    assert "ZEITLICHER RAHMEN:" in p
+    assert "veröffentlicht" not in p
+    print("  youtube_prompt_without_published_unchanged: kein Publish-Datum OK")
+
+
+def test_transcript_prompt_with_published_date() -> None:
+    """build_prompt_from_transcript mit video_published → Veröffentlichungszeile."""
+    cfg = SomasConfig()
+    p = build_prompt_from_transcript(
+        "Vortrag", "Sprecher", "Ein längerer Transkripttext zur Analyse.",
+        cfg, preset_name="Standard", video_published=date(2026, 8, 24),
+    )
+    assert "Der Beitrag wurde am 24. August 2026 veröffentlicht." in p
+    print("  transcript_prompt_with_published_date: Publish-Datum durchgereicht OK")
+
+
 def test_anchor_with_forced_faktencheck() -> None:
     """Zeitanker bleibt auch bei erzwungenem FAKTENCHECK erhalten (kein Verdrängen)."""
     cfg = SomasConfig()
@@ -88,6 +128,10 @@ def main() -> None:
     test_build_temporal_anchor_content()
     test_youtube_prompt_has_anchor_all_presets()
     test_transcript_prompt_has_anchor_no_published()
+    test_format_german_date_accepts_date()
+    test_youtube_prompt_with_published_date_all_presets()
+    test_youtube_prompt_without_published_unchanged()
+    test_transcript_prompt_with_published_date()
     test_anchor_with_forced_faktencheck()
     print("ALLE TESTS OK")
 

@@ -153,6 +153,7 @@ class ComparisonWorker(QThread):
                         preset_name=cfg.preset_name,
                         is_auto_transcript=True,
                         perspective=cfg.perspective,
+                        video_published=video_info.published,  # v0.15.0 Zeitanker
                     )
                 else:
                     analysis_prompt = build_prompt(

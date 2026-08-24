@@ -11,7 +11,7 @@ Changelog v0.5.1:
 import json
 import re
 import unicodedata
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
@@ -303,11 +303,15 @@ _GERMAN_MONTHS = {
 }
 
 
-def _format_german_date(dt: datetime) -> str:
+def _format_german_date(dt: date) -> str:
     """Formatiert ein Datum locale-sicher als ``"4. Juli 2026"``.
 
+    Nimmt ``date`` ODER ``datetime`` (``datetime`` ist ein ``date``); nutzt nur
+    ``.day``/``.month``/``.year`` und den deutschen Monats-Map (kein
+    ``strftime("%B")`` → keine Locale-Abhängigkeit).
+
     Args:
-        dt: Das zu formatierende Datum.
+        dt: Das zu formatierende Datum (``date`` oder ``datetime``).
 
     Returns:
         Deutscher Datums-String (Tag ohne führende Null, Monatsname, Jahr).
@@ -348,23 +352,27 @@ def _build_temporal_anchor(
 
 
 def _prepend_temporal_anchor(
-    rendered: str, video_published: Optional[str] = None
+    rendered: str, video_published: Optional[date] = None
 ) -> str:
     """Stellt dem gerenderten Prompt den Zeitanker mit aktuellem Datum voran.
 
     Zentral in beiden Build-Pfaden genutzt (forget-proof), unabhängig vom
     Preset/Template. Das aktuelle Datum wird hier aus ``datetime.now()`` gebildet,
-    damit der Anker immer taggenau ist.
+    damit der Anker immer taggenau ist. Das optionale Veröffentlichungsdatum
+    (v0.15.0) wird HIER locale-sicher formatiert (``_format_german_date``), damit
+    der Leaf ``_build_temporal_anchor`` seinen String-Vertrag behält.
 
     Args:
         rendered: Der bereits gerenderte Template-Prompt.
-        video_published: Optionales Veröffentlichungsdatum des Beitrags.
+        video_published: Optionales Veröffentlichungsdatum des Beitrags (``date``).
+            ``None`` → Ankerzeile entfällt, exakt bisheriger Text (Regression).
 
     Returns:
         Prompt mit vorangestelltem Zeitanker.
     """
+    published_str = _format_german_date(video_published) if video_published else None
     anchor = _build_temporal_anchor(
-        _format_german_date(datetime.now()), video_published
+        _format_german_date(datetime.now()), published_str
     )
     return f"{anchor}\n\n{rendered}"
 
@@ -492,7 +500,7 @@ def build_prompt(
         anti_monotony_hint=effective_hint,
     )
 
-    rendered = _prepend_temporal_anchor(rendered)
+    rendered = _prepend_temporal_anchor(rendered, video_info.published)
     return _apply_custom_overrides(rendered, custom_system_prompt, custom_module)
 
 
@@ -509,6 +517,7 @@ def build_prompt_from_transcript(
     anti_monotony_hint: str = "",
     custom_system_prompt: Optional[str] = None,
     custom_module: Optional[str] = None,
+    video_published: Optional[date] = None,
 ) -> str:
     """Generiert einen SOMAS-Prompt aus manuellem Transkript.
 
@@ -583,7 +592,7 @@ def build_prompt_from_transcript(
         anti_monotony_hint=effective_hint,
     )
 
-    rendered = _prepend_temporal_anchor(rendered)
+    rendered = _prepend_temporal_anchor(rendered, video_published)
     return _apply_custom_overrides(rendered, custom_system_prompt, custom_module)
 
 
@@ -1280,6 +1289,7 @@ def build_verification_prompt(
     claims: list[str],
     language: str = "Deutsch",
     source_hint: str = "",
+    video_published: Optional[date] = None,
 ) -> str:
     """Baut den Stufe-2-Verifikations-Prompt.
 
@@ -1292,12 +1302,28 @@ def build_verification_prompt(
         source_hint: Identität der GEPRÜFTEN Quelle (Videotitel/URL). Wird als
             VERBOTENE Eigenquelle in den Prompt aufgenommen — sie darf nicht als
             Beleg dienen (Unabhängigkeits-Riegel gegen zirkuläre Verifikation).
+        video_published: Optionales Veröffentlichungsdatum des geprüften Videos
+            (v0.15.0). Wenn gesetzt, wird ein Zeitanker-Block eingefügt, damit
+            relative Zeitangaben gegen dieses Datum statt gegen Ersatzobjekte aus
+            den Suchtreffern geprüft werden. ``None`` → Block entfällt (kein
+            „None"-Text im Prompt).
 
     Returns:
         Der fertige Prompt-String.
     """
     numbered = "\n".join(f"{i}. {c}" for i, c in enumerate(claims, 1))
     verdicts = " | ".join(VERDICT_VALUES)
+    # Zeitanker (v0.15.0): 'veröffentlicht', NICHT 'aufgenommen' — das
+    # Aufnahmedatum kennen wir nicht, die Differenz bleibt offen.
+    anchor_block = (
+        f"- Das geprüfte Video wurde am {_format_german_date(video_published)} "
+        f"VERÖFFENTLICHT. Relative Zeitangaben in den Behauptungen ('vor zwei "
+        f"Jahren', 'vor der Aufnahme' u. ä.) beziehen sich auf diesen "
+        f"Veröffentlichungs-Anker, NICHT auf das heutige Datum und NICHT auf "
+        f"Daten gefundener Quellen. Das Aufnahmedatum ist unbekannt; behandle "
+        f"die Differenz als offen.\n"
+        if video_published else ""
+    )
     # source_hint stammt aus externer Metadatenquelle (Videotitel/URL) — also aus
     # genau dem geprüften (potenziell gegnerischen) Inhalt. Vor der Einbettung
     # Whitespace/Zeilenumbrüche kollabieren und Länge begrenzen, damit kein
@@ -1331,6 +1357,7 @@ def build_verification_prompt(
         f"ist, einzelne DETAILANGABEN (Datum, Zahl, Zusatz) aber nicht, dann vergib "
         f"'teilweise bestätigt' und benenne konkret den belegten Kern sowie das offene "
         f"Detail — NICHT pauschal 'nicht überprüfbar'.\n"
+        f"{anchor_block}"
         f"{forbidden}"
         f"- Gib pro Behauptung EXAKT dieses Markdown-Format aus (kein Vorspann, "
         f"keine Meta, keine Einleitung):\n"
