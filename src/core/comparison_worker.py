@@ -177,7 +177,9 @@ class ComparisonWorker(QThread):
 
             # 2) Analyse A (mit v0.11-Prüfkette + 1× Auto-Retry, s. _run_analysis_step)
             self._emit_step("a")
-            result_a = self._run_analysis_step(client_a, analysis_prompt, cfg.model_a, video_info, "a")
+            result_a = self._run_analysis_step(
+                client_a, analysis_prompt, cfg.model_a, video_info, "a"
+            )
             if result_a is None:
                 return  # abgebrochen oder offener Fehlschlag (bereits gemeldet)
             resp_a, display_a = result_a  # display_a = preamble-bereinigt (kein Leak)
@@ -187,7 +189,9 @@ class ComparisonWorker(QThread):
 
             # 3) Analyse B (gleiche Prüfkette)
             self._emit_step("b")
-            result_b = self._run_analysis_step(client_b, analysis_prompt, cfg.model_b, video_info, "b")
+            result_b = self._run_analysis_step(
+                client_b, analysis_prompt, cfg.model_b, video_info, "b"
+            )
             if result_b is None:
                 return
             resp_b, display_b = result_b

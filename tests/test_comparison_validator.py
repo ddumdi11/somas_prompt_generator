@@ -193,9 +193,12 @@ def test_both_valid_document_and_synthesis_error_nonfatal() -> None:
 def test_reasoning_preamble_stripped_from_document() -> None:
     """Gültige Analyse mit entfernbarem Reasoning-Vorspann → Doc trägt den
     bereinigten Text, nicht den Rohtext (kein Preamble-Leak ins Dokument)."""
-    preamble = "Let me think about this carefully before I write the analysis.\n\n"
+    preamble = (
+        "Let me think about this carefully before I write the analysis."
+        "\n\n"
+    )
     a_with_preamble = preamble + VALID_ANALYSIS
-    worker, events, clients = _run_worker(
+    worker, events, _clients = _run_worker(
         resp_a=[_received(a_with_preamble)],
         resp_b=[_received(VALID_ANALYSIS)],
         resp_synth=[_received("Kurzbeschreibung")],
