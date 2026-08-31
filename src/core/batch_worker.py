@@ -154,6 +154,7 @@ class BatchWorker(QThread):
                 is_auto_transcript=True,
                 perspective=self._config.perspective,
                 anti_monotony_hint=anti_monotony_hint,
+                video_published=video_info.published,  # v0.15.0 Zeitanker
             )
         else:
             prompt = build_prompt(

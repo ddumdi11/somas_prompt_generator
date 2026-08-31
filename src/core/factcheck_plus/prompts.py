@@ -52,14 +52,19 @@ def sanitize_context(text: str, limit: int = _CONTEXT_LIMIT) -> str:
     return " ".join((text or "").split())[:limit]
 
 
-def _context_block(core_thesis: str, source_hint: str, note: str) -> str:
-    """Baut den optionalen Kontextblock (Kernthese + geprüfte Quelle).
+def _context_block(
+    core_thesis: str, source_hint: str, note: str, anchor_date: str = "",
+) -> str:
+    """Baut den optionalen Kontextblock (Kernthese + geprüfte Quelle + Datum).
 
     Args:
         core_thesis: SOMAS-Kernthese/Framing.
         source_hint: Titel/URL der geprüften Quelle ("" = weglassen).
         note: Stufenspezifischer Hinweis, wozu der Kontext dient — S1 ordnet nur
             ein, S2 misst die These-Nähe daran (prüfen darf sie keine der beiden).
+        anchor_date: Optionales Veröffentlichungsdatum des Beitrags (v0.15.0),
+            bereits als String formatiert ("" = weglassen). Injection-saniert wie
+            die übrigen Felder (Werte kommen aus Code, aber gleiches Muster).
 
     Returns:
         Der fertige Block inkl. Leerzeile, oder "" wenn kein Kontext vorliegt.
@@ -67,10 +72,17 @@ def _context_block(core_thesis: str, source_hint: str, note: str) -> str:
     parts: list[str] = []
     thesis = sanitize_context(core_thesis)
     hint = sanitize_context(source_hint, 300)
+    published = sanitize_context(anchor_date, 60)
     if thesis:
         parts.append(f"- Kernthese/Framing der Analyse: {thesis}")
     if hint:
         parts.append(f"- Geprüfte Quelle (nur zur Einordnung): {hint}")
+    if published:
+        parts.append(
+            f"- Veröffentlichungsdatum des geprüften Beitrags: {published}. "
+            f"Relative Zeitangaben ('vor zwei Jahren' u. ä.) beziehen sich auf "
+            f"dieses Datum — NICHT auf heute, NICHT auf Daten gefundener Quellen."
+        )
     if not parts:
         return ""
     return f"KONTEXT ({note}):\n" + "\n".join(parts) + "\n\n"
@@ -80,6 +92,7 @@ def _context_block(core_thesis: str, source_hint: str, note: str) -> str:
 
 def build_refiner_prompt(
     claims: list[str], core_thesis: str = "", source_hint: str = "",
+    anchor_date: str = "",
 ) -> str:
     """Baut den S1-Prompt: Atomisierung, Attribution-Split, Normalisierung, Typ.
 
@@ -128,6 +141,12 @@ def build_refiner_prompt(
         "prüfbaren Satz — ohne Pronomen, ohne Verweise wie „das\" oder „dies\", "
         "verständlich ohne den Ursprungstext. Trage Entitäten, Zeitraum und "
         "Metrik in die eigenen Felder ein (unbekannt → null, nichts erfinden).\n"
+        "   Enthält der Claim eine RELATIVE Zeitangabe („vor zweieinhalb Jahren\", "
+        "„letztes Jahr\") UND nennt der Kontextblock unten ein "
+        "Veröffentlichungsdatum, rechne sie in eine ABSOLUTE Angabe um (z. B. "
+        "„vor zweieinhalb Jahren\" → „ca. Anfang 2024, bezogen auf "
+        "Veröffentlichung 08/2026\") und trage diese in `timeframe` ein. Ohne "
+        "Veröffentlichungsdatum: relative Angabe unverändert lassen.\n"
         f"4. TYPISIERUNG: `claim_type` ist EINES von: {types}.\n"
         "\n"
         "ID-REGELN (verbindlich):\n"
@@ -152,7 +171,7 @@ def build_refiner_prompt(
         '  "metric": "<Bezugsgröße/Einheit oder null>"\n'
         "}\n"
         "\n"
-        f"{_context_block(core_thesis, source_hint, 'nur zur Einordnung, NICHT zu bewerten')}"
+        f"{_context_block(core_thesis, source_hint, 'nur zur Einordnung, NICHT zu bewerten', anchor_date)}"
         "VORGELEGTE BEHAUPTUNGEN:\n"
         f"{numbered}\n"
     )
@@ -361,7 +380,9 @@ def _format_claim_line(claim: dict) -> str:
     )
 
 
-def build_planner_prompt(cards_input: list[dict], core_thesis: str = "") -> str:
+def build_planner_prompt(
+    cards_input: list[dict], core_thesis: str = "", anchor_date: str = "",
+) -> str:
     """Baut den S4-Prompt: je selektiertem Claim eine Recherchekarte.
 
     Args:
@@ -431,7 +452,7 @@ def build_planner_prompt(cards_input: list[dict], core_thesis: str = "") -> str:
         '  "language_hints": []\n'
         "}\n"
         "\n"
-        f"{_context_block(core_thesis, '', 'nur zur Einordnung, NICHT zu bewerten')}"
+        f"{_context_block(core_thesis, '', 'nur zur Einordnung, NICHT zu bewerten', anchor_date)}"
         "ZU PLANENDE BEHAUPTUNGEN:\n"
         f"{listed}\n"
     )
@@ -462,6 +483,7 @@ def _card_block(card: dict) -> str:
 
 def build_claim_verification_prompt(
     claim: dict, card: dict, language: str = "Deutsch", source_hint: str = "",
+    anchor_date: str = "",
 ) -> str:
     """Baut den S5-Prompt für EINEN Claim (eigener Call, eigenes Token-Budget).
 
@@ -490,6 +512,16 @@ def build_claim_verification_prompt(
         f"- Die GEPRÜFTE Quelle selbst darf NICHT als Beleg dienen (weder in der "
         f"Begründung noch als Quelle): {safe_hint}\n"
         if safe_hint else ""
+    )
+    # Zeitanker (v0.15.0): 'veröffentlicht', NICHT 'aufgenommen' — hilft dem
+    # Scope-Check, relative Zeitangaben korrekt einzuordnen (Referenz-Drift).
+    safe_anchor = sanitize_context(anchor_date, 60)
+    anchor_block = (
+        f"- Das geprüfte Video wurde am {safe_anchor} VERÖFFENTLICHT. Relative "
+        f"Zeitangaben im Claim ('vor zwei Jahren' u. ä.) beziehen sich auf diesen "
+        f"Anker, NICHT auf heute und NICHT auf Daten gefundener Quellen; das "
+        f"Aufnahmedatum ist unbekannt (Differenz offen).\n"
+        if safe_anchor else ""
     )
     f = _claim_fields(claim)
 
@@ -520,6 +552,7 @@ def build_claim_verification_prompt(
         "gegen die Quelle ab. Eine Quelle kann korrekt sein und trotzdem nicht "
         "passen — eine zufällig ähnliche Zahl mit anderem Zeitraum oder anderer "
         "Messgröße ist KEIN Teilbeleg.\n"
+        f"{anchor_block}"
         # --- Retrieval-Grenze ≠ Prüfbarkeits-Grenze (Theorie §5.1) ---
         "- Findest du trotz Auftrag nichts: Verdikt 'unsupported' (unbelegt). "
         "'under_specified' ist NUR richtig, wenn die Behauptung selbst zu vage "

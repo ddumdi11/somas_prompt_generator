@@ -8,7 +8,7 @@ import yt_dlp
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api import TranscriptsDisabled, NoTranscriptFound
 
-from src.config.defaults import VideoInfo
+from src.config.defaults import VideoInfo, parse_upload_date
 
 
 logger = logging.getLogger(__name__)
@@ -91,6 +91,8 @@ def get_video_info(url: str) -> VideoInfo:
             duration=info.get('duration', 0),
             url=url,
             transcript=transcript,
+            # v0.15.0: Veröffentlichungsdatum als Zeitanker (yt-dlp: YYYYMMDD).
+            published=parse_upload_date(info.get('upload_date')),
         )
     except Exception as e:
         logger.error(f"Fehler beim Abruf der Metadaten: {e}")

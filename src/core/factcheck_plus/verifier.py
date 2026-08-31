@@ -114,12 +114,13 @@ class ClaimVerifier:
 
     def __init__(
         self, client: PromptClient, model: str, source_hint: str = "",
-        language: str = "Deutsch",
+        language: str = "Deutsch", anchor_date: str = "",
     ) -> None:
         self.client = client
         self.model = model
         self.source_hint = source_hint
         self.language = language
+        self.anchor_date = anchor_date  # v0.15.0: Zeitanker (formatiert, "" = keiner)
 
     def verify_one(self, claim: dict, card: dict) -> ClaimVerdict:
         """Prüft genau einen Claim (ein Call, eigenes Token-Budget).
@@ -137,6 +138,7 @@ class ClaimVerifier:
         claim_id = claim["claim_id"]
         prompt = build_claim_verification_prompt(
             claim, card, language=self.language, source_hint=self.source_hint,
+            anchor_date=self.anchor_date,
         )
         return run_json_stage(
             client=self.client,

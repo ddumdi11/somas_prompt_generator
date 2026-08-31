@@ -7,6 +7,8 @@ frei von UI-/Settings-Wissen und headless testbar bleibt.
 """
 
 from dataclasses import dataclass, field
+from datetime import date
+from typing import Optional
 
 from .comparison_item import ModelChoice  # wiederverwenden
 
@@ -25,6 +27,8 @@ class VerificationConfig:
         source_url: Optionale Quellen-URL (Anzeige/Debug).
         web_unverified: True, wenn das Modell keinen bestätigten Web-Zugriff hat
             (rendert einen dauerhaften Disclaimer im Verifikationsabschnitt).
+        video_published: Optionales Veröffentlichungsdatum des geprüften Videos
+            (v0.15.0, Zeitanker in der Verifikation). ``None`` → kein Anker-Block.
     """
 
     claims: list[str]
@@ -34,6 +38,7 @@ class VerificationConfig:
     source_title: str = ""
     source_url: str = ""
     web_unverified: bool = False
+    video_published: Optional[date] = None
 
 
 @dataclass

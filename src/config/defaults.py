@@ -1,7 +1,32 @@
 """SOMAS-Konfiguration und Standardwerte."""
 
 from dataclasses import dataclass
+from datetime import date, datetime
 from typing import Optional
+
+
+def parse_upload_date(raw: Optional[str]) -> Optional[date]:
+    """Wandelt yt-dlps ``upload_date`` (Format ``YYYYMMDD``) in ein ``date``.
+
+    Locale-unabhängig (rein numerisches Format). Zentral, weil BEIDE Metadaten-
+    Wege es brauchen (direkter ``youtube_client``-Pfad und ``intake_adapter``) —
+    hier liegt es zirkelfrei, da beide ohnehin von ``defaults`` abhängen.
+
+    Args:
+        raw: Roh-String aus den Metadaten (z.B. ``"20260824"``) oder ``None``.
+            Nicht-Strings (z.B. ein Integer ``20260824``) → ``None``: der Vertrag
+            ist ein String, keine stille Coercion (sonst parste ein Int-Datum).
+
+    Returns:
+        Das geparste ``date`` oder ``None`` (fehlend/leer/kein String/ungültiges
+        Format) — nie ein Fehler, damit ein fehlendes Datum keinen Verbraucher bricht.
+    """
+    if not raw or not isinstance(raw, str):
+        return None
+    try:
+        return datetime.strptime(raw.strip(), "%Y%m%d").date()
+    except ValueError:
+        return None
 
 
 # Tiefenstufen mit Beschreibungen
@@ -54,6 +79,9 @@ class VideoInfo:
     duration: int  # Sekunden
     url: str
     transcript: str = ""  # Transkript-Text (optional)
+    # Veröffentlichungsdatum (yt-dlp upload_date, v0.15.0). None im Transkript-
+    # Modus und wenn die Metadatenquelle kein Datum liefert (z.B. Intake-Core).
+    published: Optional[date] = None
 
     @property
     def duration_formatted(self) -> str:

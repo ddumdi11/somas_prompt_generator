@@ -19,7 +19,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from src.config.defaults import VideoInfo
+from src.config.defaults import VideoInfo, parse_upload_date
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +114,11 @@ def fetch(url: str, language: str = "de") -> IntakeResult:
             duration=data["duration"],
             url=data["url"],
             transcript=data.get("transcript") or "",
+            # v0.15.0: Soft-.get() — die gepinnte Core-Wire-Form (v1.0.0) emittiert
+            # KEIN Datumsfeld, dieser Pfad liefert also bis zu einem Core-Follow-up
+            # (upload_date in die Wire-Form + Re-Pin) immer None. Bewusst .get()
+            # statt data["…"], damit das eingefrorene Kontrakt-Mapping nicht bricht.
+            published=parse_upload_date(data.get("upload_date")),
         )
         return IntakeResult(
             video_info=video_info,

@@ -100,12 +100,16 @@ class ResearchPlanner:
         self.client = client
         self.model = model
 
-    def plan(self, claims: list, core_thesis: str = "") -> list[ResearchCard]:
+    def plan(
+        self, claims: list, core_thesis: str = "", anchor_date: str = "",
+    ) -> list[ResearchCard]:
         """Schreibt je Claim eine Recherchekarte.
 
         Args:
             claims: Die selektierten :class:`models.RefinedClaim`-Objekte.
             core_thesis: SOMAS-Kernthese — nur Kontext.
+            anchor_date: Optionales Veröffentlichungsdatum (v0.15.0, formatiert)
+                als Zeitanker-Kontext; "" → keine Datums-Zeile.
 
         Returns:
             Die :class:`ResearchCard`-Objekte, eine je Claim.
@@ -129,7 +133,7 @@ class ResearchPlanner:
             for rc in claims
         ]
         expected_ids = [rc.claim_id for rc in claims]
-        prompt = build_planner_prompt(payload, core_thesis)
+        prompt = build_planner_prompt(payload, core_thesis, anchor_date)
         return run_json_stage(
             client=self.client,
             model=self.model,

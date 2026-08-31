@@ -98,7 +98,8 @@ class VerificationWorker(QThread):
                 source_hint = " ".join(p for p in (cfg.source_title, cfg.source_url) if p)
 
             prompt = build_verification_prompt(
-                cfg.claims, language=cfg.language, source_hint=source_hint
+                cfg.claims, language=cfg.language, source_hint=source_hint,
+                video_published=cfg.video_published,
             )
 
             if self._cancelled:
