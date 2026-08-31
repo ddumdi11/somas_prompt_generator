@@ -14,16 +14,18 @@ def parse_upload_date(raw: Optional[str]) -> Optional[date]:
 
     Args:
         raw: Roh-String aus den Metadaten (z.B. ``"20260824"``) oder ``None``.
+            Nicht-Strings (z.B. ein Integer ``20260824``) → ``None``: der Vertrag
+            ist ein String, keine stille Coercion (sonst parste ein Int-Datum).
 
     Returns:
-        Das geparste ``date`` oder ``None`` (fehlend/leer/ungültiges Format) —
-        nie ein Fehler, damit ein fehlendes Datum keinen Verbraucher bricht.
+        Das geparste ``date`` oder ``None`` (fehlend/leer/kein String/ungültiges
+        Format) — nie ein Fehler, damit ein fehlendes Datum keinen Verbraucher bricht.
     """
-    if not raw:
+    if not raw or not isinstance(raw, str):
         return None
     try:
-        return datetime.strptime(str(raw).strip(), "%Y%m%d").date()
-    except (ValueError, TypeError):
+        return datetime.strptime(raw.strip(), "%Y%m%d").date()
+    except ValueError:
         return None
 
 

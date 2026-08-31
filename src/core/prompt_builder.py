@@ -538,6 +538,9 @@ def build_prompt_from_transcript(
         anti_monotony_hint: Optionaler Hinweis zur Modul-Variation.
         custom_system_prompt: Optionaler System-Prompt-Override aus PromptEditDialog.
         custom_module: Optionales erzwungenes Modul aus PromptEditDialog.
+        video_published: Optionales Veröffentlichungsdatum des Videos (v0.15.0,
+            Zeitanker). ``None`` (z.B. manueller Transkript-Tab) → keine
+            Veröffentlichungszeile im Anker, exakt bisheriger Text.
 
     Returns:
         Fertig gerenderte Prompt-Zeichenkette.
