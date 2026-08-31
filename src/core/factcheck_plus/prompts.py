@@ -92,7 +92,7 @@ def _context_block(
 
 def build_refiner_prompt(
     claims: list[str], core_thesis: str = "", source_hint: str = "",
-    anchor_date: str = "",
+    anchor_date: str = "", start_index: int = 1,
 ) -> str:
     """Baut den S1-Prompt: Atomisierung, Attribution-Split, Normalisierung, Typ.
 
@@ -100,13 +100,19 @@ def build_refiner_prompt(
         claims: Roh-Behauptungen aus Stufe 1 (bereits Basisfakt-bereinigt).
         core_thesis: SOMAS-Kernthese/Framing — reiner Kontext, wird nicht bewertet.
         source_hint: Identität der geprüften Quelle (Titel/URL), nur zur Einordnung.
+        anchor_date: Optionales Veröffentlichungsdatum (v0.15.0, formatiert).
+        start_index: 1-basierte globale Nummer der ERSTEN Behauptung dieses Batches
+            (v0.15.1-Chunking). Default 1 → unverändertes Verhalten für den
+            Ein-Call-Fall. Bei Chunking bekommt Chunk 2 z.B. ``start_index=16``,
+            damit die IDs global ``c16…`` lauten statt wieder bei ``c01`` zu
+            beginnen (Eindeutigkeit über die Chunk-Grenzen).
 
     Returns:
         Der fertige Prompt-String; erwartet ein JSON-Array als Antwort.
     """
     numbered = "\n".join(
         f"{make_claim_id(i)}: {sanitize_context(c, 1000)}"
-        for i, c in enumerate(claims, 1)
+        for i, c in enumerate(claims, start_index)
     )
     types = " | ".join(REFINER_CLAIM_TYPES)
 

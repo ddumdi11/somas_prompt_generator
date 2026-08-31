@@ -295,8 +295,20 @@ class FactcheckPlusWorker(QThread):
         published = self._config.video_published
         return _format_german_date(published) if published else ""
 
+    def _emit_chunk_stage(self, base: str, index: int, chunk_i: int, total: int) -> None:
+        """Meldet den Chunk-Fortschritt einer Stufe (v0.15.1).
+
+        Im Ein-Chunk-Normalfall ein **No-op**: der Stufen-Emit in ``_run_*`` hat
+        schon gemeldet, ein zweites Signal wäre eine Dopplung (byte-identisches
+        Signalverhalten zu vor v0.15.1). Erst ab zwei Chunks kommt der Fortschritt
+        mit „(Teil i/n)"-Zusatz.
+        """
+        if total <= 1:
+            return
+        self._emit_stage(f"{base} … (Teil {chunk_i}/{total})", index)
+
     def _run_refiner(self, client: LLMClient) -> list[RefinedClaim] | None:
-        """S1: Roh-Behauptungen → atomare Prüfeinheiten."""
+        """S1: Roh-Behauptungen → atomare Prüfeinheiten (chunk-fähig, v0.15.1)."""
         self._emit_stage("Verfeinere Behauptungen …", 1)
         if self._cancelled:
             return None
@@ -306,6 +318,8 @@ class FactcheckPlusWorker(QThread):
             core_thesis=self._config.core_thesis,
             source_hint=self._config.source_hint,
             anchor_date=self._anchor_date,
+            on_progress=lambda i, n: self._emit_chunk_stage("Verfeinere Behauptungen", 1, i, n),
+            should_cancel=lambda: self._cancelled,
         )
         self._result.refined_count = len(refined)
         logger.info("S1: %d Roh-Claims → %d Prüfeinheiten",
@@ -322,6 +336,8 @@ class FactcheckPlusWorker(QThread):
         wrapper = self._wrap(client, "s2_mapper")
         mappings = ArgumentMapper(wrapper, self._config.analysis_model.model_id).map_claims(
             refined, core_thesis=self._config.core_thesis,
+            on_progress=lambda i, n: self._emit_chunk_stage("Gewichte Argumente", 2, i, n),
+            should_cancel=lambda: self._cancelled,
         )
         return None if self._cancelled else mappings
 

@@ -16,7 +16,15 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuell (v0.15.0) — Veröffentlichungsdatum als Zeitanker
+### Aktuell (v0.15.1) — Chunking für S1 + S2 gegen Claim-Fluten
+
+Ein Realtest (2026-08-30/31, „Axis of Truth"-Video, DeepSeek V4 Pro) extrahierte **69 Roh-Behauptungen**. Der Refiner (S1) muss daraus ~80–100 Prüfeinheiten atomisieren und echot jede doppelt (`original_text` + `normalized_claim`) – beide Versuche liefen bis exakt ans 32k-Budget und wurden mitten im JSON abgeschnitten. Kein Gate-Fehler, alle Sicherheitsnetze arbeiteten korrekt: Das Ein-Call-Design von S1 skaliert schlicht nicht über ~40 Roh-Claims.
+
+- **S1- und S2-Chunking** – Roh-Claims werden in Batches (`S1_CHUNK_SIZE = 15`, `S2_CHUNK_SIZE = 20`) verarbeitet, je Batch ein eigener Stufen-Call mit vollem Prompt-Vertrag und demselben Kontext (Kernthese, Zeitanker). Die globalen IDs `cNN` bleiben über die Chunks stabil; Merge + globale Vollständigkeits-/Duplikat-Prüfung sichern, dass keine Behauptung verlorengeht. **Bleibt der „ungekappt"-Linie treu** (Budget statt Cap) und skaliert beliebig
+- **Normalfall unverändert** – Claims ≤ Chunk-Größe → genau **ein** Call, byte-identisches Verhalten zu vorher. Chunking ist ein reiner Überlauf-Mechanismus. Reparatur-Retry und Trunkierungs-Gate gelten **pro Chunk**; Abbruch greift zwischen den Chunks
+- **Kosten-Ehrlichkeit** – Chunking multipliziert den Reasoning-Overhead (Reasoning fällt **pro Call** an: 5 Chunks × ~10–15k ≈ 50–75k Reasoning-Tokens bei reasoning-freudigen Modellen – bei DeepSeek Cents, bei teuren Slugs real). Der Reasoning-Cap (v0.13.2) bleibt aktiv und dämpft, wo Hosts kooperieren
+
+### Seit v0.15.0 — Veröffentlichungsdatum als Zeitanker
 
 Ein externes Review des Nas-Daily-Faktenchecks (2026-08-24) fand „Referenz-Drift": Die Verifikationsstufen kannten das Datum des geprüften Videos nicht. Behauptungen mit relativen Zeitangaben („vor zweieinhalb Jahren") wurden gegen **irgendein datierbares Ersatzobjekt** aus den Suchtreffern geprüft (z. B. ein 2019er-Video) – drei „zweieinhalb Jahre"-Prüfungen scheiterten deshalb. Der Analyse-Prompt hatte seit v0.12.1 einen Zeitanker mit dem *aktuellen* Datum; das *Veröffentlichungsdatum* des Videos war vorbereitet, wurde aber nie befüllt.
 
