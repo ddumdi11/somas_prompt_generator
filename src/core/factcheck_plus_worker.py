@@ -251,25 +251,31 @@ class FactcheckPlusWorker(QThread):
         self.status_changed.emit("running")
 
         try:
+            # Ein None aus einer Stufe heißt IMMER Abbruch (nur dann geben die
+            # Stufen None zurück). Alle Früh-Abbruchpfade (S1-S4 bzw. vor S5)
+            # laufen über denselben Abschluss, damit der Status konsistent
+            # 'cancelled' wird und ein status_changed('cancelled') feuert (der
+            # S5-Teilergebnis-Pfad via _finish tat das schon; die früheren
+            # Stufen kehrten bisher still zurück, result.status blieb 'running').
             refined = self._run_refiner(analysis_client)
             if refined is None:
-                return
+                return self._finalize_cancelled()
 
             mappings = self._run_mapper(analysis_client, refined)
             if mappings is None:
-                return
+                return self._finalize_cancelled()
 
             selection, selected = self._run_scorer(refined, mappings)
             if selection is None:
-                return
+                return self._finalize_cancelled()
 
             cards = self._run_planner(analysis_client, selected)
             if cards is None:
-                return
+                return self._finalize_cancelled()
 
             verdicts = self._run_verifier(research_client, selected, cards)
             if verdicts is None:
-                return
+                return self._finalize_cancelled()
 
             self._finish(refined, selection, verdicts)
 
@@ -295,7 +301,9 @@ class FactcheckPlusWorker(QThread):
         published = self._config.video_published
         return _format_german_date(published) if published else ""
 
-    def _emit_chunk_stage(self, base: str, index: int, chunk_i: int, total: int) -> None:
+    def _emit_chunk_stage(
+        self, base: str, index: int, chunk_i: int, total: int
+    ) -> None:
         """Meldet den Chunk-Fortschritt einer Stufe (v0.15.1).
 
         Im Ein-Chunk-Normalfall ein **No-op**: der Stufen-Emit in ``_run_*`` hat
@@ -309,7 +317,8 @@ class FactcheckPlusWorker(QThread):
 
     def _run_refiner(self, client: LLMClient) -> list[RefinedClaim] | None:
         """S1: Roh-Behauptungen → atomare Prüfeinheiten (chunk-fähig, v0.15.1)."""
-        self._emit_stage("Verfeinere Behauptungen …", 1)
+        label = "Verfeinere Behauptungen"
+        self._emit_stage(f"{label} …", 1)
         if self._cancelled:
             return None
         wrapper = self._wrap(client, "s1_refiner")
@@ -318,7 +327,7 @@ class FactcheckPlusWorker(QThread):
             core_thesis=self._config.core_thesis,
             source_hint=self._config.source_hint,
             anchor_date=self._anchor_date,
-            on_progress=lambda i, n: self._emit_chunk_stage("Verfeinere Behauptungen", 1, i, n),
+            on_progress=lambda i, n: self._emit_chunk_stage(label, 1, i, n),
             should_cancel=lambda: self._cancelled,
         )
         self._result.refined_count = len(refined)
@@ -330,13 +339,14 @@ class FactcheckPlusWorker(QThread):
         self, client: LLMClient, refined: list[RefinedClaim],
     ) -> list[ArgumentMapping] | None:
         """S2: Prüfeinheiten → Argumentrolle + Impact + Ratings."""
-        self._emit_stage("Gewichte Argumente …", 2)
+        label = "Gewichte Argumente"
+        self._emit_stage(f"{label} …", 2)
         if self._cancelled:
             return None
         wrapper = self._wrap(client, "s2_mapper")
         mappings = ArgumentMapper(wrapper, self._config.analysis_model.model_id).map_claims(
             refined, core_thesis=self._config.core_thesis,
-            on_progress=lambda i, n: self._emit_chunk_stage("Gewichte Argumente", 2, i, n),
+            on_progress=lambda i, n: self._emit_chunk_stage(label, 2, i, n),
             should_cancel=lambda: self._cancelled,
         )
         return None if self._cancelled else mappings
@@ -507,6 +517,20 @@ class FactcheckPlusWorker(QThread):
         """Callback aus S5 — reicht den Claim-Fortschritt als Signal weiter."""
         self.stage_changed.emit(f"Recherchiere Claim {index}/{total} …", 5, TOTAL_STAGES)
         self.claim_progress.emit(index, total)
+
+    def _finalize_cancelled(self) -> None:
+        """Gemeinsamer Abschluss bei Abbruch VOR/IN einer frühen Stufe (S1–S4).
+
+        Setzt den Status auf 'cancelled' und meldet ihn — sonst bliebe
+        ``result.status`` auf 'running' und es feuerte nie ein
+        ``status_changed('cancelled')`` (nur der S5-Teilergebnis-Pfad via
+        ``_finish`` tat das). Bewusst KEIN ``finished_ok``: anders als beim
+        S5-Abbruch (Teilergebnis wird gerendert) gibt es hier keinen renderbaren
+        Abschnitt. Der Running-Zustand der GUI wird ohnehin über Qts ``finished``
+        zurückgesetzt; dieser Abschluss macht nur den Status konsistent.
+        """
+        self._result.status = "cancelled"
+        self.status_changed.emit("cancelled")
 
     def _fail(self, message: str) -> None:
         """Markiert den Lauf als fehlgeschlagen (nicht fatal) und meldet ihn."""

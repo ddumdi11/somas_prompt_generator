@@ -300,6 +300,12 @@ def test_cancel_before_start_stops_early(clients) -> None:
 
     assert seen["finished"] == []
     assert seen["errors"] == []
+    # v0.15.1: Ein Früh-Abbruch (vor/in S1–S4) läuft über die gemeinsame
+    # Finalisierung — 'cancelled' wird gemeldet und der Status ist konsistent
+    # (früher kehrte run() hier still zurück, result.status blieb 'running').
+    assert seen["status"][-1] == "cancelled"
+    assert worker.result.status == "cancelled"
+    assert "cancelled" not in seen["errors"]  # Abbruch ist kein Fehler
 
 
 def test_cancel_between_claims_keeps_the_partial_result(clients) -> None:

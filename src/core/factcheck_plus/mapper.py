@@ -14,10 +14,11 @@ from .prompts import build_mapper_prompt
 
 STAGE_NAME = "ArgumentMapper"
 
-# Chunk-Größe fürs S2-Batching (v0.15.1). Bei Claim-Fluten bekommt S2 ~80–100
-# Prüfeinheiten und würde als Nächstes das Stage-Budget sprengen (real: 30k Output
-# bei 28 Einheiten). Batches à 20 Einheiten; ≤ 20 → genau EIN Call (Regression).
-# Offset-frei: der Mapper ECHOT die IDs, er erzeugt sie nicht — Slicing genügt.
+# Chunk-Größe fürs S2-Batching (v0.15.1). Bei Claim-Fluten bekommt S2 ~80-100
+# Prüfeinheiten und würde als Nächstes das Stage-Budget sprengen (real: 30k
+# Output bei 28 Einheiten). Batches je 20 Einheiten; <= 20 -> genau EIN Call
+# (Regression). Offset-frei: der Mapper ECHOT die IDs, er erzeugt sie nicht
+# (Slicing genügt).
 S2_CHUNK_SIZE = 20
 
 
@@ -143,7 +144,8 @@ class ArgumentMapper:
 
         all_expected_ids = [rc.claim_id for rc in refined]
         chunks = [
-            refined[i:i + S2_CHUNK_SIZE] for i in range(0, len(refined), S2_CHUNK_SIZE)
+            refined[i:i + S2_CHUNK_SIZE]
+            for i in range(0, len(refined), S2_CHUNK_SIZE)
         ]
         total = len(chunks)
         merged: list[ArgumentMapping] = []

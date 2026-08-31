@@ -16,10 +16,10 @@ from .prompts import build_refiner_prompt, make_claim_id
 
 STAGE_NAME = "ClaimRefiner"
 
-# Chunk-Größe fürs S1-Batching (v0.15.1). Der Ein-Call-Refiner skaliert nicht über
-# ~40 Roh-Claims (jede Prüfeinheit echot original_text + normalized_claim → Output
-# sprengt das Stage-Budget). Batches à 15 Roh-Claims halten den Output je Call klein;
-# ≤ 15 Claims → genau EIN Call, unverändertes Verhalten (wichtigste Regression).
+# Chunk-Größe fürs S1-Batching (v0.15.1). Der Ein-Call-Refiner skaliert nicht
+# über ~40 Roh-Claims (jede Prüfeinheit echot original_text + normalized_claim
+# -> Output sprengt das Stage-Budget). Batches je 15 Roh-Claims halten den
+# Output je Call klein; <= 15 Claims -> genau EIN Call (wichtigste Regression).
 S1_CHUNK_SIZE = 15
 
 # Gültige Claim-ID: 'c01' (ungeteilt) oder 'c01a'/'c01ab' (Teil einer Zerlegung).
@@ -203,14 +203,16 @@ class ClaimRefiner:
 
         all_input_ids = [make_claim_id(i) for i in range(1, len(claims) + 1)]
         chunks = [
-            claims[i:i + S1_CHUNK_SIZE] for i in range(0, len(claims), S1_CHUNK_SIZE)
+            claims[i:i + S1_CHUNK_SIZE]
+            for i in range(0, len(claims), S1_CHUNK_SIZE)
         ]
         total = len(chunks)
         merged: list[RefinedClaim] = []
 
         for ci, chunk in enumerate(chunks):
             if should_cancel is not None and should_cancel():
-                return merged  # Abbruch: Teilergebnis ohne globale Prüfung (Aufrufer verwirft)
+                # Abbruch: Teilergebnis ohne globale Prüfung (Aufrufer verwirft es).
+                return merged
             if on_progress is not None:
                 on_progress(ci + 1, total)
 
