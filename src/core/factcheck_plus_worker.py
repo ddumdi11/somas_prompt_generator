@@ -281,11 +281,18 @@ class FactcheckPlusWorker(QThread):
 
         except StageError as exc:
             logger.warning("FactcheckPlusWorker: Stufe fehlgeschlagen — %s", exc)
-            if not self._cancelled:
+            # Bei Abbruch KEIN Fehler, aber trotzdem sauber finalisieren (Status
+            # 'cancelled' + Signal) — sonst bliebe result.status auf 'running',
+            # wenn die Stufe im Abbruchmoment noch eine StageError wirft.
+            if self._cancelled:
+                self._finalize_cancelled()
+            else:
                 self._fail(str(exc))
         except Exception as exc:  # noqa: BLE001 — Plus-Fehler darf Analyse nicht verlieren
             logger.exception("FactcheckPlusWorker: unerwarteter Fehler")
-            if not self._cancelled:
+            if self._cancelled:
+                self._finalize_cancelled()
+            else:
                 self._fail(str(exc))
 
     # --- Stufen -----------------------------------------------------------
@@ -519,7 +526,7 @@ class FactcheckPlusWorker(QThread):
         self.claim_progress.emit(index, total)
 
     def _finalize_cancelled(self) -> None:
-        """Gemeinsamer Abschluss bei Abbruch VOR/IN einer frühen Stufe (S1–S4).
+        """Gemeinsamer Abschluss bei Abbruch VOR/IN einer frühen Stufe (S1-S4).
 
         Setzt den Status auf 'cancelled' und meldet ihn — sonst bliebe
         ``result.status`` auf 'running' und es feuerte nie ein
