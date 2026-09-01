@@ -300,6 +300,12 @@ def test_cancel_before_start_stops_early(clients) -> None:
 
     assert seen["finished"] == []
     assert seen["errors"] == []
+    # v0.15.1: Ein Früh-Abbruch (vor/in S1-S4) läuft über die gemeinsame
+    # Finalisierung — 'cancelled' wird gemeldet und der Status ist konsistent
+    # (früher kehrte run() hier still zurück, result.status blieb 'running').
+    assert seen["status"][-1] == "cancelled"
+    assert worker.result.status == "cancelled"
+    assert "cancelled" not in seen["errors"]  # Abbruch ist kein Fehler
 
 
 def test_cancel_between_claims_keeps_the_partial_result(clients) -> None:
@@ -319,6 +325,47 @@ def test_cancel_between_claims_keeps_the_partial_result(clients) -> None:
     assert result.verified_count == 1
     assert len(made["perplexity"].calls) == 1, "keine weiteren Calls nach Abbruch"
     assert "Lauf vorzeitig abgebrochen" in section
+
+
+def test_cancel_during_stage_exception_finalizes_cancelled(monkeypatch) -> None:
+    """Wirft eine Stufe IM Abbruchmoment eine StageError, wird der Lauf trotzdem
+    sauber als 'cancelled' finalisiert (v0.15.1) — nicht als Fehler und nicht
+    still auf 'running' hängend. Deckt den Except-Pfad ab (Gegenstück zum
+    None-Rückgabe-Pfad)."""
+    worker = FactcheckPlusWorker(_config())
+
+    class _CancelThenTruncate:
+        """Bricht im S1-Call ab und liefert zugleich eine trunkierte Antwort."""
+
+        PROVIDER_ID = "anthropic"
+
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str]] = []
+
+        def send_prompt(self, prompt, model, max_tokens=None, cap_reasoning=False):
+            self.calls.append((prompt, model))
+            worker.cancel()  # Nutzer bricht während des laufenden S1-Calls ab
+            # …und die Antwort ist trunkiert → run_json_stage wirft StageError,
+            # BEVOR der Chunk-Loop should_cancel prüfen kann.
+            return APIResponse(
+                status=APIStatus.RECEIVED, content='[{"claim_id": "c01"',
+                finish_reason="length",
+            )
+
+    analysis = _CancelThenTruncate()
+    research = ScriptedClient("perplexity", [])
+    mapping = {"anthropic": analysis, "perplexity": research}
+    monkeypatch.setattr(fpw, "get_api_key", lambda provider: "key-123")
+    monkeypatch.setattr(fpw, "create_client", lambda provider, key: mapping[provider])
+
+    seen = _run(worker)
+
+    assert seen["status"] == ["running", "cancelled"]
+    assert worker.result.status == "cancelled"
+    assert seen["errors"] == []          # Abbruch ist kein Fehler
+    assert seen["finished"] == []        # kein renderbarer Abschnitt
+    assert len(analysis.calls) == 1      # nach Abbruch keine weitere Stufe
+    assert research.calls == []          # S5 läuft nicht mehr an
 
 
 def test_debug_logger_is_called_per_stage(clients) -> None:
