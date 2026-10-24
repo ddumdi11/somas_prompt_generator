@@ -7,7 +7,7 @@
 ## 🎯 Projektkontext
 
 **Name:** SOMAS Prompt Generator
-**Version:** 0.14.2
+**Version:** 0.15.2
 **Zweck:** Desktop-App zur Generierung und automatischen Ausführung von SOMAS-Analyse-Prompts für YouTube-Videos und manuelle Transkripte
 **Sprache:** Python 3.11+
 **GUI-Framework:** PyQt6
@@ -438,8 +438,9 @@ stufte ein reales 2026-Nachrichtenvideo (Khamenei-Begräbnis) in der FRAMING als
   … als Fiktion/Satire/Spekulation" (bewahrt echte Fiktion + Musikanalysen)
 - [x] Tests `tests/test_temporal_anchor.py` (beide Pfade, alle 7 Presets, locale-sicher,
   Transkript ohne `video_published`, Koexistenz mit erzwungenem FAKTENCHECK)
-- [ ] Follow-up: Veröffentlichungsdatum in den Anker (`video_published`) — braucht ein
-  Upload-/Publish-Datum in `VideoInfo` (yt-dlp `upload_date`); für v1 weggelassen
+- [x] ~~Follow-up: Veröffentlichungsdatum in den Anker (`video_published`)~~
+  → **umgesetzt in Phase 30 (v0.15.0)** — `VideoInfo.published` aus yt-dlp
+  `upload_date`, Anker in Analyse UND Verifikationsstufen
 
 ### Phase 16: Faktencheck Stufe 1 – Basisfakt-Sortierung ✅ (Quick Win, kein Versions-Bump)
 
@@ -856,8 +857,130 @@ alten 8192er-Budget (Stufen haben seit v0.13.3 ihr 32k).
   Maßnahmen gegen den Reasoning-Leak selbst (Host-Fehlverhalten; Validator + Gate
   decken ihn); Stufen-Modell-Entkopplung, S1-Schema (weiter vertagt)
 
+### Phase 29: Modellvergleich-Validator + Schriftmix-Detektor ✅ (v0.14.3)
+
+Realtest 2026-08-24 (Nas-Daily-Video): `deepseek-v4-flash-0731` lieferte als
+Analyse B einen **degenerierten** Output (progressiver Sprachzerfall mit
+kyrillischen Einsprengseln „Selbstseгрегация", erfundene Fakten, Mid-Wort-Ende
+bei `finish_reason=stop`) — der ComparisonWorker (v0.9.0, vor der
+Validator-Ära) übernahm ihn ungeprüft. Empirischer Kernbefund des
+Programmierers: v0.11-Validator UND Trunkierungs-Gate ließen genau diesen
+Output DURCH (Struktur oberflächlich intakt; Zerfall ist lexikalisch, nicht
+strukturell).
+
+- [x] Teil B (erfüllt die DoD): **Schriftmix-Detektor** in
+  `validate_analysis_structure` — ein alphabetisches Token, das zwei
+  Schriftsysteme mischt (z. B. Latin+Kyrillisch), macht die Analyse ungültig.
+  Bewusst IM Validator (Einzelanalyse + Vergleich profitieren). False-Positive-
+  Schutz: nur Mischung INNERHALB eines Tokens; eigenständige fremdsprachige
+  Zitat-Tokens, „N8N"/„GPT-5.6" bleiben gültig. Generischer Mid-Wort-Abbruch
+  bewusst NICHT über schärfere `_looks_truncated`-Regel (false-positive-anfällig)
+- [x] Teil A: v0.11-Prüfkette im `ComparisonWorker` — finish_reason-Gate,
+  `strip_reasoning_preamble`, Struktur-Validator, 1× sichtbarer Retry je
+  Analyse, danach offener Fehlschlag des GESAMTEN Vergleichs (kein
+  Teil-Dokument); Synthese-Fehler bleibt nicht-fatal (v0.9.0-Linie)
+- [x] Reale Flash-Fixture eingecheckt (empirischer DoD-Beweis) +
+  False-Positive-Guards; PR #67
+
+### Phase 30: Veröffentlichungsdatum als Zeitanker ✅ (v0.15.0)
+
+Externes Review (Opus 5) am Nas-Daily-Faktencheck fand „Referenz-Drift": Die
+Verifikation kannte das Videodatum nicht und prüfte relative Zeitangaben
+(„vor zweieinhalb Jahren") gegen beliebige datierbare Ersatzobjekte aus den
+Suchtreffern. Setzt das Phase-15-Follow-up um.
+
+- [x] `VideoInfo.published` aus yt-dlp `upload_date` (`YYYYMMDD` → `date`);
+  Transkript-Modus `None`, alle Verbraucher funktionieren ohne Datum
+- [x] Analyse-Zeitanker: `video_published`-Parameter (seit v0.12.1 vorhanden)
+  endlich bespielt; Formatierung locale-sicher an der
+  `_prepend_temporal_anchor`-Grenze; durch alle drei
+  YouTube-mit-Transkript-Aufrufer gefädelt (main_window, batch_worker,
+  comparison_worker)
+- [x] Klassische Verifikation: Kontextblock in `build_verification_prompt`
+  („veröffentlicht am X" — bewusst nicht „aufgenommen", Differenz bleibt offen)
+- [x] Plus: Anker injection-saniert in S1 (Normalisierung relativer →
+  absoluter Zeitangaben instruiert — der Haupthebel), S4, S5; S2 bewusst nicht
+- [x] Scoping (verifiziert): Offline-Tests beweisen Anker-Präsenz + Instruktion;
+  die Rechen-Güte des Modells ist PO-Realtest-Sache
+- [x] Verifizierter Befund: gepinnte Intake-Core-Wire-Form emittiert KEIN
+  Datumsfeld → Core-Pfad liefert `None` bis zum Submodul-Follow-up (s. Backlog);
+  `use_intake_core` ist Default aus, direkter Pfad unbetroffen. PR #68
+
+### Phase 31: S1/S2-Chunking gegen Claim-Fluten ✅ (v0.15.1)
+
+Realtest 2026-08-30/31 („Axis of Truth", 69 Roh-Claims): S1-Ein-Call-Design
+platzt ab ~40 Roh-Claims strukturell (Echo-Schema + Reasoning > 32.768; zwei
+Läufe bei exakt vollem Budget abgeschnitten). Kein Host-Clamp, kein
+v0.15.0-Fehler — alle Gates meldeten korrekt. PO-Entscheidung: **Chunking**
+(„ungekappt"-Linie aus Phase 22 bleibt).
+
+- [x] S1: Batches à `S1_CHUNK_SIZE = 15`; `start_index` in
+  `build_refiner_prompt` hält globale IDs stabil (Chunk 2 vergibt c16…);
+  `validate_refined` pro Chunk (Roh-Dicts), neues schlankes
+  `validate_merged_refined` nach Merge (Eindeutigkeit + Vollständigkeit)
+- [x] S2: Batches à `S2_CHUNK_SIZE = 20`, offset-frei (IDs stecken in den
+  Objekten); Bijektions-Prüfung pro Chunk, `validate_merged_mappings` nach
+  Merge. S3 (deterministisch) und S4/S5 (nur Selektierte) unverändert
+- [x] Reparatur-Retry + Trunkierungs-Gate wirken automatisch PRO Chunk
+  (`run_json_stage` unverändert); `should_cancel`/`on_progress` je Chunk
+  (Package Qt-frei); Chunk-Fortschritt erst ab 2 Chunks →
+  **Ein-Chunk-Normalfall byte-identisch inkl. Signalen** (Regressionstest)
+- [x] Echte 69-Claim-Liste als Fixture; Transparenz-Assert (Gesamtzahlen nach
+  Merge). 8 neue Tests, Gesamtsuite 364 grün; PR #69
+- [x] Kosten-Hinweis: Chunking multipliziert den Reasoning-Overhead pro Call;
+  Reasoning-Cap (v0.13.2) bleibt aktiv und dämpft bei kooperativen Hosts
+- [x] PO-Realtest 2026-09-01 bestanden (Schrader-Video, Standard-Preset,
+  28 → 59 Einheiten, Budget 10): S1 in 2 Chunks (Offset korrekt), S2 in 3,
+  alle 17 Calls `stop`, Transparenz-Block konsistent, ~8 Cent Gesamtkosten
+- [ ] Offen: 5-Chunk-Maximalfall (69 Claims, Academia-Preset) bisher nur
+  offline als Fixture-Test — live bei Gelegenheit
+
+### Phase 32: Präzise JSON-Diagnose im Reparatur-Retry + Quote-Heilung ✅ (v0.15.2)
+
+Realtest 2026-10-24 (Quellenbündel-Probe 4 via Transkript-Tab, GLM 5.3 Flash):
+S2-Chunk 2 scheiterte 2× mit „kein parsebares JSON-Array". Wahre Ursache:
+**unescapte ASCII-`"` in String-Werten** (`„Message received."` — öffnend
+U+201E, schließend ASCII). Kontrollexperiment im selben Lauf: Der
+Chunk-1-Vertragsbruch MIT spezifischer Enum-Meldung wurde im Reparatur-Retry
+behoben, der generische JSON-Fehler wortgleich wiederholt — die Qualität der
+Reparatur-Meldung entscheidet über den Reparatur-Erfolg. Kontext: Bündel-Läufe
+(Nebenprojekt Mehrquellen-Analyse) erhöhen das Risiko durch viel zitiertes
+Material in Claim-/reason-Texten.
+
+- [x] Teil A · Diagnose: JSON-Syntaxfehler kommen mit Fehlerart, Zeile/Spalte/
+  Position und Kontext-Zitat (±100 Zeichen, `⟦HIER⟧`-Marker) in den
+  Reparatur-Prompt; liegt der Fehler in einem String, zusätzlich der gezielte
+  Hinweis auf unescapte Anführungszeichen (unterdrückt bei `""`-Folge — dort
+  fehlt eher ein Komma). Neue Fehlerklasse erbt von ValueError (bestehende
+  Fehlerpfade fangen weiter); Schema-/Enum-Meldungen unverändert
+- [x] Teil B · Quote-Heilung als stiller Vorversuch VOR dem Reparatur-Retry:
+  ergänzt ausschließlich Backslash-Escapes (nie Textänderung), Akzeptanz nur
+  bei Parse- UND Schema-Validität, sonst Retry mit Teil-A-Diagnose;
+  Log-INFO „Quote-Heilung angewendet: N Stellen" bzw. „verworfen"
+- [x] **Zusatzbefund 1 (wichtig für künftige Diagnosen):** Der Reparatur-Prompt
+  zitierte nur die ersten 4000 Zeichen der vorigen Antwort — der Fehler lag
+  bei Zeichen 4995, **das Modell hat die Fehlerstelle nie gesehen**. Das
+  Kontext-Zitat schließt die Lücke; eigener Test dafür
+- [x] Zusatzbefund 2: Beide realen Antworten hatten je DREI kaputte Stellen;
+  `json.loads` meldet nur die erste → selbst ein perfekter Reparatur-Prompt
+  hätte iterieren müssen. Die Heilung behebt alle in einem Durchgang — beide
+  Fixtures werden zu 19/19 gültigen Mappings mit exakt einem LLM-Call
+- [x] Reale Fehl-Antworten als Fixtures eingecheckt; 22 neue Tests,
+  Gesamtsuite 386 grün; alles in `llm_stage` → gilt für S1/S2/S4/S5 inkl.
+  Chunk-Wegen. PR #70
+- [x] PO-Realtest 2026-10-24 bestanden (Bündel-Probe 4, GLM 5.3 Flash,
+  Budget 32): 25 → 46 Einheiten, S1 2 Chunks / S2 3 Chunks **ohne einen
+  einzigen Reparatur-Retry**, 29 selektiert + recherchiert
+  (GPT-5.1-Codex-Max:online), Verdikt-Spektrum 12 bestätigt / 4 teilweise /
+  3 widerlegt / 10 n.ü., Transparenz-Block konsistent (29+9+8=46),
+  Verifikation ~7 min. Die Quote-Heilung wurde live nicht gebraucht (S2
+  diesmal sauber — GLM-Varianz); ihr Beweis bleibt der Offline-Fixture-Test
+
 ### Backlog
 
+- [ ] Intake-Core: Wire-Form um `upload_date` erweitern + Submodul-Re-Pin
+  (bis dahin liefert der Core-Pfad `published=None`; direkter Pfad unbetroffen
+  — s. Phase 30)
 - [ ] A4-Feinschliff: erzwungenes Modul aus der `MODUL-AUSWAHL`-Liste entfernen
   (generisches Entfernen würde Beschreibung anderer Module löschen; ggf. FAKTENCHECK-Sonderfall)
 - [ ] FAKTENCHECK-Zweiteilung (getrennte Calls für eigenes Token-Budget) — nur bei Bedarf
@@ -905,4 +1028,4 @@ Bei Unklarheiten: Frag nach! Lieber einmal zu viel als eine falsche Annahme tref
 
 ---
 
-Letzte Aktualisierung: 2026-08-20 (v0.14.2)
+Letzte Aktualisierung: 2026-10-24 (v0.15.2)
