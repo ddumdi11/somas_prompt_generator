@@ -16,7 +16,15 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuell (v0.15.1) — Chunking für S1 + S2 gegen Claim-Fluten
+### Aktuell (v0.15.2) — Präzise JSON-Diagnose + Quote-Heilung in den Plus-Stufen
+
+Ein Realtest (2026-10-24, Quellenbündel-Probe über den Transkript-Tab, GLM 5.3 Flash) scheiterte in S2 zweimal mit „kein parsebares JSON-Array". Wahre Ursache: ein **unescaptes ASCII-`"`** in einem Begründungstext – das Modell schrieb `„Message received."` (öffnend typografisch, schließend ASCII), der JSON-String brach dort. Die Antwort war sonst vollständig und strukturkonform. Der generische Fehler ohne Positionsangabe wurde im Reparatur-Retry **wortgleich wiederholt** – zumal die Fehlerstelle (Zeichen 4995) hinter dem 4000-Zeichen-Auszug lag, den der Reparatur-Prompt zitiert. Ein Enum-Vertragsbruch im selben Lauf wurde dagegen dank spezifischer Meldung sofort behoben: Die Qualität der Reparatur-Meldung entscheidet über den Reparatur-Erfolg.
+
+- **Präzise Diagnose** – Syntaxfehler gehen jetzt mit Fehlerart, Zeile/Spalte/Position und einem markierten **Zitat der Fehlerstelle** (±100 Zeichen) in den Reparatur-Prompt; liegt der Fehler in einem String, folgt die gezielte Anweisung, unescapte Anführungszeichen zu prüfen. Die bestehenden Schema-/Enum-Meldungen bleiben unverändert
+- **Quote-Heilung als stiller Vorversuch** – Vor dem Reparatur-Retry escapt eine konservative, deterministische Heilung innere `"` in String-Werten. Sie ergänzt **ausschließlich Backslashes**, ändert nie Text, und gilt nur, wenn das Ergebnis danach parsebar **und** schema-valide ist – sonst greift der Reparatur-Retry mit der neuen Diagnose. Spart im Erfolgsfall einen LLM-Call (Log-Eintrag „Quote-Heilung angewendet: N Stellen")
+- **Gilt für alle Stufen** – S1/S2/S4/S5 inkl. Chunk-Wegen, da beides in der gemeinsamen Stufen-Mechanik sitzt. Trunkierungs-Gate und Leer-Inhalt-Pfad unverändert. Beide realen Fehl-Antworten sind als Test-Fixture eingecheckt und heilen nachweislich zu gültigen S2-Mappings (je drei Zitat-Stellen – ein Reparatur-Retry hätte bei positionsweiser Meldung womöglich mehrere Runden gebraucht)
+
+### Seit v0.15.1 — Chunking für S1 + S2 gegen Claim-Fluten
 
 Ein Realtest (2026-08-30/31, „Axis of Truth"-Video, DeepSeek V4 Pro) extrahierte **69 Roh-Behauptungen**. Der Refiner (S1) muss daraus ~80–100 Prüfeinheiten atomisieren und echot jede doppelt (`original_text` + `normalized_claim`) – beide Versuche liefen bis exakt ans 32k-Budget und wurden mitten im JSON abgeschnitten. Kein Gate-Fehler, alle Sicherheitsnetze arbeiteten korrekt: Das Ein-Call-Design von S1 skaliert schlicht nicht über ~40 Roh-Claims.
 

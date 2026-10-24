@@ -13,8 +13,9 @@ from .aggregate import (
     build_render_context, build_skipped_rows, build_transparency, build_verdict_rows,
 )
 from .llm_stage import (
-    MAX_REPAIR_ATTEMPTS, PromptClient, StageError, extract_json_array,
-    extract_json_object, run_json_stage, strip_code_fences,
+    MAX_REPAIR_ATTEMPTS, JSONSyntaxError, PromptClient, StageError,
+    describe_json_error, extract_json_array, extract_json_object,
+    heal_unescaped_quotes, run_json_stage, strip_code_fences,
 )
 from .mapper import ArgumentMapper, validate_mappings
 from .models import (
@@ -100,6 +101,9 @@ __all__ = [
     "extract_json_array",
     "extract_json_object",
     "strip_code_fences",
+    "JSONSyntaxError",
+    "describe_json_error",
+    "heal_unescaped_quotes",
     "MAX_REPAIR_ATTEMPTS",
     # Prompt-Verträge
     "build_refiner_prompt",

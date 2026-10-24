@@ -77,6 +77,217 @@ def strip_code_fences(text: str) -> str:
     return _FENCE_RE.sub("", (text or "").strip()).strip()
 
 
+# Kontext-Radius des Fehlerzitats in der Vertragsbruch-Meldung (v0.15.2). Der
+# Reparatur-Prompt zitiert die vorige Antwort nur auszugsweise (erste 4000
+# Zeichen) — lag der Fehler dahinter, sah das Modell die kaputte Stelle nie
+# (Realtest 2026-10-24: Fehler bei Zeichen 4995, der Retry wiederholte ihn
+# wortgleich). Das Zitat holt genau diese Stelle in die Fehlermeldung.
+DIAGNOSIS_CONTEXT_CHARS = 100
+
+# Markiert die Fehlerposition im Zitat — bewusst ein Zeichen, das in JSON-Output
+# praktisch nie vorkommt, damit es nicht mit dem zitierten Text verwechselt wird.
+_ERROR_MARK = "⟦HIER⟧"
+
+# Zeichen, die nach einem SCHLIESSENDEN String-Quote legitim folgen
+# (Key → ``:``, Wert → ``,``/``}``/``]``). Steht nach einem ``"`` etwas anderes,
+# war es ein inneres, unescaptes Anführungszeichen.
+_AFTER_STRING_END = frozenset(",}]:")
+
+# JSONDecodeError-Meldungen, die selbst einen Fehler INNERHALB eines Strings melden.
+_STRING_ERROR_PREFIXES = (
+    "Unterminated string", "Invalid control character", "Invalid \\escape",
+    "Invalid \\uXXXX",
+)
+
+
+class JSONSyntaxError(ValueError):
+    """Die Antwort enthält JSON-artigen Text, der syntaktisch nicht parsebar ist.
+
+    Trägt neben der diagnostischen Meldung den geprüften Kandidaten-Text — den
+    braucht :func:`run_json_stage` für die Quote-Heilung (v0.15.2).
+
+    Attributes:
+        candidate: Der Text, an dem ``json.loads`` scheiterte.
+        decode_error: Der ursprüngliche ``json.JSONDecodeError``.
+    """
+
+    def __init__(
+        self, message: str, candidate: str, decode_error: json.JSONDecodeError,
+    ) -> None:
+        super().__init__(message)
+        self.candidate = candidate
+        self.decode_error = decode_error
+
+
+def _next_significant_char(text: str, index: int) -> str:
+    """Liefert das nächste Nicht-Whitespace-Zeichen ab ``index`` ("" am Textende)."""
+    return text[index:].lstrip()[:1]
+
+
+def _error_inside_string(text: str, error: json.JSONDecodeError) -> bool:
+    """Schätzt, ob ein Parse-Fehler in einem String-Wert entstanden ist.
+
+    Zwei Fälle: Der Parser meldet selbst einen String-Fehler (unterminiert,
+    Steuerzeichen, kaputtes Escape) — oder er stolpert direkt hinter einem
+    ``"`` über ein Zeichen, das nach einem String-Ende nicht stehen darf. Das ist
+    die Signatur eines unescapten inneren Anführungszeichens: Der String endete
+    für den Parser zu früh (Realtest 2026-10-24: ``„Message received." dient``).
+
+    Args:
+        text: Der geparste Text.
+        error: Der Parse-Fehler.
+
+    Returns:
+        ``True``, wenn der Fehler vermutlich in einem String liegt.
+    """
+    if error.msg.startswith(_STRING_ERROR_PREFIXES):
+        return True
+    # Folgt direkt ein weiteres ``"``, fehlt eher ein Trennzeichen zwischen zwei
+    # Strings — dann kein Anführungszeichen-Hinweis (er führte das Modell in die Irre).
+    nxt = _next_significant_char(text, error.pos)
+    return (
+        text[:error.pos].rstrip().endswith('"')
+        and nxt not in ("", '"') and nxt not in _AFTER_STRING_END
+    )
+
+
+def describe_json_error(text: str, error: json.JSONDecodeError) -> str:
+    """Formuliert einen JSON-Parse-Fehler als präzise Reparatur-Diagnose (v0.15.2).
+
+    Enthält Fehlerart (``error.msg``), Zeile/Spalte/Position und ein klar als
+    Zitat markiertes Fenster (±:data:`DIAGNOSIS_CONTEXT_CHARS` Zeichen) des
+    eigenen Outputs mit Marke an der Fehlerstelle. Liegt der Fehler in einem
+    String, folgt die gezielte Anweisung zu unescapten Anführungszeichen.
+
+    Args:
+        text: Der Text, an dem ``json.loads`` scheiterte.
+        error: Der Parse-Fehler.
+
+    Returns:
+        Die mehrzeilige Diagnose.
+    """
+    pos = error.pos
+    lo = max(0, pos - DIAGNOSIS_CONTEXT_CHARS)
+    hi = min(len(text), pos + DIAGNOSIS_CONTEXT_CHARS)
+    excerpt = (
+        ("…" if lo > 0 else "")
+        + text[lo:pos] + _ERROR_MARK + text[pos:hi]
+        + ("…" if hi < len(text) else "")
+    )
+    lines = [
+        f"JSON-Syntaxfehler: {error.msg} (Zeile {error.lineno}, Spalte "
+        f"{error.colno}, Zeichen {pos}).",
+        f"Fundstelle in DEINER vorigen Antwort (Zitat, ±{DIAGNOSIS_CONTEXT_CHARS} "
+        f"Zeichen; {_ERROR_MARK} markiert die Fehlerposition):",
+        "--- ZITAT ANFANG ---",
+        excerpt,
+        "--- ZITAT ENDE ---",
+    ]
+    if _error_inside_string(text, error):
+        lines.append(
+            'Der Fehler liegt in einem String-Wert. Prüfe unescapte '
+            'Anführungszeichen in String-Werten an dieser Stelle: Ein " '
+            'INNERHALB eines Strings muss als \\" escapt werden.'
+        )
+    return "\n".join(lines)
+
+
+def heal_unescaped_quotes(text: str) -> tuple[str, int]:
+    """Escapt unescapte innere ``"`` in JSON-Strings — rein additiv (v0.15.2).
+
+    Konservative Heuristik über einen String-Zustandsautomaten: Ein ``"``
+    innerhalb eines Strings gilt als **schließend**, wenn das nächste
+    Nicht-Whitespace-Zeichen ``,`` ``}`` ``]`` ``:`` ist oder der Text endet —
+    sonst als **inneres** Anführungszeichen, vor das ein Backslash gesetzt wird.
+    Vorhandene Escapes bleiben unangetastet. Es werden ausschließlich Backslashes
+    ergänzt, nie Zeichen geändert oder entfernt. Ob das Ergebnis gilt, entscheidet
+    der Aufrufer (parsebar UND schema-valide), nicht diese Funktion.
+
+    Args:
+        text: Der unparsebare JSON-Kandidat.
+
+    Returns:
+        ``(geheilter_text, anzahl_ergänzter_escapes)`` — bei 0 ist der Text
+        unverändert.
+    """
+    out: list[str] = []
+    in_string = False
+    healed = 0
+    i, n = 0, len(text)
+    while i < n:
+        ch = text[i]
+        if in_string:
+            if ch == "\\":
+                out.append(text[i:i + 2])  # vorhandenes Escape unverändert
+                i += 2
+                continue
+            if ch == '"':
+                nxt = _next_significant_char(text, i + 1)
+                if nxt != "" and nxt not in _AFTER_STRING_END:
+                    out.append('\\"')
+                    healed += 1
+                    i += 1
+                    continue
+                in_string = False
+        elif ch == '"':
+            in_string = True
+        out.append(ch)
+        i += 1
+    return "".join(out), healed
+
+
+def _extract_json(text: str, expected: type, label: str):
+    """Gemeinsamer Kern von :func:`extract_json_array`/:func:`extract_json_object`.
+
+    Erst wird die bereinigte Antwort direkt geparst; scheitert das, der Bereich
+    von der ersten öffnenden bis zur letzten schließenden Klammer.
+
+    Args:
+        text: Roh-Antwort des Modells.
+        expected: ``list`` oder ``dict``.
+        label: "Array" bzw. "Objekt" (für Meldungen).
+
+    Returns:
+        Das geparste Ergebnis vom Typ ``expected``.
+
+    Raises:
+        JSONSyntaxError: Wenn kein Kandidat parsebar ist — Diagnose zum zuletzt
+            geprüften (dem engsten) Kandidaten.
+        ValueError: Wenn die Antwort leer ist oder einen falschen JSON-Typ liefert.
+    """
+    cleaned = strip_code_fences(text)
+    if not cleaned:
+        raise ValueError(f"Antwort ist leer — erwartet wurde ein JSON-{label}.")
+
+    opener, closer = ("[", "]") if expected is list else ("{", "}")
+    candidates = [cleaned]
+    start, end = cleaned.find(opener), cleaned.rfind(closer)
+    if start != -1 and end > start:
+        candidates.append(cleaned[start:end + 1])
+
+    last_error: json.JSONDecodeError | None = None
+    last_candidate = cleaned
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError as exc:
+            last_error, last_candidate = exc, candidate
+            continue
+        if isinstance(parsed, expected):
+            return parsed
+        raise ValueError(
+            f"Erwartet wurde ein JSON-{label}, geliefert wurde "
+            f"{type(parsed).__name__}."
+        )
+
+    assert last_error is not None  # jeder Kandidat ist gescheitert
+    raise JSONSyntaxError(
+        f"Antwort enthält kein parsebares JSON-{label}.\n"
+        + describe_json_error(last_candidate, last_error),
+        last_candidate, last_error,
+    )
+
+
 def extract_json_array(text: str) -> list:
     """Liest ein JSON-Array aus einer Modellantwort — tolerant gegen Beiwerk.
 
@@ -91,32 +302,11 @@ def extract_json_array(text: str) -> list:
         Die geparste Liste.
 
     Raises:
-        ValueError: Wenn kein JSON-Array gefunden bzw. geparst werden kann.
+        JSONSyntaxError: Bei Syntaxfehler — Meldung mit präziser Diagnose
+            (Fehlerart, Position, Kontext-Zitat; v0.15.2).
+        ValueError: Wenn die Antwort leer ist oder kein Array liefert.
     """
-    cleaned = strip_code_fences(text)
-    if not cleaned:
-        raise ValueError("Antwort ist leer — erwartet wurde ein JSON-Array.")
-
-    candidates = [cleaned]
-    start, end = cleaned.find("["), cleaned.rfind("]")
-    if start != -1 and end > start:
-        candidates.append(cleaned[start:end + 1])
-
-    for candidate in candidates:
-        try:
-            parsed = json.loads(candidate)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(parsed, list):
-            return parsed
-        raise ValueError(
-            f"Erwartet wurde ein JSON-Array, geliefert wurde "
-            f"{type(parsed).__name__}."
-        )
-
-    raise ValueError(
-        "Antwort enthält kein parsebares JSON-Array (kein gültiges JSON gefunden)."
-    )
+    return _extract_json(text, list, "Array")
 
 
 def extract_json_object(text: str) -> dict:
@@ -132,32 +322,54 @@ def extract_json_object(text: str) -> dict:
         Das geparste Dict.
 
     Raises:
-        ValueError: Wenn kein JSON-Objekt gefunden bzw. geparst werden kann.
+        JSONSyntaxError: Bei Syntaxfehler — Meldung mit präziser Diagnose.
+        ValueError: Wenn die Antwort leer ist oder kein Objekt liefert.
     """
-    cleaned = strip_code_fences(text)
-    if not cleaned:
-        raise ValueError("Antwort ist leer — erwartet wurde ein JSON-Objekt.")
+    return _extract_json(text, dict, "Objekt")
 
-    candidates = [cleaned]
-    start, end = cleaned.find("{"), cleaned.rfind("}")
-    if start != -1 and end > start:
-        candidates.append(cleaned[start:end + 1])
 
-    for candidate in candidates:
+def _extract_and_parse(
+    content: str, extract: Callable[[str], object], parse: Callable,
+    stage_name: str,
+):
+    """Extrahiert + validiert eine Antwort, mit Quote-Heilung als stillem Vorversuch.
+
+    Scheitert ``extract`` an einem Syntaxfehler, wird EINMAL
+    :func:`heal_unescaped_quotes` auf den Kandidaten angewendet. Das Ergebnis
+    gilt nur, wenn es danach parsebar ist UND ``parse`` (Schema + Invarianten)
+    besteht — sonst wird der URSPRÜNGLICHE Syntaxfehler samt Diagnose
+    weitergeworfen (→ Reparatur-Retry). Bei Erfolg spart das einen LLM-Call.
+
+    Args:
+        content: Roh-Antwort des Modells.
+        extract: Extraktionsfunktion der Stufe.
+        parse: Validierungs-Callback der Stufe.
+        stage_name: Stufenname fürs Logging.
+
+    Returns:
+        Das Ergebnis von ``parse``.
+
+    Raises:
+        ValueError/KeyError/TypeError: Vertragsbruch (→ Reparatur-Retry).
+    """
+    try:
+        raw = extract(content)
+    except JSONSyntaxError as exc:
+        healed_text, count = heal_unescaped_quotes(exc.candidate)
+        if count == 0:
+            raise
         try:
-            parsed = json.loads(candidate)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(parsed, dict):
-            return parsed
-        raise ValueError(
-            f"Erwartet wurde ein JSON-Objekt, geliefert wurde "
-            f"{type(parsed).__name__}."
-        )
-
-    raise ValueError(
-        "Antwort enthält kein parsebares JSON-Objekt (kein gültiges JSON gefunden)."
-    )
+            result = parse(extract(healed_text))
+        except (ValueError, KeyError, TypeError) as heal_exc:
+            logger.info(
+                "%s: Quote-Heilung verworfen (%d Stellen, danach weiterhin "
+                "ungültig: %s).", stage_name, count,
+                (str(heal_exc).splitlines() or [""])[0],
+            )
+            raise exc from None
+        logger.info("%s: Quote-Heilung angewendet: %d Stellen.", stage_name, count)
+        return result
+    return parse(raw)
 
 
 def run_json_stage(
@@ -174,6 +386,12 @@ def run_json_stage(
     Schema und Stufen-Invarianten (IDs, Bijektion, Leitplanken …). Bricht der
     Vertrag, geht **ein** Reparaturversuch mit der konkreten Fehlermeldung raus.
     Danach: ``StageError``.
+
+    Reihenfolge je Antwort: API-/Leer-Fehler → Trunkierung → Extraktion (bei
+    Syntaxfehler: stille Quote-Heilung, v0.15.2) → Schema → Reparatur-Retry. Ein
+    Syntaxfehler geht mit präziser Diagnose (Fehlerart, Position, Kontext-Zitat)
+    in den Reparatur-Prompt — der generische Fehler ohne Position wurde vom
+    Modell nachweislich wortgleich wiederholt (Realtest 2026-10-24).
 
     Transport-/API-Fehler (inkl. Leer-Inhalt) lösen KEINEN Reparatur-Retry aus —
     ein Reparaturprompt, der eine leere Antwort zitiert, wäre sinnlos. Sie
@@ -237,8 +455,9 @@ def run_json_stage(
             )
 
         try:
-            raw = extract(response.content)
-            result = parse(raw)
+            result = _extract_and_parse(
+                response.content, extract, parse, stage_name,
+            )
         except (ValueError, KeyError, TypeError) as exc:
             last_error = str(exc)
             if attempt >= MAX_REPAIR_ATTEMPTS:
