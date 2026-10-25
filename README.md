@@ -16,7 +16,14 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuell (v0.15.2) — Präzise JSON-Diagnose + Quote-Heilung in den Plus-Stufen
+### Aktuell (v0.15.3) — Doppel-Diagnose im Reparatur-Retry + S2-Rollen-Klarstellung
+
+Bündel-Probe 5 (2026-10-24 abends, GLM 5.3 Flash) zeigte in S2 **zwei Defekte gleichzeitig**: ein unescaptes Anführungszeichen („serial fabulist") **und** zweimal die erfundene Rolle `source_attribution_placeholder`. Die v0.15.2-Mechanik arbeitete wie gebaut – Heilung, Schema-Prüfung, Verwerfung –, gab dem Modell im Reparatur-Prompt aber nur die JSON-Diagnose mit. Der Retry escapte das Anführungszeichen korrekt (die präzise Meldung wirkt), steigerte die erfundene Rolle aber von 2 auf 5 Vorkommen: Sie war ihm nie als Fehler genannt worden.
+
+- **Doppel-Diagnose** – Macht die Quote-Heilung das JSON parsebar, scheitert danach aber die Schema-Prüfung, nennt die Reparatur-Meldung jetzt **beide** Probleme: zuerst den Vertragsbruch (im bewährten Wortlaut direkter Schema-Fehler), dann die JSON-Diagnose mit Position und Zitat, damit der Syntaxfehler beim Neuschreiben nicht wiederkehrt. Erfundene Werte werden bewusst **nicht** im Code korrigiert – das wäre Bedeutungsänderung; die Heilung ergänzt weiterhin nur Escapes. Alle übrigen Pfade unverändert
+- **S2-Rollen-Klarstellung** – Der Mapper-Vertrag stellt explizit klar, dass der `claim_type` einer Prüfeinheit (z. B. `source_attribution`) keine `argument_role` ist – auch nicht abgewandelt oder mit Zusätzen. Gegen GLMs wiederkehrende Verwechslung (morgens `source_attribution`, abends mit Suffix)
+
+### Seit v0.15.2 — Präzise JSON-Diagnose + Quote-Heilung in den Plus-Stufen
 
 Ein Realtest (2026-10-24, Quellenbündel-Probe über den Transkript-Tab, GLM 5.3 Flash) scheiterte in S2 zweimal mit „kein parsebares JSON-Array". Wahre Ursache: ein **unescaptes ASCII-`"`** in einem Begründungstext – das Modell schrieb `„Message received."` (öffnend typografisch, schließend ASCII), der JSON-String brach dort. Die Antwort war sonst vollständig und strukturkonform. Der generische Fehler ohne Positionsangabe wurde im Reparatur-Retry **wortgleich wiederholt** – zumal die Fehlerstelle (Zeichen 4995) hinter dem 4000-Zeichen-Auszug lag, den der Reparatur-Prompt zitiert. Ein Enum-Vertragsbruch im selben Lauf wurde dagegen dank spezifischer Meldung sofort behoben: Die Qualität der Reparatur-Meldung entscheidet über den Reparatur-Erfolg.
 

@@ -14,6 +14,7 @@ from .aggregate import (
 )
 from .llm_stage import (
     MAX_REPAIR_ATTEMPTS, JSONSyntaxError, PromptClient, StageError,
+    build_healed_contract_error,
     describe_json_error, extract_json_array, extract_json_object,
     heal_unescaped_quotes, run_json_stage, strip_code_fences,
 )
@@ -104,6 +105,7 @@ __all__ = [
     "JSONSyntaxError",
     "describe_json_error",
     "heal_unescaped_quotes",
+    "build_healed_contract_error",
     "MAX_REPAIR_ATTEMPTS",
     # Prompt-Verträge
     "build_refiner_prompt",

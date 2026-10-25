@@ -337,8 +337,10 @@ def _extract_and_parse(
     Scheitert ``extract`` an einem Syntaxfehler, wird EINMAL
     :func:`heal_unescaped_quotes` auf den Kandidaten angewendet. Das Ergebnis
     gilt nur, wenn es danach parsebar ist UND ``parse`` (Schema + Invarianten)
-    besteht — sonst wird der URSPRÜNGLICHE Syntaxfehler samt Diagnose
-    weitergeworfen (→ Reparatur-Retry). Bei Erfolg spart das einen LLM-Call.
+    besteht. Bei Erfolg spart das einen LLM-Call. Sonst → Reparatur-Retry mit:
+    weiterhin unparsebar → dem URSPRÜNGLICHEN Syntaxfehler samt Diagnose;
+    parsebar, aber Vertragsbruch → beiden Diagnosen, Vertragsbruch zuerst
+    (:func:`build_healed_contract_error`, v0.15.3).
 
     Args:
         content: Roh-Antwort des Modells.
@@ -366,10 +368,45 @@ def _extract_and_parse(
                 "ungültig: %s).", stage_name, count,
                 (str(heal_exc).splitlines() or [""])[0],
             )
-            raise exc from None
+            if isinstance(heal_exc, JSONSyntaxError):
+                raise exc from None  # weiterhin unparsebar → Diagnose wie v0.15.2
+            # Parsebar, aber Vertragsbruch: BEIDE Probleme benennen (v0.15.3).
+            # Realtest 2026-10-24 abends: nur die JSON-Diagnose ging raus, der
+            # Retry escapte den Quote korrekt, steigerte die erfundene Rolle aber
+            # von 2 auf 5 Vorkommen — er bekam sie nie als Fehler genannt.
+            raise ValueError(
+                build_healed_contract_error(str(heal_exc), str(exc))
+            ) from None
         logger.info("%s: Quote-Heilung angewendet: %d Stellen.", stage_name, count)
         return result
     return parse(raw)
+
+
+def build_healed_contract_error(contract_error: str, json_diagnosis: str) -> str:
+    """Kombinierte Meldung, wenn die Quote-Heilung einen Vertragsbruch aufdeckt.
+
+    Primär der Schema-/Vertragsfehler im selben Wortlaut wie bei direkten
+    Schema-Fehlern (der wirkt nachweislich), sekundär die JSON-Diagnose — das
+    Modell schreibt die Antwort neu und machte den Syntaxfehler sonst erneut.
+    Erfundene Werte werden bewusst NICHT im Code korrigiert (Bedeutungsänderung);
+    die Heilung ergänzt nur Escapes.
+
+    Args:
+        contract_error: Die Meldung der Stufen-Validierung nach der Heilung.
+        json_diagnosis: Die Meldung des ursprünglichen :class:`JSONSyntaxError`.
+
+    Returns:
+        Die zweiteilige Fehlermeldung (Schema-Teil zuerst).
+    """
+    return (
+        "Nach automatischer Korrektur der Anführungszeichen bleibt dieser "
+        f"Vertragsbruch:\n{contract_error}\n"
+        "\n"
+        "ZUSÄTZLICH enthielt deine Antwort einen JSON-Syntaxfehler. Er wurde nur "
+        "für diese Prüfung automatisch korrigiert — escape beim Neuschreiben "
+        "selbst korrekt:\n"
+        f"{json_diagnosis}"
+    )
 
 
 def run_json_stage(
