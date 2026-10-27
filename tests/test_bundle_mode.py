@@ -251,6 +251,21 @@ def test_first_video_of_session_keeps_inputs(win, monkeypatch) -> None:
     assert win.transcript_widget.framing_edit.toPlainText() == FRAMING
 
 
+def test_reset_to_original_transcript_keeps_inputs(win) -> None:
+    """„Zurücksetzen" stellt dieselbe Quelle wieder her — kein Wechsel, kein Reset."""
+    tw = win.transcript_widget
+    tw.set_auto_transcript(BUNDLE, title="Musk/Starlink", author="Kurator")
+    _fill_inputs(win)
+    tw.transcript_edit.insertPlainText("\nNachtrag.")
+    tw.reset_transcript()
+    assert tw.transcript_edit.toPlainText() == BUNDLE
+    assert win.questions_text.toPlainText() == "Eine Frage?"
+    assert tw.framing_edit.toPlainText() == FRAMING
+    # Danach greift die Ersetzungs-Erkennung wieder normal.
+    tw.transcript_edit.setPlainText("Ein ganz anderes Bündel.")
+    assert _inputs_cleared(win)
+
+
 def test_preset_change_keeps_inputs(win) -> None:
     """Regression: bloßer Preset-Wechsel lässt Fragen + Rahmung stehen."""
     win.transcript_widget.transcript_edit.setPlainText(BUNDLE)
@@ -348,6 +363,19 @@ def test_comparison_with_transcript_inherits_bundle_mode(monkeypatch) -> None:
     assert captured["transcript"] == BUNDLE
 
 
+def test_comparison_config_roundtrip_keeps_bundle_fields() -> None:
+    """to_dict/from_dict verliert Flagge + Rahmung nicht (künftige Persistenz)."""
+    choice = ModelChoice(provider_id="openrouter", model_id="m")
+    cfg = ComparisonConfig(input_mode="transcript", transcript_text=BUNDLE,
+                           is_bundle=True, framing=FRAMING, model_a=choice)
+    restored = ComparisonConfig.from_dict(cfg.to_dict())
+    assert restored.is_bundle is True and restored.framing == FRAMING
+    legacy = cfg.to_dict()
+    del legacy["is_bundle"], legacy["framing"]
+    old = ComparisonConfig.from_dict(legacy)
+    assert old.is_bundle is False and old.framing == ""
+
+
 def test_comparison_config_from_gui_carries_bundle_fields(win) -> None:
     """main_window baut die Vergleichs-Config mit Flagge + Rahmung."""
     tw = win.transcript_widget
@@ -376,4 +404,10 @@ def win(app, monkeypatch):
     monkeypatch.setattr(mw, "save_preferences", lambda p: prefs.update(p))
     for name in ("warning", "information", "critical"):
         monkeypatch.setattr(QMessageBox, name, lambda *a, **k: None)
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: QMessageBox.StandardButton.No)
+    # Startpfade ohne Dateisystem-/Netzzugriff
+    monkeypatch.setattr(mw.MainWindow, "_check_batch_recovery", lambda self: None)
+    monkeypatch.setattr(mw.MainWindow, "_load_dynamic_models",
+                        lambda self, provider_id: None)
     return mw.MainWindow()

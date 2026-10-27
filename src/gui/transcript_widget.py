@@ -40,6 +40,8 @@ class TranscriptInputWidget(QWidget):
         self._original_transcript = ""
         # Stand vor der laufenden Änderung — für die Ersetzungs-Erkennung.
         self._prev_text = ""
+        # Wiederherstellen des Originals ist dieselbe Quelle — kein Wechsel (B4).
+        self._suppress_replaced = False
         self._setup_ui()
         self._connect_signals()
 
@@ -141,7 +143,8 @@ class TranscriptInputWidget(QWidget):
         also noch der alte Stand. Entfernt EIN Schritt mindestens den gesamten
         alten Inhalt, ist das ein Ersetzen bzw. Leeren — kein Tippen/Kürzen.
         """
-        if self._prev_text.strip() and removed >= len(self._prev_text):
+        if (not self._suppress_replaced and self._prev_text.strip()
+                and removed >= len(self._prev_text)):
             self.transcript_replaced.emit()
 
     @pyqtSlot(bool)
@@ -260,6 +263,14 @@ class TranscriptInputWidget(QWidget):
 
     @pyqtSlot()
     def reset_transcript(self) -> None:
-        """Stellt das Original-Transkript wieder her."""
+        """Stellt das Original-Transkript wieder her.
+
+        Dieselbe Quelle, kein Quellenwechsel → ``transcript_replaced`` bleibt
+        stumm, Fragen und Rahmung bleiben stehen (B4).
+        """
         if self._original_transcript:
-            self.transcript_edit.setPlainText(self._original_transcript)
+            self._suppress_replaced = True
+            try:
+                self.transcript_edit.setPlainText(self._original_transcript)
+            finally:
+                self._suppress_replaced = False
