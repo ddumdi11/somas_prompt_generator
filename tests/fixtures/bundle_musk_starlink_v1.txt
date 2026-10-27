@@ -1,0 +1,51 @@
+QUELLENLEGENDE
+Bündelhinweise: Ursprungsgruppe · Lager: Q1 links, Q2 rechts · Gegenprobe: vorhanden · Ursprung: D1 (Politico, 20.10.2026)
+Q1 · Secular Talk (Kyle Kulinski), „Elon PANICS & Realizes He's Going To Prison" (15:19 Min., Datum unbekannt): Monolog eines linken Kommentators; liest den Politico-Artikel mit Zitaten vor; trägt eine lange Liste von DOGE-Folgen ohne Quellenangaben vor; sehr aggressiver Ton. Der Beleg im Titel („Realizes He's Going To Prison") ist ein Musk-Zitat aus dem Wahlkampf 2024.
+Q2 · Angela Rose, „Democrats Reveal EVIL Plan if they Win the Midterms" (19:58 Min., Datum unbekannt): Monolog einer konservativen Kommentatorin; zeigt Schlagzeilen und X-Beiträge, vor allem von Musk; keine eigenen Belege; sehr musknah im Ton.
+
+URSPRUNGSDOKUMENTE
+D1 · Politico, „Elon Musk is in Democrats' oversight crosshairs" (20.10.2026), https://www.politico.com/news/2026/10/20/elon-musk-democrats-oversight-01127543
+
+1. DAS EREIGNIS
+Politico berichtete vor den US-Midterms im November 2026, dass Demokraten im Fall einer Mehrheit im Repräsentantenhaus Untersuchungen gegen Elon Musk planen. Genannt werden Musks Rolle beim Department of Government Efficiency (DOGE), Bundesverträge seiner Unternehmen und eine mögliche Rolle Musks bei der Drosselung von Starlink-Internetzugängen des ukrainischen Militärs. Beide Quellen sind englischsprachig; die Wiedergabe hier ist deutsch.
+
+3. SACHBEHAUPTUNGEN, DIE BEIDE QUELLEN ENTHALTEN (gemeinsamer Ursprung, siehe Hinweis)
+3.1 Politico berichtete vor den Midterms im November 2026 (laut Q1: Wahl „next month“), dass Demokraten bei einem Mehrheitswechsel im Repräsentantenhaus Untersuchungen gegen Elon Musk planen. [Q1 liest den Artikel vor; Q2 zeigt die Schlagzeile „Dem gavels are coming for Elon Musk"]
+3.2 Zu den geplanten Untersuchungen gegen Musk gehört seine Rolle bei DOGE. [Q1 laut Politico und Sara Guerrero; Q2 laut einer eingespielten, nicht namentlich genannten Kommentatorin]
+3.3 Die Starlink-Verbindung des ukrainischen Militärs war gedrosselt oder gestört; laut Q1 geschah das „the other day“, also kurz vor Erscheinen von Q1 (dessen Datum unbekannt ist). [Q1, Q2]
+3.4 Musk erklärte zur Starlink-Drosselung in der Ukraine, die Entscheidung liege nicht bei ihm, sondern beim US-Militär bzw. beim Präsidenten. [Q1 sinngemäß; Q2 laut Musks Beitrag: Starlink-Systeme seien „owned and controlled by the US government", Grenzen bei Geschwindigkeit oder Nutzung entschieden das US-Militär und letztlich der Präsident]
+3.5 Elon Musk ist bzw. war zeitweise der erste Billionär (Trillionaire) der Welt. [Q1 „for a little bit"; Q2]
+
+4. STRITTIGE PUNKTE
+4.1 Wer entschied über die Starlink-Drosselung in der Ukraine?
+- Q1: Mehrere Berichte hätten ergeben, dass Musk selbst entschieden habe; die Abgeordnete Pramila Jayapal sagte laut Politico: „What happens when one guy gets a giant contract from the government and then uses it to do something that shuts down communication in a war …"
+- Q2: Das Wall Street Journal berichtete, Musk habe die Drosselung angeordnet. Musk widersprach: Militär und Präsident entschieden. Q2 hält den WSJ-Bericht für unbelegt.
+4.2 Was hat DOGE unter Musk bewirkt?
+- Q1: Kürzungen und Entlassungen mit schweren Folgen (siehe 5.5 bis 5.8), ohne Quellenangaben.
+- Q2: DOGE habe „billions of dollars" eingespart, ebenfalls ohne Zahl und Quelle.
+
+5. SACHBEHAUPTUNGEN, DIE NUR EINE QUELLE ENTHÄLT
+Nur Q1:
+5.1 Pramila Jayapal (Demokratin, Mitglied im Auswärtigen Ausschuss) sagte Politico zu Musk und Starlink: „There's a lot of different parts of the corruption around Musk." [Q1]
+5.2 Sara Guerrero, Sprecherin des Demokraten Robert Garcia (ranghöchster Demokrat im Oversight Committee), sagte Politico, man habe viele Fragen zu Musks Rolle bei DOGE und plane Untersuchungen. [Q1]
+5.3 Musks Sprecher reagierten auf mehrere Anfragen von Politico zu den Untersuchungsplänen nicht. [Q1]
+5.4 Ein Bericht von 2024 besagt, dass Musk seit Ende 2022 in regelmäßigem Kontakt mit Wladimir Putin steht. [Q1]
+5.5 Unter DOGE wurden u. a. Forschung zu Kinderkrebs, ein Programm gegen den Neuwelt-Schraubenwurm, Teile des National Weather Service, Meals on Wheels, das Consumer Financial Protection Bureau, FEMA, Teile des Bildungsministeriums, Lebensmittelinspektoren und USAID gekürzt oder abgebaut. [Q1, ohne Quellen]
+5.6 Unter DOGE wurden 83.000 Veteranen und insgesamt 250.000 Bundesbedienstete entlassen. [Q1, ohne Quellen]
+5.7 Unter DOGE wurden 50 Prozent der Sozialversicherungsbüros geschlossen; Zahlungen der Sozialversicherung fielen erstmals aus. [Q1, ohne Quellen]
+5.8 Die Kürzung von USAID unter DOGE hat bereits zu Hunderttausenden Toten geführt. [Q1, ohne Quelle]
+5.9 Musk sagte in einem Podcast, den Q1 als aktuell darstellt (Datum unbekannt), er hätte bei DOGE stärker im Hintergrund bleiben und es nur ein bis zwei Monate machen sollen. [Q1, eingespielt]
+5.10 Musk sagte im Wahlkampf 2024 in einem Interview, wenn Trump verliere, sei er „f…", und fragte scherzhaft nach der Länge seiner Haftstrafe. [Q1, eingespielt; Material von 2024]
+Nur Q2:
+5.11 Eine Kommentatorin sagte im Zusammenhang mit den Untersuchungsplänen (Datum unbekannt), Musk habe „like a half a dozen investigations" gegen seine Unternehmen gestoppt; unter Kamala Harris säße er womöglich im Gefängnis. [Q2, eingespielt, Person nicht genannt]
+5.12 Musk antwortete auf diese Aussage mit „Message received." [Q2]
+5.13 Musk antwortete auf die Politico-Schlagzeile: „Live by the sword, die by the sword. Those who pick fights with me should understand that I will find out who is really pulling the strings and come for them …" [Q2]
+5.14 Michael Bloomberg gibt im Wahlkampf 2026 80 Millionen Dollar zur Unterstützung der Demokraten. [Q2]
+5.15 Senator Bernie Sanders sagte im Wahlkampf 2026: Wenn Musk wolle, dass die Republikaner Senat und Repräsentantenhaus kontrollieren, sei das ein guter Grund, demokratisch zu wählen. [Q2, eingespielt]
+5.16 Während der Midterms 2026 erscheint ein Dokumentarfilm über Musk; Musk nannte dessen Macher „a fraud". [Q2]
+
+6. DEUTUNGEN UND WERTUNGEN DER QUELLEN (nicht prüfbar, zur Einordnung)
+6.1 Motiv der Untersuchungen: Q1 sieht Aufklärung von Straftaten; DOGE sei eine Anmaßung der Haushaltshoheit des Kongresses gewesen. Q2 sieht politische Vergeltung, weil Musk die Demokraten kritisiere; die Pläne sollten einschüchtern.
+6.2 Musks Rolle: Q1 hält Musk für einen „scammer" und Kriminellen, der ins Gefängnis gehöre. Q2 hält ihn für einen „national hero", DOGE für das beste Regierungsprogramm.
+6.3 Musks Tonfall: Q1 deutet Musks Selbstkritik (5.9) als Angst vor Strafverfolgung. Q2 deutet Musks Antworten (5.12, 5.13) als Stärke.
+6.4 Medien: Q2 hält etablierte Medien für unglaubwürdig und X für die bessere Quelle. Q1 empfiehlt Videos des YouTubers Thunderf00t.

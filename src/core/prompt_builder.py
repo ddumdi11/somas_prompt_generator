@@ -518,11 +518,21 @@ def build_prompt_from_transcript(
     custom_system_prompt: Optional[str] = None,
     custom_module: Optional[str] = None,
     video_published: Optional[date] = None,
+    is_bundle: bool = False,
+    framing: str = "",
 ) -> str:
     """Generiert einen SOMAS-Prompt aus manuellem Transkript.
 
     Verwendet ein eigenes Template (somas_prompt_transcript.txt), das
     den Transkript-Text direkt in den Prompt einbettet.
+
+    Im Quellenbündel-Modus (v0.16.0) wird nur das Basis-Template getauscht
+    (somas_prompt_bundle.txt: Lesehilfe als Instruktion, kein STT-Disclaimer,
+    Quellenkürzel-Vorrangregel, optionaler Rahmung-Block). Presets, Overrides,
+    Zeitanker und FAKTENCHECK-Injektion liegen unverändert darüber. Das Bündel
+    gewinnt auch gegen Presets mit eigenem Transkript-Template (Musik,
+    Songstruktur) — „Bündel" ist eine Eigenschaft der Eingabe (PO, 2026-10-27).
+    Der Bündeltext wird nicht normalisiert (Zeilenumbrüche/Nummern bleiben).
 
     Args:
         title: Titel der Quelle.
@@ -541,6 +551,10 @@ def build_prompt_from_transcript(
         video_published: Optionales Veröffentlichungsdatum des Videos (v0.15.0,
             Zeitanker). ``None`` (z.B. manueller Transkript-Tab) → keine
             Veröffentlichungszeile im Anker, exakt bisheriger Text.
+        is_bundle: Quellenbündel-Modus (v0.16.0). ``False`` → exakt bisheriger
+            Prompt (Regression gegen den v0.15.3-Snapshot).
+        framing: Rahmung/Leitfrage des Kurators (nur im Bündel-Modus). Leer →
+            kein Rahmung-Block.
 
     Returns:
         Fertig gerenderte Prompt-Zeichenkette.
@@ -560,9 +574,12 @@ def build_prompt_from_transcript(
         if preset and preset.sentences_per_section > 0:
             sentences_per_section = preset.sentences_per_section
 
+    # Bündel-Modus tauscht das Basis-Template (Vorrang vor transcript_aware).
     # Preset mit eigenem Transkript-Template (z.B. Musik) nutzt sein Template,
     # andere Presets nutzen das generische Transkript-Template
-    if preset and preset.transcript_aware:
+    if is_bundle:
+        template = env.get_template("somas_prompt_bundle.txt")
+    elif preset and preset.transcript_aware:
         template = env.get_template(preset.template_file)
     else:
         template = env.get_template("somas_prompt_transcript.txt")
@@ -593,6 +610,8 @@ def build_prompt_from_transcript(
         questions=questions.strip() if questions else "",
         perspective_text=perspective_text,
         anti_monotony_hint=effective_hint,
+        # Nur das Bündel-Template kennt die Variable; die anderen ignorieren sie.
+        framing=framing.strip() if (is_bundle and framing) else "",
     )
 
     rendered = _prepend_temporal_anchor(rendered, video_published)

@@ -16,7 +16,18 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuell (v0.15.3) — Doppel-Diagnose im Reparatur-Retry + S2-Rollen-Klarstellung
+### Aktuell (v0.16.0) — Quellenbündel-Modus
+
+Ein Nachbarprojekt analysiert **Quellenbündel**: mehrere Beiträge zum selben Ereignis, verdichtet zu einem Text mit Quellenlegende und nummerierten Sachbehauptungen. Bisher lief das als Behelf über den Transkript-Tab – mit Nebenwirkungen, die sieben Proben belegt haben: Die mitgeschickte Lesehilfe wurde als Deutung des Kompilators analysiert, Quellenkürzel wanderten als „laut Q2“ in die Behauptungen und lösten Attributions-Recherchen aus, eine Rahmung im Fragenfeld leckte in die Interpretationen. v0.16.0 macht aus dem Behelf einen Modus – ohne Eingriff in die Faktencheck-Verträge.
+
+- **Checkbox „Quellenbündel“ im Transkript-Tab** – tauscht das Basis-Template gegen `somas_prompt_bundle.txt`: Die Lesehilfe ist jetzt Prompt-Instruktion (Gegenstand ist das Ereignis, geprüft wird der Inhalt, nicht wer ihn genannt hat; gemeinsamer Ursprung ist Wiedergabe, keine Bestätigung; eine „Bündelhinweise:“-Zeile am Anfang der Quellenlegende gilt als Lesehilfe). Kein STT-Hinweis, keine „Sprecher“-Formulierungen, und die Absatzvorgaben gelten nicht für den FAKTENCHECK. Presets bleiben frei kombinierbar (z. B. Academia + Bündel) – auch Musik/Songstruktur liefern dann nur Limit und Perspektive
+- **Quellenkürzel-Regel** – `[Q1]` und Kanalnamen der Bündel-Quellen gehören nicht in Sachbehauptungen; das hat im Bündel Vorrang vor dem allgemeinen Attributions-Hinweis. Aussagen von Akteuren im Ereignis und Zuschreibungen an Ursprungsdokumente bleiben Attributionsaussagen
+- **Feld „Rahmung / Leitfrage“** – erscheint mit der Checkbox; die Rahmung des Kurators geht als gekennzeichneter Block in den Prompt („Deutung, nicht prüfbar, keine Quelle“) und wird nicht als Behauptung oder Interpretation extrahiert
+- **Was ab jetzt ins Textfeld gehört:** Quellenlegende, ggf. Ursprungsdokumente und die Abschnitte 1/3/4/5/6. **Nicht mehr:** die Lesehilfe (übernimmt die Vorlage) und die Rahmung (eigenes Feld). Der Text wird nicht normalisiert – Zeilenumbrüche und Nummern bleiben, damit Verweise wie „Abschnitt 4“ tragen
+- **Fragen- und Rahmung-Feld werden bei Quellenwechsel geleert** (für alle Nutzer): beim Laden eines neuen Videos nach einer vorherigen Quelle und beim Ersetzen eines nicht-leeren Transkripts in einem Schritt. Erst-Einfügen in ein leeres Feld, Tippen, Kürzen und Preset-Wechsel lassen die Felder stehen – eine vorab geschriebene Rahmung geht nicht verloren
+- **Unverändert** – ohne Checkbox ist der Transkript-Prompt byte-identisch zu v0.15.3 (Snapshot-Test über alle Presets). FAKTENCHECK-Erzwingung, Verifikation (Classic + Plus), Zeitanker und KI-Kennzeichnung laufen wie bisher; der Modellvergleich mit Transkript-Eingabe erbt den Modus
+
+### Seit v0.15.3 — Doppel-Diagnose im Reparatur-Retry + S2-Rollen-Klarstellung
 
 Bündel-Probe 5 (2026-10-24 abends, GLM 5.3 Flash) zeigte in S2 **zwei Defekte gleichzeitig**: ein unescaptes Anführungszeichen („serial fabulist") **und** zweimal die erfundene Rolle `source_attribution_placeholder`. Die v0.15.2-Mechanik arbeitete wie gebaut – Heilung, Schema-Prüfung, Verwerfung –, gab dem Modell im Reparatur-Prompt aber nur die JSON-Diagnose mit. Der Retry escapte das Anführungszeichen korrekt (die präzise Meldung wirkt), steigerte die erfundene Rolle aber von 2 auf 5 Vorkommen: Sie war ihm nie als Fehler genannt worden.
 
@@ -291,6 +302,7 @@ somas_prompt_generator/
 ├── templates/
 │   ├── somas_prompt.txt        # Basis-Prompt-Template (Jinja2)
 │   ├── somas_prompt_transcript.txt # Transkript-Template (mit STT-Disclaimer)
+│   ├── somas_prompt_bundle.txt # Quellenbündel-Template (Lesehilfe, Rahmung)
 │   ├── somas_standard.txt      # Standard-Preset
 │   ├── somas_linkedin.txt      # LinkedIn-Preset
 │   ├── somas_minimal.txt       # Minimal-Preset
@@ -393,6 +405,13 @@ Nach einem Pin-Wechsel des Submoduls den Core neu installieren.
 1. Auf **Tab "Transkript"** wechseln
 2. **Titel, Autor** und **Transkript-Text** eingeben
 3. **"Generate Prompt" klicken** → Analyse aus dem Transkript
+
+### Quellenbündel-Modus
+
+1. Im **Tab "Transkript"** die Checkbox **"Quellenbündel"** aktivieren
+2. Ins Textfeld: Quellenlegende (optional beginnend mit einer Zeile „Bündelhinweise: …“), ggf. Ursprungsdokumente und die Abschnitte 1/3/4/5/6 – **ohne** Lesehilfe und Rahmung
+3. Optional **"Rahmung / Leitfrage"** ausfüllen (Klammer · Leitfrage als Frage · Beobachtungsauftrag)
+4. Preset frei wählen (z. B. Academia) und **"Generate Prompt" klicken**
 
 ### Batch-Modus
 

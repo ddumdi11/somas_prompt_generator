@@ -1,0 +1,81 @@
+{% if max_chars and max_chars > 0 %}⚠ ZEICHENLIMIT: Deine GESAMTE Antwort MUSS unter {{ max_chars }} Zeichen bleiben. Zähle mit.
+
+{% endif %}Analysiere das folgende Quellenbündel nach dem SOMAS-Schema (Source Overview Mapping And extraction Schema).
+WICHTIG: "SOMAS" ist nur der Name dieses Analyse-Frameworks. Verwende den Begriff NICHT in deiner Analyse.
+
+LESEHILFE (gilt für den gesamten Text unter QUELLENBÜNDEL):
+- Der Text ist kein Transkript eines einzelnen Beitrags, sondern ein Quellenbündel: mehrere Beiträge (Q1 … Qn) zum selben Ereignis, von einem Kurator verdichtet und gegliedert.
+- Gegenstand der Analyse ist das Ereignis, wie es sich über die Quellen hinweg darstellt — nicht der Bündeltext als Dokument und nicht seine Zusammenstellung durch den Kurator.
+- Prüfgegenstand sind die Sachbehauptungen über das Ereignis (Abschnitte 3, 4 und 5 des Bündels). Maßgeblich ist jeweils ihr Inhalt, nicht die Frage, ob eine Quelle ihn genannt hat.
+- Die Quellenlegende und alle Angaben über die Quellen (Kanal, Titel, Lager, Format, Datum) dienen nur der Einordnung. Sie sind weder Behauptungen noch Prüfkandidaten.
+- Beginnt die Quellenlegende mit einer Zeile „Bündelhinweise:“, ist diese Zeile Lesehilfe des Kurators (etwa: gemeinsamer Ursprung, nur ein Lager, Dokumente nicht verwechseln). Beachte sie beim Lesen, übernimm sie aber weder als Behauptung noch als Interpretation.
+- Stimmen Quellen überein, weil sie auf einen gemeinsamen Ursprung zurückgehen (z. B. dasselbe Ursprungsdokument D1), ist das Wiedergabe, keine unabhängige Bestätigung.
+
+BEZEICHNUNGEN: Sprich vom Ereignis und von den Quellen, nicht von „dem Sprecher“ oder „dem Text“. Die Quellen benennst du in der Analyse über ihre Rolle im Ereignis bzw. ihr Lager laut Legende. Triff keine Annahmen über das Geschlecht, sofern es nicht eindeutig aus der Legende hervorgeht.
+
+QUELLENKÜRZEL UND ZUSCHREIBUNG:
+- Übernimm Quellenkürzel ([Q1], [Q1, Q2] …) und die Kanal- bzw. Autorennamen der Bündel-Quellen aus der Quellenlegende NICHT in Sachbehauptungen — weder als „laut Q2“ noch als „[Kanal] behauptet, dass …“. Formuliere den Inhalt über das Ereignis.
+- Im Quellenbündel hat diese Regel VORRANG vor dem allgemeinen Hinweis, Attributionsaussagen („X behauptet, dass …“) als solche zu formulieren — aber NUR für die bündel-eigenen Quellen (Q1 … Qn und ihre Kanäle bzw. Autoren).
+- Unverändert als Attributionsaussage zu formulieren bleiben: Aussagen von Akteuren IM Ereignis („Person X erklärte, dass …“) und Zuschreibungen an Ursprungsdokumente („Der Artikel ‚…‘ vom … berichtet, dass …“).
+
+KONFIGURATION:
+- Tiefe: {{ depth }} ({{ depth_description }})
+- Abschnitte: FRAMING, KERNTHESE, ELABORATION, IMPLIKATION + 1 passendes Erweiterungsmodul
+- Sprache: {{ language }}
+{% if perspective_text %}
+{{ perspective_text }}
+{% endif %}
+MODUL-AUSWAHL:
+Wähle genau eines der folgenden Module als 5. Abschnitt:
+- KRITIK: Identifiziere Bias, einseitige Darstellung oder sachlich problematische Aussagen in den Quellen.
+- ZITATE: Wähle die 2–3 aussagekräftigsten wörtlichen Zitate aus den Quellen.
+- OFFENE_FRAGEN: Benenne, was ungeklärt bleibt, strittig ist oder in den Quellen ausgelassen wird.
+- VERBINDUNGEN: Ordne das Ereignis in einen größeren historischen oder gesellschaftlichen Kontext ein.
+- SUBTEXT: Dekodiere die impliziten Botschaften. Was wird zwischen den Zeilen gesagt? Welche Annahmen setzen die Quellen als selbstverständlich voraus? Nicht bewerten – nur sichtbar machen. Verzichte auf wertende Adjektive.
+- FAKTENCHECK: Trenne die Aussagen strikt in drei nummerierte Blöcke mit EXAKT diesen Sub-Headern: **Meinungen:** (subjektive Wertungen, nicht prüfbar), **Interpretationen:** (Deutungen/Schlussfolgerungen, nicht direkt prüfbar), **Behauptungen (überprüfbar):** (je eine einzelne, in sich abgeschlossene, falsifizierbare Tatsachenaussage pro Punkt, neutral und kontextfrei formuliert, ohne Meinungswörter). Fälle KEIN Urteil über Wahr/Falsch. Ordne jeden Block nach Relevanz absteigend (wichtigste zuerst); triviale Selbstverständlichkeiten ans Ende. Schreibe jeden nummerierten Punkt auf eine eigene Zeile (keine Inline-Aufzählung).
+{% if anti_monotony_hint %}{{ anti_monotony_hint }}
+{% endif %}
+OUTPUT-FORMAT:
+Erstelle genau 5 Absätze mit jeweils {{ sentences_per_section }} Sätzen. Diese Absatz- und Satzvorgaben gelten NICHT für einen FAKTENCHECK-Abschnitt: Dort gilt ausschließlich das FAKTENCHECK-Format (nummerierte Punkte, so viele wie nötig). Verwende folgende Struktur:
+
+### FRAMING
+[Welches Ereignis, welche Quellen (Anzahl, Lager, Format), welcher Kontext – {{ sentences_per_section }} Sätze]
+
+### KERNTHESE
+[Zentrale Aussage oder Streitfrage des Ereignisses über die Quellen hinweg – {{ sentences_per_section }} Sätze]
+
+### ELABORATION
+[Vertiefung, Mechanismen, Belege, Übereinstimmungen und Widersprüche zwischen den Quellen – {{ sentences_per_section }} Sätze]
+
+### IMPLIKATION
+[Fazit, Bedeutung, offene Punkte des Ereignisses – {{ sentences_per_section }} Sätze]
+
+### [GEWÄHLTES MODUL]
+[Inhalt des gewählten Erweiterungsmoduls – {{ sentences_per_section }} Sätze]
+
+BÜNDEL:
+Titel: "{{ title }}" (zusammengestellt von {{ author }})
+{% if url %}URL: {{ url }}
+{% endif %}
+
+{% if framing %}
+RAHMUNG DURCH DEN KURATOR (Deutung — nicht prüfbar, keine Quelle):
+Die folgende Rahmung ist die Deutung des Kurators, nicht prüfbar und keine Quelle. Extrahiere sie NICHT als Behauptung, Meinung oder Interpretation. Sie dient ausschließlich der Fokussierung der Analyse.
+"""
+{{ framing }}
+"""
+
+{% endif %}
+QUELLENBÜNDEL:
+"""
+{{ transcript }}
+"""
+{% if questions %}
+---
+WICHTIG: Analysiere ZUERST das Quellenbündel vollständig. Anschlussfragen werden NACH der Analyse bearbeitet:
+{{ questions }}
+{% endif %}
+{% if max_chars and max_chars > 0 %}
+
+⚠ ERINNERUNG: Maximale Ausgabelänge = {{ max_chars }} Zeichen. Kürze dich lieber als zu überschreiten.
+{% endif %}
