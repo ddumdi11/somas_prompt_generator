@@ -317,7 +317,7 @@ def test_lesehilfe_points_to_buendelhinweise_line() -> None:
     assert "Beginnt die Quellenlegende mit einer Zeile „Bündelhinweise:“" in lesehilfe
     assert "Lesehilfe des Kurators" in lesehilfe
     assert "weder als Behauptung noch als Interpretation" in lesehilfe
-    assert "Bündelhinweise: Beide Quellen" in prompt  # Fixture-Zeile kommt an
+    assert "Bündelhinweise: Ursprungsgruppe · Lager:" in prompt  # Fixture-Zeile kommt an
 
 
 # --- Spec §4: Modellvergleich erbt den Modus -----------------------------------
