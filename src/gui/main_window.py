@@ -851,6 +851,10 @@ class MainWindow(QMainWindow):
         # Input-Tabs (YouTube / Transkript)
         self.input_tabs.currentChanged.connect(self._on_input_tab_changed)
         self.transcript_widget.data_changed.connect(self._update_generate_enabled)
+        # B4 (v0.16.0): Ersetzen eines nicht-leeren Transkripts = Quellenwechsel
+        self.transcript_widget.transcript_replaced.connect(
+            self._reset_source_bound_inputs
+        )
         self.transcript_widget.data_changed.connect(
             lambda: self._update_transcript_tab_indicator(
                 self.transcript_widget.has_valid_data()
@@ -1094,9 +1098,15 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Fehler", "Bitte eine YouTube-URL eingeben.")
             return
 
+        # B4: Nur ein echter Quellenwechsel leert Fragen/Rahmung — wer vor dem
+        # ersten Video der Sitzung schon eine Frage tippt, behält sie (PO).
+        had_source = self.video_info is not None
+
         try:
             self.video_info = resolve_video_info(url)
             self.video_info_source = "youtube"
+            if had_source:
+                self._reset_source_bound_inputs()
             self._display_meta()
             self._clear_stale_sources()
             self.btn_generate.setEnabled(True)
@@ -1409,6 +1419,8 @@ class MainWindow(QMainWindow):
             anti_monotony_hint=anti_monotony_hint,
             custom_system_prompt=self._custom_system_prompt,
             custom_module=effective_module,
+            is_bundle=self.transcript_widget.is_bundle(),  # v0.16.0
+            framing=self.transcript_widget.get_framing(),
         )
         self.prompt_text.setText(prompt)
 
@@ -2454,6 +2466,8 @@ class MainWindow(QMainWindow):
                 transcript_author=data["author"],
                 transcript_text=data["transcript"],
                 is_auto_transcript=self.transcript_widget.is_auto_source(),
+                is_bundle=self.transcript_widget.is_bundle(),  # v0.16.0
+                framing=self.transcript_widget.get_framing(),
                 preset_name=preset_name,
                 perspective=perspective,
                 depth=self.config.depth,
@@ -3357,6 +3371,18 @@ class MainWindow(QMainWindow):
             return
         dialog = ChannelRatingDialog(channel_name, self._rating_store, self)
         dialog.exec()
+
+    @pyqtSlot()
+    def _reset_source_bound_inputs(self) -> None:
+        """Leert Fragen- und Rahmung-Feld bei Quellenwechsel (B4, v0.16.0).
+
+        Fortsetzung der v0.5.0-Stale-State-Linie für ALLE Nutzer: Zurücksetzen
+        statt Warnung (Beleg Probe 7: zweimal unbemerkt gefülltes Fragenfeld).
+        Auslöser: neues Video nach einer vorherigen Quelle und das Ersetzen eines
+        nicht-leeren Transkripts — nicht Preset-Wechsel, nicht Erst-Einfügen.
+        """
+        self.questions_text.clear()
+        self.transcript_widget.clear_framing()
 
     def _clear_stale_sources(self) -> None:
         """Setzt den Quellen-Button und -Puffer zurück (verhindert Stale-State)."""

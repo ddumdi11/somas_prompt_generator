@@ -66,6 +66,8 @@ class ComparisonConfig:
         transcript_author: Autor/Kanal/Sprecher (bei Transkript).
         transcript_text: Der Transkript-Text (bei Transkript).
         is_auto_transcript: True, wenn automatisch transkribiert (STT-Disclaimer).
+        is_bundle: Quellenbündel-Modus (nur Transkript-Eingabe, v0.16.0).
+        framing: Rahmung/Leitfrage des Kurators (nur im Bündel-Modus).
         preset_name: SOMAS-Preset (Anzeigename, z.B. "Standard").
         perspective: Analyse-Perspektive ("neutral" | "critical" | "empathic").
         depth: Tiefenstufe (1-3).
@@ -84,6 +86,9 @@ class ComparisonConfig:
     transcript_author: str = ""
     transcript_text: str = ""
     is_auto_transcript: bool = False
+    # Quellenbündel-Modus (v0.16.0): erbt der Vergleich über denselben Builder
+    is_bundle: bool = False
+    framing: str = ""
 
     # Gemeinsame SOMAS-Parameter (gelten für BEIDE Analysen identisch)
     preset_name: str = "standard"

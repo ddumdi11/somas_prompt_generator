@@ -6,11 +6,21 @@ z.B. eigene Transkriptionen, Podcast-Mitschnitte oder Vorträge.
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
-    QLabel, QLineEdit, QTextEdit, QPushButton, QSizePolicy,
+    QLabel, QLineEdit, QTextEdit, QPushButton, QSizePolicy, QCheckBox,
 )
 from PyQt6.QtCore import pyqtSignal, pyqtSlot
 
 from src.gui.collapsible_section import CollapsibleSection
+
+# Platzhalter nach dem A5-Muster des Bündelformats v1 (Klammer · Leitfrage als
+# Frage · Beobachtungsauftrag).
+FRAMING_PLACEHOLDER = (
+    "Optional. Beispiel:\n"
+    "Klammer: …\n"
+    "Leitfrage für dieses Ereignis (als Frage formulieren): …?\n"
+    "Beobachtungsauftrag: …\n"
+    "Deutung des Kurators – wird nicht als Behauptung geprüft."
+)
 
 
 class TranscriptInputWidget(QWidget):
@@ -18,11 +28,18 @@ class TranscriptInputWidget(QWidget):
 
     # Signal wenn sich Daten ändern
     data_changed = pyqtSignal()
+    # Ein nicht-leeres Transkript wurde in EINEM Schritt komplett ersetzt oder
+    # geleert (Strg+A + Einfügen/Entf, YouTube-Übernahme). Normales Tippen und
+    # Kürzen lösen es nicht aus, Erst-Einfügen in ein leeres Feld auch nicht
+    # (v0.16.0, B4 — Rahmung-zuerst-Workflow bleibt erhalten).
+    transcript_replaced = pyqtSignal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._auto_source = False
         self._original_transcript = ""
+        # Stand vor der laufenden Änderung — für die Ersetzungs-Erkennung.
+        self._prev_text = ""
         self._setup_ui()
         self._connect_signals()
 
@@ -52,6 +69,25 @@ class TranscriptInputWidget(QWidget):
 
         self.info_section.set_content_widget(info_content)
         layout.addWidget(self.info_section)
+
+        # Quellenbündel-Modus (v0.16.0): Lauf-bezogen, bewusst nicht persistiert
+        self.bundle_checkbox = QCheckBox("Quellenbündel")
+        self.bundle_checkbox.setToolTip(
+            "Der Text ist ein Quellenbündel (mehrere Beiträge zum selben Ereignis)\n"
+            "statt des Transkripts eines Beitrags. Ins Textfeld gehören\n"
+            "Quellenlegende, ggf. Ursprungsdokumente und die Abschnitte 1/3/4/5/6 —\n"
+            "die Lesehilfe übernimmt die Vorlage, die Rahmung das Feld darunter."
+        )
+        layout.addWidget(self.bundle_checkbox)
+
+        self.framing_label = QLabel("Rahmung / Leitfrage:")
+        self.framing_edit = QTextEdit()
+        self.framing_edit.setMaximumHeight(90)
+        self.framing_edit.setPlaceholderText(FRAMING_PLACEHOLDER)
+        self.framing_label.setVisible(False)
+        self.framing_edit.setVisible(False)
+        layout.addWidget(self.framing_label)
+        layout.addWidget(self.framing_edit)
 
         # Transkript
         transcript_label = QLabel("Transkript:")
@@ -87,16 +123,39 @@ class TranscriptInputWidget(QWidget):
 
     def _connect_signals(self) -> None:
         """Verbindet interne Signals."""
+        self.transcript_edit.document().contentsChange.connect(
+            self._on_contents_change
+        )
         self.transcript_edit.textChanged.connect(self._on_text_changed)
+        self.bundle_checkbox.toggled.connect(self._on_bundle_toggled)
         self.title_edit.textChanged.connect(self.data_changed.emit)
         self.author_edit.textChanged.connect(self.data_changed.emit)
         self.url_edit.textChanged.connect(self.data_changed.emit)
         self.reset_btn.clicked.connect(self.reset_transcript)
 
+    @pyqtSlot(int, int, int)
+    def _on_contents_change(self, position: int, removed: int, added: int) -> None:
+        """Erkennt das Ersetzen eines nicht-leeren Transkripts (B4, v0.16.0).
+
+        Qt meldet ``contentsChange`` vor ``textChanged``; ``_prev_text`` ist hier
+        also noch der alte Stand. Entfernt EIN Schritt mindestens den gesamten
+        alten Inhalt, ist das ein Ersetzen bzw. Leeren — kein Tippen/Kürzen.
+        """
+        if self._prev_text.strip() and removed >= len(self._prev_text):
+            self.transcript_replaced.emit()
+
+    @pyqtSlot(bool)
+    def _on_bundle_toggled(self, checked: bool) -> None:
+        """Zeigt das Rahmung-Feld nur im Quellenbündel-Modus."""
+        self.framing_label.setVisible(checked)
+        self.framing_edit.setVisible(checked)
+        self.data_changed.emit()
+
     @pyqtSlot()
     def _on_text_changed(self) -> None:
         """Aktualisiert die Statistik-Anzeige bei Textänderung."""
         text = self.transcript_edit.toPlainText()
+        self._prev_text = text
         chars = len(text)
         words = len(text.split()) if text.strip() else 0
         reading_time = max(1, words // 200) if words > 0 else 0
@@ -142,6 +201,20 @@ class TranscriptInputWidget(QWidget):
     def is_auto_source(self) -> bool:
         """Prüft ob das Transkript automatisch von YouTube geladen wurde."""
         return self._auto_source
+
+    def is_bundle(self) -> bool:
+        """Prüft, ob der Quellenbündel-Modus aktiv ist (v0.16.0)."""
+        return self.bundle_checkbox.isChecked()
+
+    def get_framing(self) -> str:
+        """Rahmung/Leitfrage — nur im Bündel-Modus, sonst leer (v0.16.0)."""
+        if not self.is_bundle():
+            return ""
+        return self.framing_edit.toPlainText().strip()
+
+    def clear_framing(self) -> None:
+        """Leert das Rahmung-Feld (Stale-State-Reset bei Quellenwechsel, B4)."""
+        self.framing_edit.clear()
 
     def clear(self) -> None:
         """Setzt alle Felder zurück."""

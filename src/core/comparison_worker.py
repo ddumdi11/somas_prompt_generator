@@ -174,6 +174,8 @@ class ComparisonWorker(QThread):
                     preset_name=cfg.preset_name,
                     is_auto_transcript=cfg.is_auto_transcript,
                     perspective=cfg.perspective,
+                    is_bundle=cfg.is_bundle,  # v0.16.0: erbt den Bündel-Modus
+                    framing=cfg.framing,
                 )
 
             # 2) Analyse A (mit v0.11-Prüfkette + 1× Auto-Retry, s. _run_analysis_step)
