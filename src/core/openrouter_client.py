@@ -31,6 +31,14 @@ OPENROUTER_DEFAULT_MAX_TOKENS = 32768
 
 # v0.16.1: Länge des Rohbody-Auszugs bei HTTP 200 ohne `choices` (Log + error_message).
 RAW_BODY_EXCERPT_CHARS = 500
+# v0.16.1: Obergrenze für Upstream-`code`/`message` in der Fehlerbegründung.
+UPSTREAM_TEXT_MAX_CHARS = 300
+
+
+def _one_line(value: object, limit: int) -> str:
+    """Upstream-Text einzeilig und gekürzt (Datenzitat, nicht vertrauenswürdig)."""
+    text = " ".join(str(value).split())
+    return text if len(text) <= limit else text[:limit - 1].rstrip() + "…"
 
 
 class OpenRouterClient(LLMClient):
@@ -322,13 +330,16 @@ class OpenRouterClient(LLMClient):
         """
         error = data.get("error") if isinstance(data, dict) else None
         if isinstance(error, dict):
-            code = error.get("code", "?")
-            message = error.get("message", "(ohne Meldung)")
+            code = _one_line(error.get("code", "?"), UPSTREAM_TEXT_MAX_CHARS)
+            message = _one_line(
+                error.get("message", "(ohne Meldung)"), UPSTREAM_TEXT_MAX_CHARS)
             reason = f"OpenRouter-Fehlerantwort statt Completion: {code}: {message}"
         elif error:
-            reason = f"OpenRouter-Fehlerantwort statt Completion: {error}"
+            reason = ("OpenRouter-Fehlerantwort statt Completion: "
+                      f"{_one_line(error, UPSTREAM_TEXT_MAX_CHARS)}")
         elif isinstance(data, dict):
-            fields = ", ".join(sorted(data)) or "keine"
+            fields = _one_line(", ".join(sorted(map(str, data))) or "keine",
+                               UPSTREAM_TEXT_MAX_CHARS)
             reason = f"Unerwartete API-Antwort ohne 'choices'; Felder: {fields}"
         else:
             reason = (

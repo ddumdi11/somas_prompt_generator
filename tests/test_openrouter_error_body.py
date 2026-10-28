@@ -73,6 +73,19 @@ def test_error_object_reaches_error_message() -> None:
     assert not is_empty_content_error(response.error_message)
 
 
+def test_multiline_and_overlong_upstream_message_is_cleaned() -> None:
+    """Umbrüche in ``error.message`` → einzeilig; überlange Texte gekürzt."""
+    response = _send({"error": {"message": "Zeile eins\nZeile zwei\r\n\tdrei",
+                                "code": "upstream\nerror"}})
+    assert "\n" not in response.error_message and "\r" not in response.error_message
+    assert ("OpenRouter-Fehlerantwort statt Completion: upstream error: "
+            "Zeile eins Zeile zwei drei") in response.error_message
+
+    response = _send({"error": {"message": "x" * 5000, "code": 502}})
+    reason = response.error_message.split(" [Rohbody-Auszug", 1)[0]
+    assert len(reason) < 400 and reason.endswith("…")
+
+
 def test_error_as_plain_string() -> None:
     """Manche Upstreams liefern ``error`` als String statt Objekt."""
     response = _send({"error": "rate limited"})
