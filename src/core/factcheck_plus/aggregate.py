@@ -13,7 +13,8 @@ from .models import STATUS_BASISFAKT_SKIPPED, STATUS_EXCLUDED_OPINION
 from .models import STATUS_NOT_SELECTED_BUDGET, STATUS_SELECTED
 from .models import STATUS_UNDER_SPECIFIED, ClaimVerdict, RefinedClaim, SelectionResult
 from .verdict import (
-    FAILED_REASON_MAX_CHARS, FAILED_UI_VERDICT, format_reason_line, map_verdict,
+    FAILED_REASON_MAX_CHARS, FAILED_UI_VERDICT, RAW_EXCERPT_MARKER,
+    format_reason_line, map_verdict,
 )
 
 
@@ -22,7 +23,9 @@ def shorten_failed_reason(reason: str) -> str:
 
     Render-Entscheidung, keine Client-/Logger-Änderung: Die volle Meldung (inkl.
     Rohbody-Auszug) bleibt in Log und response.json; der Bericht trägt den
-    ehrlichen Kurzgrund, einzeilig und mit „…“, falls gekürzt.
+    ehrlichen Kurzgrund, einzeilig und mit „…“, falls gekürzt. Ein
+    Rohbody-Auszug (ab :data:`RAW_EXCERPT_MARKER`) fällt immer weg — auch
+    bei kurzen Gründen.
 
     Args:
         reason: Die volle Begründung aus :func:`verifier.failed_verdict`.
@@ -30,7 +33,7 @@ def shorten_failed_reason(reason: str) -> str:
     Returns:
         Höchstens :data:`FAILED_REASON_MAX_CHARS` Zeichen.
     """
-    line = " ".join(reason.split())
+    line = " ".join(reason.split(RAW_EXCERPT_MARKER, 1)[0].split())
     if len(line) <= FAILED_REASON_MAX_CHARS:
         return line
     return line[:FAILED_REASON_MAX_CHARS - 1].rstrip() + "…"

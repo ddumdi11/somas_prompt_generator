@@ -116,6 +116,19 @@ def test_other_malformed_bodies_do_not_crash(payload) -> None:
     assert "Unerwartete API-Antwort ohne 'choices'" in response.error_message
 
 
+@pytest.mark.parametrize("payload", [
+    {"id": "gen-789", "choices": ["x"]},
+    {"id": "gen-789", "choices": [{"message": "kein Objekt"}]},
+])
+def test_non_mapping_choice_is_malformed_not_generic(payload) -> None:
+    """Nicht-Objekt in choices[0]/message → Malformed-Pfad mit Rohbody + Status 200."""
+    response = _send(payload)
+    assert response.status == APIStatus.ERROR
+    assert response.http_status == 200
+    assert not response.error_message.startswith("Unerwarteter Fehler")
+    assert "gen-789" in response.error_message
+
+
 def test_raw_excerpt_is_capped_and_single_line() -> None:
     """Auszug gekürzt und einzeilig — die Meldung landet auch in der Berichts-Begründung."""
     big = {"error": {"message": "x", "code": 500},
@@ -195,11 +208,33 @@ def test_report_shortens_failed_reason_but_keeps_short_cause() -> None:
                          normalized_claim="Behauptung", claim_type="factual")
     row = build_verdict_rows([claim], [failed_verdict("c01", error)])[0]
     line = row["reason_line"]
-    assert len(line) <= FAILED_REASON_MAX_CHARS and line.endswith("…")
-    assert line.startswith("Prüfung fehlgeschlagen: ClaimVerifier[c01]: API-Fehler — "
-                           "OpenRouter-Fehlerantwort statt Completion: 502")
+    # Ohne Rohbody passt der Upstream-Grund hier vollständig in die Zeile.
+    assert len(line) <= FAILED_REASON_MAX_CHARS
+    assert line == ("Prüfung fehlgeschlagen: ClaimVerifier[c01]: API-Fehler — "
+                    "OpenRouter-Fehlerantwort statt Completion: 502: "
+                    "Upstream search provider timed out")
     assert "gen-123" not in line  # Rohbody bleibt draußen …
     assert "gen-123" in error     # … steht aber weiter in der vollen Meldung (Log)
+
+
+def test_report_drops_raw_excerpt_even_for_short_reasons() -> None:
+    """Kurzer Body ohne choices: Grund < 160 Zeichen — Rohbody trotzdem nicht im Bericht."""
+    from src.core.factcheck_plus.aggregate import shorten_failed_reason
+    from src.core.factcheck_plus.verdict import FAILED_REASON_PREFIX
+
+    response = _send({"id": "x"})
+    full = f"{FAILED_REASON_PREFIX}: ClaimVerifier[c01]: API-Fehler — {response.error_message}"
+    line = shorten_failed_reason(full)
+    assert line.endswith("Unerwartete API-Antwort ohne 'choices'; Felder: id")
+    assert "Rohbody" not in line and '{"id"' not in line
+    assert '{"id": "x"}' in full  # volle Meldung (Log) behält den Auszug
+
+
+def test_raw_excerpt_marker_mirror_is_consistent() -> None:
+    """Drift-Schutz: Package-Spiegel == Client-Konstante."""
+    from src.core import api_client
+    from src.core.factcheck_plus import verdict
+    assert verdict.RAW_EXCERPT_MARKER == api_client.RAW_EXCERPT_MARKER
 
 
 def test_short_failed_reason_is_untouched() -> None:

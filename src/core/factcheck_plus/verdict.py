@@ -60,6 +60,10 @@ FAILED_REASON_PREFIX = "Prüfung fehlgeschlagen"
 # diese Länge gekürzt — Log und response.json behalten die volle Diagnose samt
 # Rohbody-Auszug; Provider-Interna gehören nicht nach WordPress/LinkedIn.
 FAILED_REASON_MAX_CHARS = 160
+# Ab hier folgt in einer Client-Fehlermeldung der Rohbody-Auszug — der gehört nie
+# in den Bericht. Bewusst gespiegelt statt importiert (Package bleibt frei vom
+# SOMAS-Client); Drift-Schutz per Konsistenztest gegen `api_client`.
+RAW_EXCERPT_MARKER = " [Rohbody-Auszug (Daten): "
 
 
 class VerdictError(ValueError):

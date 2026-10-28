@@ -10,7 +10,7 @@ from typing import ClassVar, Optional
 
 import requests
 
-from .api_client import APIResponse, APIStatus, LLMClient
+from .api_client import RAW_EXCERPT_MARKER, APIResponse, APIStatus, LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -223,7 +223,14 @@ class OpenRouterClient(LLMClient):
                 data = response.json()
                 try:
                     choice = data["choices"][0]
+                    # v0.16.1: Nicht-Objekte (z. B. `choices: ["x"]`) sind eine
+                    # kaputte Antwort — Rohbody + Status erhalten statt in den
+                    # generischen except zu fallen.
+                    if not isinstance(choice, dict):
+                        raise TypeError("choices[0] ist kein Objekt")
                     message = choice.get("message", {}) or {}
+                    if not isinstance(message, dict):
+                        raise TypeError("choices[0].message ist kein Objekt")
                     finish_reason = choice.get("finish_reason")
                 except (KeyError, IndexError, TypeError) as e:
                     logger.error(f"Unerwartete API-Antwort-Struktur: {e}")
@@ -353,7 +360,7 @@ class OpenRouterClient(LLMClient):
         logger.error(f"{reason} — Rohbody (Auszug, Daten): {excerpt}")
         return APIResponse(
             status=APIStatus.ERROR,
-            error_message=f"{reason} [Rohbody-Auszug (Daten): {excerpt}]",
+            error_message=f"{reason}{RAW_EXCERPT_MARKER}{excerpt}]",
             http_status=200,
         )
 

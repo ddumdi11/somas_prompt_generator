@@ -31,6 +31,12 @@ class APIStatus(Enum):
 # den harten Fehlerdialog. Muss daher wortgleich über alle Clients bleiben.
 EMPTY_CONTENT_ERROR_PREFIX = "Modell lieferte leeren Inhalt"
 
+# v0.16.1: Leitet einen Rohbody-Auszug in `error_message` ein (Diagnose für Log/
+# response.json). Der Plus-Bericht schneidet ab hier ab — gespiegelt in
+# `factcheck_plus.verdict.RAW_EXCERPT_MARKER` (Package bleibt importfrei;
+# Konsistenztest sichert den Gleichlauf).
+RAW_EXCERPT_MARKER = " [Rohbody-Auszug (Daten): "
+
 
 def build_empty_content_error(reason_label: str, reason_value: object) -> str:
     """Baut die einheitliche Leer-Inhalt-Fehlermeldung.
