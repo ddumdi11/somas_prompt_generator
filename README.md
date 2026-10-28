@@ -18,7 +18,7 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ### Aktuell (v0.16.1) — OpenRouter-Fehlerantworten im Klartext
 
-S5-Calls mit `:online`-Websuche hingen sporadisch bis zu ~29 Minuten und lieferten dann HTTP 200 **ohne** `choices` – übrig blieb nur „Unerwartete API-Antwort: 'choices'“, der eigentliche Grund ging verloren. Jetzt nennt die Meldung den Upstream-Fehler (`code: message`) bzw. die vorhandenen Felder der Antwort und trägt einen gekürzten Rohbody-Auszug; das Debug-Log zeigt den echten Status 200 statt eines erfundenen 500. Verhalten sonst unverändert: Die betroffene Prüfeinheit bleibt „Prüfung fehlgeschlagen“, der Rest läuft weiter, kein Retry.
+S5-Calls mit `:online`-Websuche hingen sporadisch bis zu ~29 Minuten und lieferten dann HTTP 200 **ohne** `choices` – übrig blieb nur „Unerwartete API-Antwort: 'choices'“, der eigentliche Grund ging verloren. Jetzt nennt die Meldung den Upstream-Fehler (`code: message`) bzw. die vorhandenen Felder der Antwort und trägt einen gekürzten Rohbody-Auszug; das Debug-Log zeigt den echten Status 200 statt eines erfundenen 500 – ebenso bei echten HTTP-Fehlern (ein 402 steht als 402 im Log). Der Bericht kürzt die Begründung „Prüfung fehlgeschlagen“ auf 160 Zeichen: Er ist ein Veröffentlichungs-Artefakt, Provider-Rohdaten bleiben in Log und `response.json`. Verhalten sonst unverändert: Die betroffene Prüfeinheit bleibt „Prüfung fehlgeschlagen“, der Rest läuft weiter, kein Retry.
 
 ### Seit v0.16.0 — Quellenbündel-Modus
 

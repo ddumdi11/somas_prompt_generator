@@ -12,7 +12,28 @@ from __future__ import annotations
 from .models import STATUS_BASISFAKT_SKIPPED, STATUS_EXCLUDED_OPINION
 from .models import STATUS_NOT_SELECTED_BUDGET, STATUS_SELECTED
 from .models import STATUS_UNDER_SPECIFIED, ClaimVerdict, RefinedClaim, SelectionResult
-from .verdict import FAILED_UI_VERDICT, format_reason_line, map_verdict
+from .verdict import (
+    FAILED_REASON_MAX_CHARS, FAILED_UI_VERDICT, format_reason_line, map_verdict,
+)
+
+
+def shorten_failed_reason(reason: str) -> str:
+    """Kürzt die Begründung eines gescheiterten Calls für den Bericht (v0.16.1).
+
+    Render-Entscheidung, keine Client-/Logger-Änderung: Die volle Meldung (inkl.
+    Rohbody-Auszug) bleibt in Log und response.json; der Bericht trägt den
+    ehrlichen Kurzgrund, einzeilig und mit „…“, falls gekürzt.
+
+    Args:
+        reason: Die volle Begründung aus :func:`verifier.failed_verdict`.
+
+    Returns:
+        Höchstens :data:`FAILED_REASON_MAX_CHARS` Zeichen.
+    """
+    line = " ".join(reason.split())
+    if len(line) <= FAILED_REASON_MAX_CHARS:
+        return line
+    return line[:FAILED_REASON_MAX_CHARS - 1].rstrip() + "…"
 
 
 def build_verdict_rows(
@@ -49,7 +70,7 @@ def build_verdict_rows(
             raise ValueError(f"Kein Claim zu Verdikt '{verdict.claim_id}'")
         if verdict.failed:
             ui_verdict = FAILED_UI_VERDICT
-            reason_line = verdict.reason
+            reason_line = shorten_failed_reason(verdict.reason)
         else:
             ui_verdict, _ground = map_verdict(verdict.verdict)
             reason_line = format_reason_line(

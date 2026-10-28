@@ -153,11 +153,44 @@ def test_debug_log_gets_real_status_and_body_excerpt() -> None:
     assert "gen-123" in logged["error"]
 
 
-# --- 3. Regression: Non-200-Pfad unverändert --------------------------------
+# --- 3. Non-200-Pfad: Meldung unverändert, Status jetzt echt ----------------
 
-def test_non_200_path_unchanged() -> None:
-    """HTTP 402 behält Meldungsform und http_status (None → Worker-Default)."""
+def test_non_200_path_keeps_message_and_logs_real_status() -> None:
+    """HTTP 402: Meldungsform wie bisher, aber http_status=402 statt Default 500."""
     response = _send({"error": {"message": "Insufficient credits", "code": 402}}, 402)
     assert response.status == APIStatus.ERROR
     assert response.error_message.startswith("HTTP 402: ")
-    assert response.http_status is None
+    assert response.http_status == 402
+    dbg = _RecordingDebugLogger()
+    with patch("src.core.openrouter_client.requests.post",
+               return_value=_Resp({"error": "x"}, 402)):
+        fpw._TokenCountingClient(OpenRouterClient("k"), "s", dbg).send_prompt("p", "m")
+    assert dbg.responses[-1]["status_code"] == 402
+
+
+# --- 4. Bericht: Fehler-Begründung gekürzt, Log behält alles ----------------
+
+def test_report_shortens_failed_reason_but_keeps_short_cause() -> None:
+    """Die Berichtszeile trägt den Kurzgrund (≤ 160, „…“), nicht den Rohbody-Dump."""
+    from src.core.factcheck_plus import build_verdict_rows, failed_verdict
+    from src.core.factcheck_plus.models import RefinedClaim
+    from src.core.factcheck_plus.verdict import FAILED_REASON_MAX_CHARS
+
+    response = _send(_UPSTREAM_ERROR)
+    error = f"ClaimVerifier[c01]: API-Fehler — {response.error_message}"
+    claim = RefinedClaim(claim_id="c01", parent_id=None, original_text="x",
+                         normalized_claim="Behauptung", claim_type="factual")
+    row = build_verdict_rows([claim], [failed_verdict("c01", error)])[0]
+    line = row["reason_line"]
+    assert len(line) <= FAILED_REASON_MAX_CHARS and line.endswith("…")
+    assert line.startswith("Prüfung fehlgeschlagen: ClaimVerifier[c01]: API-Fehler — "
+                           "OpenRouter-Fehlerantwort statt Completion: 502")
+    assert "gen-123" not in line  # Rohbody bleibt draußen …
+    assert "gen-123" in error     # … steht aber weiter in der vollen Meldung (Log)
+
+
+def test_short_failed_reason_is_untouched() -> None:
+    """Kurze Gründe (z. B. „HTTP 503“) bleiben unverändert, ohne „…“."""
+    from src.core.factcheck_plus.aggregate import shorten_failed_reason
+    assert shorten_failed_reason("Prüfung fehlgeschlagen: HTTP 503") == \
+        "Prüfung fehlgeschlagen: HTTP 503"

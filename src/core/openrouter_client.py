@@ -279,6 +279,8 @@ class OpenRouterClient(LLMClient):
             return APIResponse(
                 status=APIStatus.ERROR,
                 error_message=f"HTTP {response.status_code}: {response.text[:200]}",
+                # v0.16.1: echter Status ins Debug-Log (z. B. 402) statt Default 500.
+                http_status=response.status_code,
             )
 
         except requests.Timeout:

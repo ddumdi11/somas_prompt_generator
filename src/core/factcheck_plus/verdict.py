@@ -56,6 +56,10 @@ assert {ui for ui, _ in VERDICT_MAP.values()} <= set(UI_VERDICTS), (
 # statt den ganzen Lauf zu kippen oder still zu verschwinden.
 FAILED_UI_VERDICT = "nicht überprüfbar"
 FAILED_REASON_PREFIX = "Prüfung fehlgeschlagen"
+# v0.16.1: Im Bericht (Veröffentlichungs-Artefakt) wird die Fehler-Begründung auf
+# diese Länge gekürzt — Log und response.json behalten die volle Diagnose samt
+# Rohbody-Auszug; Provider-Interna gehören nicht nach WordPress/LinkedIn.
+FAILED_REASON_MAX_CHARS = 160
 
 
 class VerdictError(ValueError):
