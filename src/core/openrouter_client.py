@@ -10,7 +10,7 @@ from typing import ClassVar, Optional
 
 import requests
 
-from .api_client import APIResponse, APIStatus, LLMClient
+from .api_client import RAW_EXCERPT_MARKER, APIResponse, APIStatus, LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,17 @@ logger = logging.getLogger(__name__)
 # Qt↔Package-Naht — andere Schicht, andere Bedeutung. Stage-Calls übergeben
 # `max_tokens` explizit; dieser Default hier greift nur bei `max_tokens is None`.
 OPENROUTER_DEFAULT_MAX_TOKENS = 32768
+
+# v0.16.1: Länge des Rohbody-Auszugs bei HTTP 200 ohne `choices` (Log + error_message).
+RAW_BODY_EXCERPT_CHARS = 500
+# v0.16.1: Obergrenze für Upstream-`code`/`message` in der Fehlerbegründung.
+UPSTREAM_TEXT_MAX_CHARS = 300
+
+
+def _one_line(value: object, limit: int) -> str:
+    """Upstream-Text einzeilig und gekürzt (Datenzitat, nicht vertrauenswürdig)."""
+    text = " ".join(str(value).split())
+    return text if len(text) <= limit else text[:limit - 1].rstrip() + "…"
 
 
 class OpenRouterClient(LLMClient):
@@ -212,14 +223,18 @@ class OpenRouterClient(LLMClient):
                 data = response.json()
                 try:
                     choice = data["choices"][0]
+                    # v0.16.1: Nicht-Objekte (z. B. `choices: ["x"]`) sind eine
+                    # kaputte Antwort — Rohbody + Status erhalten statt in den
+                    # generischen except zu fallen.
+                    if not isinstance(choice, dict):
+                        raise TypeError("choices[0] ist kein Objekt")
                     message = choice.get("message", {}) or {}
+                    if not isinstance(message, dict):
+                        raise TypeError("choices[0].message ist kein Objekt")
                     finish_reason = choice.get("finish_reason")
                 except (KeyError, IndexError, TypeError) as e:
                     logger.error(f"Unerwartete API-Antwort-Struktur: {e}")
-                    return APIResponse(
-                        status=APIStatus.ERROR,
-                        error_message=f"Unerwartete API-Antwort: {e}",
-                    )
+                    return self._build_malformed_response(data, response.text)
 
                 # content kann fehlen oder None sein; manche (Reasoning-)Modelle
                 # liefern den Text stattdessen im Feld 'reasoning'.
@@ -279,6 +294,8 @@ class OpenRouterClient(LLMClient):
             return APIResponse(
                 status=APIStatus.ERROR,
                 error_message=f"HTTP {response.status_code}: {response.text[:200]}",
+                # v0.16.1: echter Status ins Debug-Log (z. B. 402) statt Default 500.
+                http_status=response.status_code,
             )
 
         except requests.Timeout:
@@ -299,6 +316,53 @@ class OpenRouterClient(LLMClient):
                 status=APIStatus.ERROR,
                 error_message=f"Unerwarteter Fehler: {e}",
             )
+
+    @staticmethod
+    def _build_malformed_response(data: object, raw_text: str) -> APIResponse:
+        """Fehler-Response für HTTP 200 ohne verwertbare ``choices`` (v0.16.1).
+
+        Realfall (S5, ``:online``-Websuche): Nach ~29 min Upstream-Hänger kam
+        HTTP 200 mit einem Body ohne ``choices``. Bisher blieb davon nur
+        ``'choices'`` übrig — der Body, der den Grund trug, wurde verworfen.
+        Jetzt: ``error``-Objekt auswerten bzw. die vorhandenen Felder nennen,
+        plus gekürzter Rohbody-Auszug (geht über ``error_message`` ins
+        Debug-Log). ``http_status`` ist der echte Status 200, nicht 500.
+
+        Args:
+            data: Der geparste JSON-Body.
+            raw_text: Der Rohbody für den Auszug.
+
+        Returns:
+            APIResponse mit ``APIStatus.ERROR`` und ``http_status=200``.
+        """
+        error = data.get("error") if isinstance(data, dict) else None
+        if isinstance(error, dict):
+            code = _one_line(error.get("code", "?"), UPSTREAM_TEXT_MAX_CHARS)
+            message = _one_line(
+                error.get("message", "(ohne Meldung)"), UPSTREAM_TEXT_MAX_CHARS)
+            reason = f"OpenRouter-Fehlerantwort statt Completion: {code}: {message}"
+        elif error:
+            reason = ("OpenRouter-Fehlerantwort statt Completion: "
+                      f"{_one_line(error, UPSTREAM_TEXT_MAX_CHARS)}")
+        elif isinstance(data, dict):
+            fields = _one_line(", ".join(sorted(map(str, data))) or "keine",
+                               UPSTREAM_TEXT_MAX_CHARS)
+            reason = f"Unerwartete API-Antwort ohne 'choices'; Felder: {fields}"
+        else:
+            reason = (
+                "Unerwartete API-Antwort ohne 'choices'; "
+                f"Body ist {type(data).__name__}, kein Objekt"
+            )
+
+        # Eine Zeile: Die Meldung landet auch in der Begründung „Prüfung
+        # fehlgeschlagen" des Berichts — Umbrüche würden die Liste zerreißen.
+        excerpt = " ".join(raw_text.split())[:RAW_BODY_EXCERPT_CHARS]
+        logger.error(f"{reason} — Rohbody (Auszug, Daten): {excerpt}")
+        return APIResponse(
+            status=APIStatus.ERROR,
+            error_message=f"{reason}{RAW_EXCERPT_MARKER}{excerpt}]",
+            http_status=200,
+        )
 
     def validate_key(self) -> bool:
         """Prüft ob der API-Key gültig ist.
