@@ -16,7 +16,11 @@ Diese App automatisiert den Workflow zur Erstellung strukturierter Quellenanalys
 
 ## ✨ Features
 
-### Aktuell (v0.16.0) — Quellenbündel-Modus
+### Aktuell (v0.16.1) — OpenRouter-Fehlerantworten im Klartext
+
+S5-Calls mit `:online`-Websuche hingen sporadisch bis zu ~29 Minuten und lieferten dann HTTP 200 **ohne** `choices` – übrig blieb nur „Unerwartete API-Antwort: 'choices'“, der eigentliche Grund ging verloren. Jetzt nennt die Meldung den Upstream-Fehler (`code: message`) bzw. die vorhandenen Felder der Antwort und trägt einen gekürzten Rohbody-Auszug; das Debug-Log zeigt den echten Status 200 statt eines erfundenen 500. Verhalten sonst unverändert: Die betroffene Prüfeinheit bleibt „Prüfung fehlgeschlagen“, der Rest läuft weiter, kein Retry.
+
+### Seit v0.16.0 — Quellenbündel-Modus
 
 Ein Nachbarprojekt analysiert **Quellenbündel**: mehrere Beiträge zum selben Ereignis, verdichtet zu einem Text mit Quellenlegende und nummerierten Sachbehauptungen. Bisher lief das als Behelf über den Transkript-Tab – mit Nebenwirkungen, die sieben Proben belegt haben: Die mitgeschickte Lesehilfe wurde als Deutung des Kompilators analysiert, Quellenkürzel wanderten als „laut Q2“ in die Behauptungen und lösten Attributions-Recherchen aus, eine Rahmung im Fragenfeld leckte in die Interpretationen. v0.16.0 macht aus dem Behelf einen Modus – ohne Eingriff in die Faktencheck-Verträge.
 
